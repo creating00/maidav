@@ -1,0 +1,7 @@
+<footer th:fragment="footer"
+        xmlns:th="http://www.thymeleaf.org"
+        class="bg-white text-center py-3 text-sm text-gray-500">
+
+    © <span th:text="${#dates.format(#dates.createNow(), 'yyyy')}"></span> Maidav
+
+</footer>

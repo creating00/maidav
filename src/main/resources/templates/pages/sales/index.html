@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="layout/main :: layout(~{::content}, 'Ventas')">
+
+<section th:fragment="content">
+
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Ventas</h1>
+
+        <a sec:authorize="hasAuthority('SALES_CREATE')"
+           th:href="@{/sales/new}"
+           class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            + Nueva Venta
+        </a>
+    </div>
+
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
+    <div th:if="${saleNumber}"
+         class="mb-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700">
+        <span th:text="${'Numero de venta: ' + saleNumber}"></span>
+        <span th:if="${accountNumber}" th:text="${' | Numero de cuenta: ' + accountNumber}"></span>
+    </div>
+
+    <div class="bg-white rounded shadow overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-100 text-left">
+            <tr>
+                <th class="px-4 py-3">Numero</th>
+                <th class="px-4 py-3">Fecha</th>
+                <th class="px-4 py-3">Cliente</th>
+                <th class="px-4 py-3">Vendedor</th>
+                <th class="px-4 py-3">Forma</th>
+                <th class="px-4 py-3">Estado</th>
+                <th class="px-4 py-3">Total</th>
+                <th class="px-4 py-3 text-right">Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="sale : ${sales}" class="border-t hover:bg-gray-50">
+                <td class="px-4 py-3" th:text="${sale.saleNumber != null ? sale.saleNumber : sale.id}"></td>
+                <td class="px-4 py-3" th:text="${#temporals.format(sale.saleDate, 'yyyy-MM-dd HH:mm')}"></td>
+                <td class="px-4 py-3"
+                    th:text="${sale.client.nationalId + ' - ' + sale.client.firstName + ' ' + sale.client.lastName}">
+                </td>
+                <td class="px-4 py-3" th:text="${sale.seller.email}"></td>
+                <td class="px-4 py-3"
+                    th:text="${sale.paymentType.name() == 'CREDIT' ? 'Credito' : 'Contado'}"></td>
+                <td class="px-4 py-3"
+                    th:text="${sale.status.name() == 'VOID' ? 'Anulado' : 'Activo'}"
+                    th:classappend="${sale.status.name() == 'VOID'} ? ' text-red-600 font-semibold' : ' text-green-600 font-semibold'"></td>
+                <td class="px-4 py-3" th:text="${sale.totalAmount}"></td>
+                <td class="px-4 py-3 text-right space-x-2">
+                    <a sec:authorize="hasAuthority('ARREARS_READ')"
+                       th:if="${sale.paymentType.name() == 'CREDIT'}"
+                       th:href="@{/accounts/by-sale/{id}(id=${sale.id})}"
+                       class="text-blue-600 hover:underline">
+                        Ver cuenta
+                    </a>
+                    <form sec:authorize="hasAuthority('SALES_DELETE')"
+                          th:action="@{/sales/{id}/void(id=${sale.id})}"
+                          method="post"
+                          class="inline"
+                          onsubmit="return confirm('Anular venta?');">
+                        <button class="text-red-600 hover:underline">Anular</button>
+                    </form>
+                </td>
+            </tr>
+
+            <tr th:if="${#lists.isEmpty(sales)}">
+                <td colspan="8" class="px-4 py-6 text-center text-gray-500">
+                    No hay ventas registradas
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+</section>
+</html>

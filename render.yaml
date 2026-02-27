@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: maidav-app
+    env: docker
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    healthCheckPath: /login
+    envVars:
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: maidav-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: maidav-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: maidav-db
+          property: password
+      - key: APP_UPLOAD_DIR
+        value: /var/data/uploads
+      - key: SPRING_JPA_SHOW_SQL
+        value: "false"
+      - key: SPRING_THYMELEAF_CACHE
+        value: "true"
+    disk:
+      name: maidav-data
+      mountPath: /var/data
+      sizeGB: 1
+
+databases:
+  - name: maidav-db
+    databaseName: sales_db
+    user: sales

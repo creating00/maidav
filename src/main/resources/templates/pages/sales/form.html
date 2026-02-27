@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Nueva venta')">
+
+<section th:fragment="content">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">Nueva Venta</h1>
+        <p class="text-gray-500 text-sm">Seleccione cliente, productos y forma de pago</p>
+    </div>
+
+    <form th:action="@{/sales}" method="post" class="bg-white p-8 rounded-lg shadow">
+
+        <div th:if="${formError}"
+             class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700"
+             th:text="${formError}">
+        </div>
+        <div th:if="${saleNumber}"
+             class="mb-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700">
+            <span th:text="${'Numero de venta: ' + saleNumber}"></span>
+            <span th:if="${accountNumber}" th:text="${' | Numero de cuenta: ' + accountNumber}"></span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <label class="block text-sm font-semibold mb-1">Cliente</label>
+                <input type="text" id="clientSearch" placeholder="Buscar por DNI o nombre"
+                       class="mb-2 w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <select name="clientId" required
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Seleccionar cliente</option>
+                    <option th:each="client : ${clients}"
+                            th:value="${client.id}"
+                            th:data-dni="${client.nationalId}"
+                            th:data-name="${client.firstName + ' ' + client.lastName}"
+                            th:text="${client.nationalId + ' - ' + client.firstName + ' ' + client.lastName}">
+                    </option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Forma de pago</label>
+                <select name="paymentType" id="paymentType" required
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="CASH">Contado</option>
+                    <option value="CREDIT">Credito</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Tipo de venta</label>
+                <select id="priceMode"
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="RETAIL">Minorista</option>
+                    <option value="WHOLESALE">Mayorista</option>
+                </select>
+            </div>
+
+            <div>
+                <div class="flex items-center justify-between">
+                    <label class="block text-sm font-semibold mb-1">Fecha de venta</label>
+                    <span th:if="${saleNumber != null or accountNumber != null or previewSaleNumber != null or previewAccountNumber != null}"
+                          class="text-xs font-semibold px-2 py-1 rounded-full bg-blue-100 text-blue-800">
+                        <span id="saleNumberBadge"
+                              th:attr="data-sale=${saleNumber != null ? saleNumber : previewSaleNumber},data-account=${accountNumber != null ? accountNumber : previewAccountNumber}"
+                              th:text="${accountNumber != null ? accountNumber : (saleNumber != null ? saleNumber : previewSaleNumber)}"></span>
+                    </span>
+                </div>
+                <input type="date" name="saleDate"
+                       th:value="${#temporals.format(T(java.time.LocalDate).now(), 'yyyy-MM-dd')}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <p id="saleNumberHelp" class="mt-2 text-sm font-semibold text-gray-800"></p>
+            </div>
+
+            <div class="credit-field">
+                <label class="block text-sm font-semibold mb-1">Fecha primer vencimiento</label>
+                <input type="date" name="firstDueDate"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div class="credit-field">
+                <label class="block text-sm font-semibold mb-1">Frecuencia de pago</label>
+                <select name="paymentFrequency" id="paymentFrequency"
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Seleccionar frecuencia</option>
+                    <option value="DAILY">Diario</option>
+                    <option value="WEEKLY">Semanal</option>
+                    <option value="BIWEEKLY">Quincenal</option>
+                    <option value="MONTHLY">Mensual</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Descuento (monto)</label>
+                <input type="number" step="0.01" name="discountAmount" value="0"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div class="credit-field">
+                <label class="block text-sm font-semibold mb-1">Cuotas (1-12)</label>
+                <select name="weeksCount"
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option th:each="i : ${#numbers.sequence(1,12)}"
+                            th:value="${i}" th:text="${i}"></option>
+                </select>
+            </div>
+
+            <div class="credit-field md:col-span-3">
+                <label class="block text-sm font-semibold mb-2">Dias de vencimiento</label>
+                <div id="dailyOptions" class="flex flex-wrap gap-3">
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="dailyDays" value="MONDAY" class="rounded"/>
+                        Lunes
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="dailyDays" value="TUESDAY" class="rounded"/>
+                        Martes
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="dailyDays" value="WEDNESDAY" class="rounded"/>
+                        Miercoles
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="dailyDays" value="THURSDAY" class="rounded"/>
+                        Jueves
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="dailyDays" value="FRIDAY" class="rounded"/>
+                        Viernes
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="dailyDays" value="SATURDAY" class="rounded"/>
+                        Sabado
+                    </label>
+                    <label class="inline-flex items-center gap-2">
+                        <input type="checkbox" name="dailyDays" value="SUNDAY" class="rounded"/>
+                        Domingo
+                    </label>
+                </div>
+
+                <div id="weeklyOptions" class="hidden mt-3">
+                    <label class="block text-sm font-semibold mb-1">Dia de la semana</label>
+                    <select name="weeklyDay"
+                            class="w-full md:w-1/3 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">Seleccionar dia</option>
+                        <option value="MONDAY">Lunes</option>
+                        <option value="TUESDAY">Martes</option>
+                        <option value="WEDNESDAY">Miercoles</option>
+                        <option value="THURSDAY">Jueves</option>
+                        <option value="FRIDAY">Viernes</option>
+                        <option value="SATURDAY">Sabado</option>
+                        <option value="SUNDAY">Domingo</option>
+                    </select>
+                </div>
+
+                <div id="biweeklyOptions" class="hidden mt-3">
+                    <label class="block text-sm font-semibold mb-1">Dias del mes</label>
+                    <div class="flex flex-wrap gap-3">
+                        <input type="number" min="1" max="28" name="biMonthlyDay1" placeholder="Dia 1"
+                               class="w-28 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                        <input type="number" min="1" max="28" name="biMonthlyDay2" placeholder="Dia 2"
+                               class="w-28 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                    </div>
+                </div>
+
+                <div id="monthlyOptions" class="hidden mt-3">
+                    <label class="block text-sm font-semibold mb-1">Dia fijo del mes</label>
+                    <input type="number" min="1" max="28" name="monthlyDay" placeholder="Dia"
+                           class="w-28 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-8">
+            <h2 class="text-lg font-semibold mb-3">Productos</h2>
+            <div class="mb-3">
+                <input type="text" id="productSearch" placeholder="Buscar por codigo de barra"
+                       class="w-full md:w-1/2 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+            <table class="min-w-full text-sm" id="itemsTable">
+                <thead class="bg-gray-100 text-left">
+                <tr>
+                    <th class="px-3 py-2">Producto</th>
+                    <th class="px-3 py-2">Cantidad</th>
+                    <th class="px-3 py-2">Precio unitario</th>
+                    <th class="px-3 py-2">Total</th>
+                    <th class="px-3 py-2"></th>
+                </tr>
+                </thead>
+                <tbody id="itemsBody">
+                <tr class="border-t">
+                    <td class="px-3 py-2">
+                        <select name="productIds" class="product-select w-full border rounded px-3 py-2">
+                            <option value="">Seleccionar producto</option>
+                            <option th:each="product : ${products}"
+                                    th:value="${product.id}"
+                                    th:data-retail="${product.priceRetail}"
+                                    th:data-wholesale="${product.priceWholesale}"
+                                    th:data-barcode="${product.barcode}"
+                                    th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
+                            </option>
+                        </select>
+                    </td>
+                    <td class="px-3 py-2">
+                        <input type="number" name="quantities" value="1" min="1"
+                               class="w-full border rounded px-3 py-2"/>
+                    </td>
+                    <td class="px-3 py-2">
+                        <input type="number" step="0.01" name="unitPrices"
+                               class="unit-price w-full border rounded px-3 py-2"/>
+                    </td>
+                    <td class="px-3 py-2">
+                        <span class="line-total">0.00</span>
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                        <button type="button" class="remove-row text-red-600">Quitar</button>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+
+            <div class="mt-3 flex items-center justify-between">
+                <button type="button" id="addRow"
+                        class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">
+                    + Agregar producto
+                </button>
+                <div class="text-sm text-gray-700">
+                    <span class="mr-4">Total productos: <strong id="totalItems">0</strong></span>
+                    <span>Total carrito: <strong id="totalAmount">0.00</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mt-8 pt-6 border-t">
+            <a th:href="@{/sales}" class="text-gray-600 hover:text-gray-900">
+                Volver al listado
+            </a>
+            <div class="flex gap-3">
+                <a th:href="@{/sales}"
+                   class="px-5 py-2 rounded border border-gray-300 hover:bg-gray-100">
+                    Cancelar
+                </a>
+                <button class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
+                    Guardar Venta
+                </button>
+            </div>
+        </div>
+
+    </form>
+
+    <script>
+        (function () {
+            const body = document.getElementById('itemsBody');
+            const addRow = document.getElementById('addRow');
+            const clientSearch = document.getElementById('clientSearch');
+            const productSearch = document.getElementById('productSearch');
+            const clientSelect = document.querySelector('select[name="clientId"]');
+            const priceMode = document.getElementById('priceMode');
+            const paymentType = document.getElementById('paymentType');
+            const paymentFrequency = document.getElementById('paymentFrequency');
+            const creditFields = document.querySelectorAll('.credit-field');
+            const dailyOptions = document.getElementById('dailyOptions');
+            const weeklyOptions = document.getElementById('weeklyOptions');
+            const biweeklyOptions = document.getElementById('biweeklyOptions');
+            const monthlyOptions = document.getElementById('monthlyOptions');
+            const saleNumberBadge = document.getElementById('saleNumberBadge');
+            const saleNumberHelp = document.getElementById('saleNumberHelp');
+
+            function parseNumber(value) {
+                const num = parseFloat(value);
+                return Number.isFinite(num) ? num : 0;
+            }
+
+            function getPriceFromOption(option) {
+                if (!option) {
+                    return '';
+                }
+                const mode = priceMode ? priceMode.value : 'RETAIL';
+                return mode === 'WHOLESALE' ? option.dataset.wholesale : option.dataset.retail;
+            }
+
+            function updateTotals() {
+                let totalItems = 0;
+                let totalAmount = 0;
+                body.querySelectorAll('tr').forEach(row => {
+                    const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
+                    const price = parseNumber(row.querySelector('input[name="unitPrices"]').value);
+                    const lineTotal = qty * price;
+                    row.querySelector('.line-total').textContent = lineTotal.toFixed(2);
+                    totalItems += qty;
+                    totalAmount += lineTotal;
+                });
+                document.getElementById('totalItems').textContent = totalItems.toString();
+                document.getElementById('totalAmount').textContent = totalAmount.toFixed(2);
+            }
+
+            function bindRow(row) {
+                const select = row.querySelector('.product-select');
+                const priceInput = row.querySelector('.unit-price');
+                const removeBtn = row.querySelector('.remove-row');
+                const qtyInput = row.querySelector('input[name="quantities"]');
+
+                select.addEventListener('change', function () {
+                    const option = select.options[select.selectedIndex];
+                    const price = getPriceFromOption(option);
+                    if (price) {
+                        priceInput.value = price;
+                    }
+                    updateTotals();
+                });
+
+                qtyInput.addEventListener('input', function () {
+                    const price = getPriceFromOption(select.options[select.selectedIndex]);
+                    if (parseNumber(qtyInput.value) > 0 && (!priceInput.value || parseNumber(priceInput.value) === 0)) {
+                        if (price) {
+                            priceInput.value = price;
+                        }
+                    }
+                    updateTotals();
+                });
+
+                priceInput.addEventListener('input', updateTotals);
+
+                removeBtn.addEventListener('click', function () {
+                    if (body.children.length > 1) {
+                        row.remove();
+                        updateTotals();
+                    }
+                });
+            }
+
+            bindRow(body.querySelector('tr'));
+            updateTotals();
+
+            function toggleCreditFields() {
+                const isCredit = paymentType && paymentType.value === 'CREDIT';
+                creditFields.forEach(field => {
+                    field.classList.toggle('hidden', !isCredit);
+                });
+                if (!isCredit) {
+                    updateSaleNumberBadge();
+                    return;
+                }
+                toggleFrequencyOptions();
+                updateSaleNumberBadge();
+            }
+
+            function toggleFrequencyOptions() {
+                if (!paymentFrequency) {
+                    return;
+                }
+                const freq = paymentFrequency.value;
+                dailyOptions.classList.toggle('hidden', freq !== 'DAILY');
+                weeklyOptions.classList.toggle('hidden', freq !== 'WEEKLY');
+                biweeklyOptions.classList.toggle('hidden', freq !== 'BIWEEKLY');
+                monthlyOptions.classList.toggle('hidden', freq !== 'MONTHLY');
+            }
+
+            if (clientSearch && clientSelect) {
+                clientSearch.addEventListener('input', function () {
+                    const term = clientSearch.value.toLowerCase().trim();
+                    Array.from(clientSelect.options).forEach(option => {
+                        if (!option.value) {
+                            option.hidden = false;
+                            return;
+                        }
+                        const dni = (option.dataset.dni || '').toLowerCase();
+                        const name = (option.dataset.name || '').toLowerCase();
+                        option.hidden = term.length > 0 && !(dni.includes(term) || name.includes(term));
+                    });
+                });
+            }
+
+            if (productSearch) {
+                productSearch.addEventListener('input', function () {
+                    const term = productSearch.value.toLowerCase().trim();
+                    body.querySelectorAll('.product-select').forEach(select => {
+                        Array.from(select.options).forEach(option => {
+                            if (!option.value) {
+                                option.hidden = false;
+                                return;
+                            }
+                            const barcode = (option.dataset.barcode || '').toLowerCase();
+                            option.hidden = term.length > 0 && !barcode.includes(term);
+                        });
+                    });
+                });
+
+                productSearch.addEventListener('keydown', function (event) {
+                    if (event.key !== 'Enter') {
+                        return;
+                    }
+                    event.preventDefault();
+                    const term = productSearch.value.toLowerCase().trim();
+                    if (!term) {
+                        return;
+                    }
+
+                    let matchedOption = null;
+                    const selectTemplate = body.querySelector('tr .product-select');
+                    if (!selectTemplate) {
+                        return;
+                    }
+                    Array.from(selectTemplate.options).forEach(option => {
+                        if (!option.value || matchedOption) {
+                            return;
+                        }
+                        const barcode = (option.dataset.barcode || '').toLowerCase();
+                        if (barcode === term) {
+                            matchedOption = option;
+                        }
+                    });
+
+                    if (!matchedOption) {
+                        return;
+                    }
+
+                    const row = body.querySelector('tr').cloneNode(true);
+                    row.querySelectorAll('input').forEach(input => input.value = input.name === 'quantities' ? 1 : '');
+                    const rowSelect = row.querySelector('select');
+                    rowSelect.value = matchedOption.value;
+                    const priceInput = row.querySelector('.unit-price');
+                    const selectedPrice = getPriceFromOption(matchedOption);
+                    if (selectedPrice) {
+                        priceInput.value = selectedPrice;
+                    }
+                    bindRow(row);
+                    body.appendChild(row);
+                    updateTotals();
+                    productSearch.value = '';
+                });
+            }
+
+            if (priceMode) {
+                priceMode.addEventListener('change', function () {
+                    body.querySelectorAll('tr').forEach(row => {
+                        const select = row.querySelector('.product-select');
+                        const priceInput = row.querySelector('.unit-price');
+                        const option = select.options[select.selectedIndex];
+                        const price = getPriceFromOption(option);
+                        if (price) {
+                            priceInput.value = price;
+                        }
+                    });
+                    updateTotals();
+                });
+            }
+
+            addRow.addEventListener('click', function () {
+                const row = body.querySelector('tr').cloneNode(true);
+                row.querySelectorAll('input').forEach(input => input.value = input.name === 'quantities' ? 1 : '');
+                row.querySelector('select').selectedIndex = 0;
+                bindRow(row);
+                body.appendChild(row);
+                updateTotals();
+            });
+
+            if (paymentType) {
+                paymentType.addEventListener('change', toggleCreditFields);
+            }
+            if (paymentFrequency) {
+                paymentFrequency.addEventListener('change', toggleFrequencyOptions);
+            }
+            function updateSaleNumberBadge() {
+                if (!saleNumberBadge || !paymentType) {
+                    return;
+                }
+                const isCredit = paymentType.value === 'CREDIT';
+                const saleNumber = saleNumberBadge.dataset.sale || '';
+                const accountNumber = saleNumberBadge.dataset.account || '';
+                const value = isCredit ? accountNumber : saleNumber;
+                saleNumberBadge.textContent = value;
+                if (saleNumberHelp) {
+                    saleNumberHelp.textContent = value ? 'Numero: ' + value : '';
+                }
+            }
+            toggleCreditFields();
+        })();
+    </script>
+
+</section>
+</html>

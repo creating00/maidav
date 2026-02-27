@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Zona')">
+
+<section th:fragment="content">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold"
+            th:text="${zone.id == null ? 'Nueva Zona' : 'Editar Zona'}">
+        </h1>
+        <p class="text-gray-500 text-sm">
+            Complete la informacion de la zona
+        </p>
+    </div>
+
+    <form th:action="${zone.id == null ? '/zones' : '/zones/' + zone.id}"
+          method="post"
+          class="bg-white p-8 rounded-lg shadow max-w-3xl">
+
+        <div th:if="${formError}"
+             class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700"
+             th:text="${formError}">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Direccion</label>
+                <input type="text"
+                       name="address"
+                       th:value="${zone.address}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Numero</label>
+                <input type="text"
+                       name="number"
+                       th:value="${zone.number}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-sm font-semibold mb-1">Link Google Maps</label>
+                <input type="url"
+                       name="mapLink"
+                       th:value="${zone.mapLink}"
+                       placeholder="https://maps.google.com/..."
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between items-center mt-8 pt-6 border-t">
+            <a th:href="@{/zones}" class="text-gray-600 hover:text-gray-900">
+                Volver al listado
+            </a>
+            <div class="flex gap-3">
+                <a th:href="@{/zones}"
+                   class="px-5 py-2 rounded border border-gray-300 hover:bg-gray-100">
+                    Cancelar
+                </a>
+                <button class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
+                    Guardar Zona
+                </button>
+            </div>
+        </div>
+
+    </form>
+
+</section>
+</html>

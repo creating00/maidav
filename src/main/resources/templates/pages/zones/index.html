@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="layout/main :: layout(~{::content}, 'Zonas')">
+
+<section th:fragment="content">
+
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Zonas</h1>
+
+        <a sec:authorize="hasAuthority('ZONE_CREATE')"
+           th:href="@{/zones/new}"
+           class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            + Nueva Zona
+        </a>
+    </div>
+
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
+
+    <div class="bg-white rounded shadow overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-100 text-left">
+            <tr>
+                <th class="px-4 py-3">Direccion</th>
+                <th class="px-4 py-3">Numero</th>
+                <th class="px-4 py-3">Mapa</th>
+                <th class="px-4 py-3 text-right">Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="zone : ${zones}" class="border-t hover:bg-gray-50">
+                <td class="px-4 py-3" th:text="${zone.address}"></td>
+                <td class="px-4 py-3" th:text="${zone.number}"></td>
+                <td class="px-4 py-3">
+                    <a th:if="${zone.mapLink != null && !zone.mapLink.isBlank()}"
+                       th:href="${zone.mapLink}"
+                       target="_blank"
+                       rel="noopener"
+                       class="text-blue-600 hover:underline">
+                        Ver mapa
+                    </a>
+                    <span th:if="${zone.mapLink == null || zone.mapLink.isBlank()}">-</span>
+                </td>
+                <td class="px-4 py-3 text-right space-x-2">
+                    <a sec:authorize="hasAuthority('ZONE_UPDATE')"
+                       th:href="@{/zones/{id}/edit(id=${zone.id})}"
+                       class="text-blue-600 hover:underline">
+                        Editar
+                    </a>
+                    <form sec:authorize="hasAuthority('ZONE_DELETE')"
+                          th:action="@{/zones/{id}/delete(id=${zone.id})}"
+                          method="post"
+                          class="inline"
+                          onsubmit="return confirm('Eliminar zona?');">
+                        <button class="text-red-600 hover:underline">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+
+            <tr th:if="${#lists.isEmpty(zones)}">
+                <td colspan="4" class="px-4 py-6 text-center text-gray-500">
+                    No hay zonas registradas
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+</section>
+</html>

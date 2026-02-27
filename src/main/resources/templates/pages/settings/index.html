@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Configuracion')">
+
+<section th:fragment="content">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">Configuracion</h1>
+        <p class="text-gray-500 text-sm">Datos de la empresa</p>
+    </div>
+
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
+
+    <div th:if="${formError}"
+         class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+        <span th:text="${formError}"></span>
+    </div>
+
+    <form th:action="@{/settings}"
+          method="post"
+          enctype="multipart/form-data"
+          class="bg-white p-8 rounded-lg shadow max-w-3xl">
+
+        <input type="hidden" name="id" th:value="${settings.id}"/>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Nombre</label>
+                <input type="text"
+                       name="name"
+                       th:value="${settings.name}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Telefono</label>
+                <input type="text"
+                       name="phone"
+                       th:value="${settings.phone}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Correo</label>
+                <input type="email"
+                       name="email"
+                       th:value="${settings.email}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Direccion</label>
+                <input type="text"
+                       name="address"
+                       th:value="${settings.address}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-sm font-semibold mb-1">Logo</label>
+                <input type="file"
+                       name="logo"
+                       id="logoInput"
+                       accept="image/*"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <div class="mt-3 flex items-center gap-4">
+                    <img id="logoPreview"
+                         th:src="${settings.logoPath}"
+                         th:classappend="${settings.logoPath == null} ? ' hidden' : ''"
+                         alt="Logo"
+                         class="h-20 w-20 rounded object-cover border"/>
+                    <span id="logoPlaceholder"
+                          th:classappend="${settings.logoPath != null} ? ' hidden' : ''"
+                          class="text-sm text-gray-500">
+                        Sin logo
+                    </span>
+                </div>
+            </div>
+
+        </div>
+
+        <div class="flex justify-end items-center mt-8 pt-6 border-t">
+            <button class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
+                Guardar
+            </button>
+        </div>
+
+    </form>
+
+    <script>
+        (function () {
+            const input = document.getElementById('logoInput');
+            const preview = document.getElementById('logoPreview');
+            const placeholder = document.getElementById('logoPlaceholder');
+
+            if (!input) {
+                return;
+            }
+
+            input.addEventListener('change', function () {
+                const file = input.files && input.files[0];
+                if (!file) {
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    if (!preview) {
+                        return;
+                    }
+                    preview.src = event.target.result;
+                    preview.classList.remove('hidden');
+                    if (placeholder) {
+                        placeholder.classList.add('hidden');
+                    }
+                };
+                reader.readAsDataURL(file);
+            });
+        })();
+    </script>
+
+</section>
+</html>

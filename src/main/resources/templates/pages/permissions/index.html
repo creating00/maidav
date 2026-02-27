@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Permisos')">
+
+<section th:fragment="content">
+
+    <div class="flex justify-between mb-6">
+        <h1 class="text-2xl font-bold">Permisos</h1>
+        <a th:href="@{/permissions/new}"
+           class="bg-blue-600 text-white px-4 py-2 rounded">
+            Nuevo Permiso
+        </a>
+    </div>
+
+    <table class="w-full bg-white rounded shadow">
+        <thead class="bg-gray-100">
+        <tr>
+            <th class="p-3 text-left">Nombre</th>
+            <th class="p-3 text-right">Acciones</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="p : ${permissions}">
+            <td class="p-3" th:text="${p.name}"></td>
+            <td class="p-3 text-right space-x-2">
+                <a th:href="@{|/permissions/${p.id}/edit|}"
+                   class="text-blue-600">Editar</a>
+
+                <form th:action="@{|/permissions/${p.id}/delete|}"
+                      method="post" class="inline">
+                    <button class="text-red-600"
+                            onclick="return confirm('¿Eliminar?')">
+                        Eliminar
+                    </button>
+                </form>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+
+</section>
+</html>

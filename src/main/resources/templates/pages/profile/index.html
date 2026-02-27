@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Mi perfil')">
+
+<section th:fragment="content">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">Mi perfil</h1>
+        <p class="text-gray-500 text-sm">Actualiza tus datos personales</p>
+    </div>
+
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
+    <div th:if="${errorMessage}"
+         class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+        <span th:text="${errorMessage}"></span>
+    </div>
+
+    <form th:action="@{/profile}" method="post" enctype="multipart/form-data"
+          class="bg-white p-8 rounded-lg shadow max-w-3xl">
+
+        <div class="flex items-center gap-6 mb-6">
+            <div class="h-24 w-24 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                <img th:if="${user.photoPath}" th:src="${user.photoPath}" alt="Foto"
+                     class="h-full w-full object-cover"/>
+                <span th:if="${user.photoPath == null}" class="text-gray-400 text-sm">Sin foto</span>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-1">Foto de perfil</label>
+                <input type="file" name="photo" accept="image/*"
+                       class="block text-sm text-gray-700"/>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Nombre</label>
+                <input type="text" name="firstName" th:value="${user.firstName}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Apellido</label>
+                <input type="text" name="lastName" th:value="${user.lastName}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Fecha nacimiento</label>
+                <input type="date" name="birthDate" th:value="${user.birthDate}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <p class="text-xs text-gray-500 mt-1" th:if="${age != null}">
+                    Edad: <span th:text="${age}"></span> años
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Teléfono</label>
+                <input type="text" name="phone" th:value="${user.phone}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-sm font-semibold mb-1">Dirección</label>
+                <input type="text" name="address" th:value="${user.address}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between items-center mt-8 pt-6 border-t">
+            <a th:href="@{/dashboard}" class="text-gray-600 hover:text-gray-900">
+                Volver al dashboard
+            </a>
+            <button class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
+                Guardar
+            </button>
+        </div>
+    </form>
+
+</section>
+</html>

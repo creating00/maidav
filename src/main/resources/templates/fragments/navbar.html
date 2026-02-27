@@ -1,0 +1,19 @@
+<nav th:fragment="navbar"
+     class="bg-white shadow px-6 py-3 flex justify-between items-center" xmlns:th="http://www.thymeleaf.orgl">
+
+    <div class="text-xl font-bold text-gray-800">
+        Maidav
+    </div>
+
+    <div class="flex items-center gap-4">
+        <span class="text-gray-600 text-sm">
+            <span th:text="${#authentication.name}">usuario@email.com</span>
+        </span>
+
+        <form th:action="@{/logout}" method="post">
+            <button class="text-red-500 hover:text-red-700 text-sm">
+                Logout
+            </button>
+        </form>
+    </div>
+</nav>

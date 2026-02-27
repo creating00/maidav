@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="layout/main :: layout(~{::content}, 'Proveedores')">
+
+<section th:fragment="content">
+
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Proveedores</h1>
+
+        <a sec:authorize="hasAuthority('PROVIDER_CREATE')"
+           th:href="@{/providers/new}"
+           class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            + Nuevo Proveedor
+        </a>
+    </div>
+
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
+
+    <div class="bg-white rounded shadow overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-100 text-left">
+            <tr>
+                <th class="px-4 py-3">Empresa</th>
+                <th class="px-4 py-3">Encargado</th>
+                <th class="px-4 py-3">Telefono</th>
+                <th class="px-4 py-3">Email</th>
+                <th class="px-4 py-3">Direccion</th>
+                <th class="px-4 py-3 text-right">Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="provider : ${providers}" class="border-t hover:bg-gray-50">
+                <td class="px-4 py-3" th:text="${provider.name}"></td>
+                <td class="px-4 py-3" th:text="${provider.contactName}"></td>
+                <td class="px-4 py-3" th:text="${provider.phone}"></td>
+                <td class="px-4 py-3" th:text="${provider.email}"></td>
+                <td class="px-4 py-3" th:text="${provider.address}"></td>
+                <td class="px-4 py-3 text-right space-x-2">
+                    <a sec:authorize="hasAuthority('PROVIDER_UPDATE')"
+                       th:href="@{/providers/{id}/edit(id=${provider.id})}"
+                       class="text-blue-600 hover:underline">
+                        Editar
+                    </a>
+                    <form sec:authorize="hasAuthority('PROVIDER_DELETE')"
+                          th:action="@{/providers/{id}/delete(id=${provider.id})}"
+                          method="post"
+                          class="inline"
+                          onsubmit="return confirm('Eliminar proveedor?');">
+                        <button class="text-red-600 hover:underline">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+
+            <tr th:if="${#lists.isEmpty(providers)}">
+                <td colspan="6" class="px-4 py-6 text-center text-gray-500">
+                    No hay proveedores registrados
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+</section>
+</html>

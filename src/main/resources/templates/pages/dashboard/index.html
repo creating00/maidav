@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="layout/main :: layout(~{::content}, 'Dashboard')">
+
+<section th:fragment="content">
+
+    <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-gray-500 text-sm">Total clientes</h2>
+            <p class="text-3xl font-bold" th:text="${clientsCount}">0</p>
+        </div>
+
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-gray-500 text-sm">Total ventas</h2>
+            <p class="text-3xl font-bold" th:text="${salesCount}">0</p>
+        </div>
+
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-gray-500 text-sm">Clientes morosos</h2>
+            <p class="text-3xl font-bold" th:text="${overdueClientsCount}">0</p>
+        </div>
+
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-gray-500 text-sm">Ventas del dia</h2>
+            <p class="text-3xl font-bold" th:text="${todaySalesCount}">0</p>
+        </div>
+
+        <div class="bg-white p-6 rounded shadow">
+            <h2 class="text-gray-500 text-sm">Productos</h2>
+            <p class="text-3xl font-bold" th:text="${productsCount}">0</p>
+        </div>
+
+    </div>
+
+</section>
+</html>

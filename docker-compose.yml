@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16
+    container_name: maidav-db
+    environment:
+      POSTGRES_DB: sales_db
+      POSTGRES_USER: sales
+      POSTGRES_PASSWORD: sales123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    container_name: maidav-app
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/sales_db
+      SPRING_DATASOURCE_USERNAME: sales
+      SPRING_DATASOURCE_PASSWORD: sales123
+      APP_UPLOAD_DIR: /app/uploads
+      SPRING_JPA_SHOW_SQL: "true"
+      SPRING_THYMELEAF_CACHE: "false"
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    volumes:
+      - uploads:/app/uploads
+
+volumes:
+  pgdata:
+  uploads:

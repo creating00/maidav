@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="layout/main :: layout(~{::content}, 'Productos')">
+
+<section th:fragment="content">
+
+    <div class="flex justify-between items-center mb-6">
+        <h1 class="text-2xl font-bold">Productos</h1>
+
+        <a sec:authorize="hasAuthority('PRODUCT_CREATE')"
+           th:href="@{/products/new}"
+           class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            + Nuevo Producto
+        </a>
+    </div>
+
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
+
+    <div th:if="${lowStockOnly}"
+         class="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 flex items-center justify-between">
+        <span>Mostrando productos con stock bajo</span>
+        <a th:href="@{/products}" class="text-sm text-amber-900 hover:underline">Ver todos</a>
+    </div>
+
+    <div class="bg-white rounded shadow overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-100 text-left">
+            <tr>
+                <th class="px-4 py-3">Imagen</th>
+                <th class="px-4 py-3">Proveedor</th>
+                <th class="px-4 py-3">Codigo</th>
+                <th class="px-4 py-3">Codigo barra</th>
+                <th class="px-4 py-3">Descripcion</th>
+                <th class="px-4 py-3">Stock</th>
+                <th class="px-4 py-3">Mayorista</th>
+                <th class="px-4 py-3">Minorista</th>
+                <th class="px-4 py-3">IVA</th>
+                <th class="px-4 py-3 text-right">Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="product : ${products}" class="border-t hover:bg-gray-50">
+                <td class="px-4 py-3">
+                    <img th:if="${product.imagePath}"
+                         th:src="${product.imagePath}"
+                         alt="Imagen"
+                         class="h-10 w-10 rounded object-cover border"/>
+                    <span th:if="${product.imagePath == null}" class="text-xs text-gray-500">-</span>
+                </td>
+                <td class="px-4 py-3" th:text="${product.provider.name}"></td>
+                <td class="px-4 py-3" th:text="${product.productCode}"></td>
+                <td class="px-4 py-3" th:text="${product.barcode}"></td>
+                <td class="px-4 py-3" th:text="${product.description}"></td>
+                <td class="px-4 py-3">
+                    <div class="flex flex-col">
+                        <span th:text="${product.stockAvailable}"></span>
+                        <span th:if="${product.stockAvailable <= product.stockMin}"
+                              class="text-xs text-red-600">
+                            Stock bajo
+                        </span>
+                    </div>
+                </td>
+                <td class="px-4 py-3" th:text="${product.priceWholesale}"></td>
+                <td class="px-4 py-3" th:text="${product.priceRetail}"></td>
+                <td class="px-4 py-3" th:text="${product.vatRate + '%'}"></td>
+                <td class="px-4 py-3 text-right space-x-2">
+                    <a sec:authorize="hasAuthority('PRODUCT_UPDATE')"
+                       th:href="@{/products/{id}/edit(id=${product.id})}"
+                       class="text-blue-600 hover:underline">
+                        Editar
+                    </a>
+                    <form sec:authorize="hasAuthority('PRODUCT_DELETE')"
+                          th:action="@{/products/{id}/delete(id=${product.id})}"
+                          method="post"
+                          class="inline"
+                          onsubmit="return confirm('Eliminar producto?');">
+                        <button class="text-red-600 hover:underline">Eliminar</button>
+                    </form>
+                </td>
+            </tr>
+
+            <tr th:if="${#lists.isEmpty(products)}">
+                <td colspan="10" class="px-4 py-6 text-center text-gray-500">
+                    No hay productos registrados
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+</section>
+</html>

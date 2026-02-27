@@ -1,0 +1,75 @@
+<header th:fragment="header"
+        xmlns:th="http://www.thymeleaf.org"
+        xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+        class="bg-white shadow h-14 flex items-center justify-between px-6">
+
+    <!-- LOGO -->
+    <span class="font-bold text-lg text-gray-800">
+        Maidav
+    </span>
+
+    <!-- USER DROPDOWN -->
+    <div class="relative"
+         x-data="{ open: false }">
+
+        <!-- BUTTON -->
+        <div class="flex items-center gap-3">
+            <a sec:authorize="hasAuthority('PRODUCT_READ')"
+               th:href="@{/products(lowStock=true)}"
+               class="relative inline-flex items-center justify-center text-gray-600 hover:text-gray-900"
+               th:attr="title=${lowStockCount > 0 ? 'Stock bajo: ' + lowStockCount : 'Sin alertas de stock'}">
+                <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 8a6 6 0 1 0-12 0c0 7-3 7-3 7h18s-3 0-3-7"></path>
+                    <path d="M13.7 21a2 2 0 0 1-3.4 0"></path>
+                </svg>
+                <span th:if="${lowStockCount > 0}"
+                      class="absolute -top-2 -right-2 rounded-full bg-red-600 text-white text-[10px] px-1.5 py-0.5">
+                    <span th:text="${lowStockCount}">0</span>
+                </span>
+            </a>
+
+            <button @click="open = !open"
+                    class="flex items-center gap-3 focus:outline-none">
+
+            <!-- AVATAR -->
+            <div class="w-9 h-9 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold overflow-hidden">
+                <img th:if="${currentUser != null && currentUser.photoPath != null}"
+                     th:src="${currentUser.photoPath}"
+                     alt="Foto"
+                     class="h-full w-full object-cover"/>
+                <span th:if="${currentUser == null || currentUser.photoPath == null}"
+                      th:text="${#authentication.name.substring(0,1).toUpperCase()}">U</span>
+            </div>
+
+            <!-- EMAIL -->
+            <span class="text-sm text-gray-700 hidden md:block"
+                  th:text="${#authentication.name}">
+                usuario@mail.com
+            </span>
+            </button>
+        </div>
+
+        <!-- DROPDOWN -->
+        <div x-show="open"
+             @click.outside="open = false"
+             class="absolute right-0 mt-2 w-48 bg-white rounded shadow border z-50">
+
+            <a th:href="@{/profile}"
+               class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                Mi perfil
+            </a>
+
+            <form th:action="@{/logout}" method="post">
+                <button type="submit"
+                        class="w-full text-left px-4 py-2 text-sm
+                               text-red-600 hover:bg-gray-100">
+                    Cerrar sesión
+                </button>
+            </form>
+
+        </div>
+
+    </div>
+
+</header>

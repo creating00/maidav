@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Producto')">
+
+<section th:fragment="content">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold"
+            th:text="${product.id == null ? 'Nuevo Producto' : 'Editar Producto'}">
+        </h1>
+        <p class="text-gray-500 text-sm">
+            Precios sin IVA, el sistema recalcula automaticamente
+        </p>
+    </div>
+
+    <form th:action="${product.id == null ? '/products' : '/products/' + product.id}"
+          method="post"
+          enctype="multipart/form-data"
+          class="bg-white p-8 rounded-lg shadow max-w-4xl">
+
+        <div th:if="${formError}"
+             class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700"
+             th:text="${formError}">
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Proveedor</label>
+                <select name="provider.id"
+                        required
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Seleccionar proveedor</option>
+                    <option th:each="provider : ${providers}"
+                            th:value="${provider.id}"
+                            th:selected="${product.provider != null && provider.id == product.provider.id}"
+                            th:text="${provider.name}">
+                    </option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Codigo de producto</label>
+                <input type="text"
+                       name="productCode"
+                       th:value="${product.productCode}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Codigo de barra</label>
+                <input type="text"
+                       name="barcode"
+                       th:value="${product.barcode}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Descripcion</label>
+                <input type="text"
+                       name="description"
+                       th:value="${product.description}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Costo</label>
+                <input type="number"
+                       step="0.01"
+                       name="cost"
+                       id="cost"
+                       th:value="${product.cost}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <p class="text-xs text-gray-500 mt-1">
+                    Con IVA: <span id="costWithVat">0.00</span>
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">IVA</label>
+                <select name="vatRate"
+                        id="vatRate"
+                        required
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option th:value="0" th:selected="${product.vatRate == 0}">0%</option>
+                    <option th:value="21" th:selected="${product.vatRate == 21}">21%</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Ganancia mayorista (%)</label>
+                <input type="number"
+                       step="0.01"
+                       id="profitWholesalePct"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Ganancia minorista (%)</label>
+                <input type="number"
+                       step="0.01"
+                       id="profitRetailPct"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Precio mayorista (sin IVA)</label>
+                <input type="number"
+                       step="0.01"
+                       name="priceWholesaleNet"
+                       id="priceWholesaleNet"
+                       th:value="${product.priceWholesaleNet}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <p class="text-xs text-gray-500 mt-1">
+                    Con IVA: <span id="priceWholesaleWithVat">0.00</span>
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Precio minorista (sin IVA)</label>
+                <input type="number"
+                       step="0.01"
+                       name="priceRetailNet"
+                       id="priceRetailNet"
+                       th:value="${product.priceRetailNet}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <p class="text-xs text-gray-500 mt-1">
+                    Con IVA: <span id="priceRetailWithVat">0.00</span>
+                </p>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-sm font-semibold mb-1">Imagen del producto</label>
+                <input type="file"
+                       name="image"
+                       id="imageInput"
+                       accept="image/*"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <div class="mt-3 flex items-center gap-4">
+                    <img id="imagePreview"
+                         th:src="${product.imagePath}"
+                         th:classappend="${product.imagePath == null} ? ' hidden' : ''"
+                         alt="Imagen del producto"
+                         class="h-24 w-24 rounded object-cover border"/>
+                    <span id="imagePlaceholder"
+                          th:classappend="${product.imagePath != null} ? ' hidden' : ''"
+                          class="text-sm text-gray-500">
+                        Sin imagen
+                    </span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Stock disponible</label>
+                <input type="number"
+                       name="stockAvailable"
+                       th:value="${product.stockAvailable}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Stock minimo</label>
+                <input type="number"
+                       name="stockMin"
+                       th:value="${product.stockMin}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Stock maximo</label>
+                <input type="number"
+                       name="stockMax"
+                       th:value="${product.stockMax}"
+                       required
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between items-center mt-8 pt-6 border-t">
+            <a th:href="@{/products}" class="text-gray-600 hover:text-gray-900">
+                Volver al listado
+            </a>
+            <div class="flex gap-3">
+                <a th:href="@{/products}"
+                   class="px-5 py-2 rounded border border-gray-300 hover:bg-gray-100">
+                    Cancelar
+                </a>
+                <button class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
+                    Guardar Producto
+                </button>
+            </div>
+        </div>
+
+    </form>
+
+    <script>
+        (function () {
+            const vatSelect = document.getElementById('vatRate');
+            const costInput = document.getElementById('cost');
+            const wholesaleNet = document.getElementById('priceWholesaleNet');
+            const retailNet = document.getElementById('priceRetailNet');
+            const wholesaleWithVat = document.getElementById('priceWholesaleWithVat');
+            const retailWithVat = document.getElementById('priceRetailWithVat');
+            const costWithVat = document.getElementById('costWithVat');
+            const profitWholesale = document.getElementById('profitWholesalePct');
+            const profitRetail = document.getElementById('profitRetailPct');
+            const imageInput = document.getElementById('imageInput');
+            const imagePreview = document.getElementById('imagePreview');
+            let internalUpdate = false;
+
+            function parseNumber(value) {
+                const num = parseFloat(value);
+                return Number.isFinite(num) ? num : 0;
+            }
+
+            function recalcVat() {
+                const vat = parseNumber(vatSelect.value) / 100;
+                const multiplier = 1 + vat;
+
+                const cost = parseNumber(costInput.value) * multiplier;
+                const wholesale = parseNumber(wholesaleNet.value) * multiplier;
+                const retail = parseNumber(retailNet.value) * multiplier;
+
+                costWithVat.textContent = cost.toFixed(2);
+                wholesaleWithVat.textContent = wholesale.toFixed(2);
+                retailWithVat.textContent = retail.toFixed(2);
+            }
+
+            function updatePricesFromProfit() {
+                if (internalUpdate) {
+                    return;
+                }
+                internalUpdate = true;
+                const cost = parseNumber(costInput.value);
+                const wholesalePct = parseNumber(profitWholesale.value);
+                const retailPct = parseNumber(profitRetail.value);
+                if (cost > 0) {
+                    wholesaleNet.value = (cost * (1 + wholesalePct / 100)).toFixed(2);
+                    retailNet.value = (cost * (1 + retailPct / 100)).toFixed(2);
+                } else {
+                    wholesaleNet.value = '';
+                    retailNet.value = '';
+                }
+                internalUpdate = false;
+                recalcVat();
+            }
+
+            function updateProfitFromPrices() {
+                if (internalUpdate) {
+                    return;
+                }
+                internalUpdate = true;
+                const cost = parseNumber(costInput.value);
+                const wholesale = parseNumber(wholesaleNet.value);
+                const retail = parseNumber(retailNet.value);
+                if (cost > 0) {
+                    profitWholesale.value = ((wholesale / cost - 1) * 100).toFixed(2);
+                    profitRetail.value = ((retail / cost - 1) * 100).toFixed(2);
+                } else {
+                    profitWholesale.value = '';
+                    profitRetail.value = '';
+                }
+                internalUpdate = false;
+                recalcVat();
+            }
+
+            vatSelect.addEventListener('change', recalcVat);
+            costInput.addEventListener('input', updatePricesFromProfit);
+            profitWholesale.addEventListener('input', updatePricesFromProfit);
+            profitRetail.addEventListener('input', updatePricesFromProfit);
+            wholesaleNet.addEventListener('input', updateProfitFromPrices);
+            retailNet.addEventListener('input', updateProfitFromPrices);
+
+            if (imageInput) {
+                imageInput.addEventListener('change', function () {
+                    const file = imageInput.files && imageInput.files[0];
+                    if (!file) {
+                        return;
+                    }
+                    const reader = new FileReader();
+                    reader.onload = function (event) {
+                        if (!imagePreview) {
+                            return;
+                        }
+                        imagePreview.src = event.target.result;
+                        imagePreview.classList.remove('hidden');
+                        const placeholder = document.getElementById('imagePlaceholder');
+                        if (placeholder) {
+                            placeholder.classList.add('hidden');
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                });
+            }
+
+            updateProfitFromPrices();
+        })();
+    </script>
+
+</section>
+</html>

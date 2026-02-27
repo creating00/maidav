@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Permiso')">
+
+<section th:fragment="content">
+
+    <h1 class="text-2xl font-bold mb-6"
+        th:text="${permission.id == null ? 'Nuevo Permiso' : 'Editar Permiso'}">
+    </h1>
+
+    <form th:action="${permission.id == null ? '/permissions' : '/permissions/' + permission.id}"
+          method="post"
+          class="bg-white p-6 rounded shadow max-w-md">
+
+        <label class="block mb-2 text-sm font-medium">Nombre</label>
+        <input type="text"
+               name="name"
+               th:value="${permission.name}"
+               class="w-full border rounded px-3 py-2 mb-4"
+               required/>
+
+        <div class="flex justify-end gap-2">
+            <a th:href="@{/permissions}" class="px-4 py-2">Cancelar</a>
+            <button class="bg-blue-600 text-white px-4 py-2 rounded">
+                Guardar
+            </button>
+        </div>
+
+    </form>
+
+</section>
+</html>

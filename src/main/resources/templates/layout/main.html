@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="es"
+      xmlns:th="http://www.thymeleaf.org"
+      th:fragment="layout(content, pageTitle)">
+
+<head>
+    <meta charset="UTF-8">
+    <title th:text="${pageTitle} ?: 'Maidav'">Maidav</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+
+<body class="bg-gray-100 min-h-screen flex flex-col">
+
+<!-- HEADER -->
+<div th:replace="fragments/header :: header"></div>
+
+<!-- BODY -->
+<div class="flex flex-1">
+
+    <!-- SIDEBAR -->
+    <div th:replace="fragments/sidebar :: sidebar"></div>
+
+    <!-- CONTENT -->
+    <main class="flex-1 p-6">
+        <div th:replace="${content}"></div>
+    </main>
+
+</div>
+
+<!-- FOOTER -->
+<div th:replace="fragments/footer :: footer"></div>
+
+</body>
+</html>
