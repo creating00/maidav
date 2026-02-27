@@ -15,6 +15,8 @@ WORKDIR /app
 
 RUN mkdir -p /app/uploads
 COPY --from=builder /app/target/*.jar /app/app.jar
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["/app/entrypoint.sh"]
