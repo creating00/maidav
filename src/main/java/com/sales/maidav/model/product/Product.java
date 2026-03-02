@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 @Table(name = "products")
 public class Product extends BaseEntity {
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "provider_id", nullable = false)
     private Provider provider;
 

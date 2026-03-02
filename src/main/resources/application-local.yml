@@ -1,0 +1,36 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    open-in-view: false
+    properties:
+      hibernate.jdbc.time_zone: UTC
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    url: ${maidav.local.datasource.jdbc-url}
+    user: ${maidav.local.datasource.username}
+    password: ${maidav.local.datasource.password}
+
+  thymeleaf:
+    cache: false
+
+server:
+  port: ${PORT:8080}
+
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+
+app:
+  upload-dir: uploads
+
+maidav:
+  local:
+    datasource:
+      jdbc-url: jdbc:postgresql://localhost:5432/sales_db
+      username: sales
+      password: sales123
+      driver-class-name: org.postgresql.Driver

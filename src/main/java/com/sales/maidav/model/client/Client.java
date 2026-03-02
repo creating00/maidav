@@ -5,6 +5,7 @@ import com.sales.maidav.model.user.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
@@ -29,7 +30,7 @@ public class Client extends BaseEntity {
     @Column(length = 255)
     private String address;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "zone_id")
     private Zone zone;
 
@@ -42,11 +43,11 @@ public class Client extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String observations;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seller_id")
     private User seller;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recommended_by_id")
     private Client recommendedBy;
 

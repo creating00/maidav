@@ -10,7 +10,7 @@ import java.time.LocalDate;
 @Table(name = "credit_payments")
 public class CreditPayment extends BaseEntity {
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "account_id", nullable = false)
     private CreditAccount account;
 

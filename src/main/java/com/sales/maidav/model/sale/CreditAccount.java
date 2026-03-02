@@ -11,11 +11,11 @@ import java.time.LocalDate;
 @Table(name = "credit_accounts")
 public class CreditAccount extends BaseEntity {
 
-    @OneToOne
+    @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sale_id", nullable = false)
     private Sale sale;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "client_id", nullable = false)
     private Client client;
 

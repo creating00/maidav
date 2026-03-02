@@ -1,13 +1,13 @@
 spring:
   datasource:
-    url: ${SPRING_DATASOURCE_URL}
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL:${DATABASE_URL:}}
+    username: ${SPRING_DATASOURCE_USERNAME:${DATABASE_USERNAME:}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${DATABASE_PASSWORD:}}
 
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: ${SPRING_JPA_SHOW_SQL:true}
+    show-sql: ${SPRING_JPA_SHOW_SQL:false}
     open-in-view: false
     properties:
       hibernate.jdbc.time_zone: UTC
@@ -20,6 +20,10 @@ spring:
 
 server:
   port: ${PORT:8080}
+
+logging:
+  level:
+    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:OFF}
 
 app:
   upload-dir: ${APP_UPLOAD_DIR:uploads}

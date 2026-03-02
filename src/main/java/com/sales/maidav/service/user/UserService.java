@@ -1,6 +1,7 @@
 package com.sales.maidav.service.user;
 
 import com.sales.maidav.model.user.User;
+import com.sales.maidav.web.dto.CurrentUserView;
 
 import java.util.List;
 
@@ -21,5 +22,7 @@ public interface UserService {
     List<User> findByRoleName(String roleName);
 
     User findByEmail(String email);
+
+    CurrentUserView findCurrentUserViewByEmail(String email);
 }
 

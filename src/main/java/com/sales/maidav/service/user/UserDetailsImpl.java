@@ -1,54 +1,50 @@
 package com.sales.maidav.service.user;
 
-import com.sales.maidav.model.user.User;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 
 public class UserDetailsImpl implements UserDetails {
 
-    private final User user;
+    private final Long userId;
+    private final String username;
+    private final String password;
+    private final boolean enabled;
+    private final Set<GrantedAuthority> authorities;
 
-    public UserDetailsImpl(User user) {
-        this.user = user;
+    public UserDetailsImpl(Long userId,
+                           String username,
+                           String password,
+                           boolean enabled,
+                           Set<GrantedAuthority> authorities) {
+        this.userId = userId;
+        this.username = username;
+        this.password = password;
+        this.enabled = enabled;
+        this.authorities = Set.copyOf(authorities);
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        Set<GrantedAuthority> authorities = new HashSet<>();
-
-        user.getRoles().forEach(role -> {
-            // ROLE_ prefix para Spring Security
-            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
-
-            // Permisos sin prefijo
-            role.getPermissions().forEach(permission ->
-                    authorities.add(new SimpleGrantedAuthority(permission.getName()))
-            );
-        });
-
         return authorities;
     }
 
     @Override
     public String getUsername() {
-        return user.getEmail();
+        return username;
     }
 
     @Override
     public String getPassword() {
-        return user.getPassword();
+        return password;
     }
 
     @Override
     public boolean isEnabled() {
-        // IMPORTANTE: debe ser boolean primitivo en la entidad
-        return user.isEnabled();
+        return enabled;
     }
 
     @Override
@@ -66,24 +62,15 @@ public class UserDetailsImpl implements UserDetails {
         return true;
     }
 
-    // =========================
-    // Buenas prácticas
-    // =========================
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof UserDetailsImpl that)) return false;
-        return Objects.equals(user.getId(), that.user.getId());
+        return Objects.equals(userId, that.userId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(user.getId());
-    }
-
-    // Opcional: acceso al User original
-    public User getUser() {
-        return user;
+        return Objects.hash(userId);
     }
 }

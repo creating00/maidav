@@ -38,7 +38,7 @@ public class User extends BaseEntity {
     @Column(name = "photo_path", length = 255)
     private String photoPath;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "user_roles",
             joinColumns = @JoinColumn(name = "user_id"),

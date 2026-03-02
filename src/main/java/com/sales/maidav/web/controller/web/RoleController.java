@@ -56,7 +56,7 @@ public class RoleController {
     @PreAuthorize("hasAuthority('ROLE_UPDATE')")
     public String editForm(@PathVariable Long id, Model model) {
 
-        model.addAttribute("role", roleRepository.findById(id).orElseThrow());
+        model.addAttribute("role", roleRepository.findWithPermissionsById(id).orElseThrow());
         model.addAttribute("permissions", permissionRepository.findAll());
 
         return "pages/roles/form";
@@ -68,7 +68,7 @@ public class RoleController {
                          Role data,
                          @RequestParam(required = false) List<Long> permissionIds) {
 
-        Role role = roleRepository.findById(id)
+        Role role = roleRepository.findWithPermissionsById(id)
                 .orElseThrow(() -> new RuntimeException("Rol no encontrado"));
 
         role.setName(data.getName());

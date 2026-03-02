@@ -4,6 +4,7 @@ import com.sales.maidav.model.user.Role;
 import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.user.RoleRepository;
 import com.sales.maidav.repository.user.UserRepository;
+import com.sales.maidav.web.dto.CurrentUserView;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -27,7 +28,7 @@ public class UserServiceImpl implements UserService{
 
     @Override
     public User findById(Long id) {
-        return userRepository.findById(id)
+        return userRepository.findWithRolesById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
 
@@ -97,5 +98,11 @@ public class UserServiceImpl implements UserService{
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+    }
+
+    @Override
+    public CurrentUserView findCurrentUserViewByEmail(String email) {
+        String photoPath = userRepository.findPhotoPathByEmail(email).orElse(null);
+        return new CurrentUserView(email, photoPath);
     }
 }
