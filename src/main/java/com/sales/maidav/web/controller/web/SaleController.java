@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
@@ -73,6 +74,7 @@ public class SaleController {
                          @RequestParam(name = "productIds") List<Long> productIds,
                          @RequestParam(name = "quantities") List<Integer> quantities,
                          @RequestParam(name = "unitPrices") List<BigDecimal> unitPrices,
+                         @RequestParam(required = false) String draftState,
                          Authentication authentication,
                          Model model,
                          RedirectAttributes redirectAttributes) {
@@ -81,7 +83,7 @@ public class SaleController {
             Client client = clientService.findById(clientId);
             User seller = userService.findByEmail(authentication.getName());
             List<SaleItemInput> items = buildItems(productIds, quantities, unitPrices);
-            List<String> dueDays = resolveDueDays(paymentFrequency, dailyDays, weeklyDay, biMonthlyDay1, biMonthlyDay2, monthlyDay);
+            List<String> dueDays = resolveDueDays(paymentFrequency, dailyDays, weeklyDay, biMonthlyDay1, biMonthlyDay2, monthlyDay, firstDueDate);
 
             Sale sale = saleService.createSale(client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
                     discountAmount, weeksCount, items);
@@ -96,6 +98,7 @@ public class SaleController {
             return "redirect:/sales/new";
         } catch (InvalidSaleException ex) {
             model.addAttribute("formError", ex.getMessage());
+            model.addAttribute("draftState", draftState);
             model.addAttribute("clients", clientService.findAll());
             model.addAttribute("products", productService.findAll());
             addNumberPreviews(model);
@@ -150,20 +153,25 @@ public class SaleController {
                                         String weeklyDay,
                                         Integer biMonthlyDay1,
                                         Integer biMonthlyDay2,
-                                        Integer monthlyDay) {
+                                        Integer monthlyDay,
+                                        LocalDate firstDueDate) {
         List<String> dueDays = new ArrayList<>();
         if (paymentFrequency == null) {
             return dueDays;
         }
         switch (paymentFrequency) {
             case DAILY -> {
-                if (dailyDays != null) {
+                if (dailyDays != null && !dailyDays.isEmpty()) {
                     dueDays.addAll(dailyDays);
+                } else if (firstDueDate != null) {
+                    dueDays.add(firstDueDate.getDayOfWeek().name());
                 }
             }
             case WEEKLY -> {
                 if (weeklyDay != null && !weeklyDay.isBlank()) {
                     dueDays.add(weeklyDay);
+                } else if (firstDueDate != null) {
+                    dueDays.add(firstDueDate.getDayOfWeek().name());
                 }
             }
             case BIWEEKLY -> {
@@ -173,13 +181,35 @@ public class SaleController {
                 if (biMonthlyDay2 != null) {
                     dueDays.add(String.valueOf(biMonthlyDay2));
                 }
+                if (dueDays.size() < 2 && firstDueDate != null) {
+                    int day1 = normalizeDayOfMonth(firstDueDate.getDayOfMonth());
+                    int day2 = day1 + 14;
+                    if (day2 > 28) {
+                        day2 = day2 - 28;
+                    }
+                    if (day2 == day1) {
+                        day2 = day1 == 28 ? 14 : day1 + 1;
+                    }
+                    dueDays.clear();
+                    dueDays.add(String.valueOf(day1));
+                    dueDays.add(String.valueOf(day2));
+                }
             }
             case MONTHLY -> {
                 if (monthlyDay != null) {
                     dueDays.add(String.valueOf(monthlyDay));
+                } else if (firstDueDate != null) {
+                    dueDays.add(String.valueOf(normalizeDayOfMonth(firstDueDate.getDayOfMonth())));
                 }
             }
         }
         return dueDays;
+    }
+
+    private int normalizeDayOfMonth(int day) {
+        if (day < 1) {
+            return 1;
+        }
+        return Math.min(day, 28);
     }
 }

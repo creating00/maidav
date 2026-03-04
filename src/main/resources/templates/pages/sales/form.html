@@ -12,14 +12,18 @@
     <form th:action="@{/sales}" method="post" class="bg-white p-8 rounded-lg shadow">
 
         <div th:if="${formError}"
+             data-form-error="true"
+             id="formErrorBox"
              class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700"
              th:text="${formError}">
         </div>
         <div th:if="${saleNumber}"
+             id="saleSuccessMessage"
              class="mb-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700">
             <span th:text="${'Numero de venta: ' + saleNumber}"></span>
             <span th:if="${accountNumber}" th:text="${' | Numero de cuenta: ' + accountNumber}"></span>
         </div>
+        <input type="hidden" name="draftState" id="draftStateInput" th:value="${draftState}"/>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
@@ -97,15 +101,143 @@
             </div>
 
             <div class="credit-field">
-                <label class="block text-sm font-semibold mb-1">Cuotas (1-12)</label>
-                <select name="weeksCount"
-                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option th:each="i : ${#numbers.sequence(1,12)}"
-                            th:value="${i}" th:text="${i}"></option>
-                </select>
+                <label class="block text-sm font-semibold mb-1">Cantidad de cuotas</label>
+                <input type="number" min="1" max="365" name="weeksCount" value="4"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
 
             <div class="credit-field md:col-span-3">
+                <div class="mb-6 rounded-xl border border-blue-100 bg-blue-50/60 p-5">
+                    <h3 class="text-base font-semibold text-blue-900 mb-4">Calculadora automatica de cuotas</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Recargo financiero</label>
+                            <input type="number" step="0.01" id="calcRecargo" value="1.26"
+                                   class="w-full border rounded px-3 py-2"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Multiplicador contado</label>
+                            <input type="number" step="0.01" id="calcMultContado" value="1.30"
+                                   class="w-full border rounded px-3 py-2"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Multiplicador debito</label>
+                            <input type="number" step="0.01" id="calcMultDebito" value="1.50"
+                                   class="w-full border rounded px-3 py-2"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Interes diario</label>
+                            <input type="number" step="0.01" id="calcIntDia" value="2"
+                                   class="w-full border rounded px-3 py-2"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Dias (plan diario)</label>
+                            <input type="number" min="1" id="calcDias" value="144"
+                                   class="w-full border rounded px-3 py-2"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Interes semanal</label>
+                            <input type="number" step="0.01" id="calcIntSem" value="2"
+                                   class="w-full border rounded px-3 py-2"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Semanas (plan semanal)</label>
+                            <input type="number" min="1" id="calcSemanas" value="13"
+                                   class="w-full border rounded px-3 py-2"/>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Meses corto / interes</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="number" min="1" id="calcMeses4" value="4"
+                                       class="w-full border rounded px-3 py-2"/>
+                                <input type="number" step="0.01" id="calcIntMes4" value="2"
+                                       class="w-full border rounded px-3 py-2"/>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">Meses largo / interes</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="number" min="1" id="calcMeses8" value="8"
+                                       class="w-full border rounded px-3 py-2"/>
+                                <input type="number" step="0.01" id="calcIntMes8" value="2.5"
+                                       class="w-full border rounded px-3 py-2"/>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div class="rounded-lg border border-green-100 bg-white p-4">
+                            <div class="text-sm text-gray-600">Contado</div>
+                            <div class="text-2xl font-bold text-green-700" id="calcContado">$0</div>
+                        </div>
+                        <div class="rounded-lg border border-indigo-100 bg-white p-4">
+                            <div class="text-sm text-gray-600">Debito / Transferencia</div>
+                            <div class="text-2xl font-bold text-indigo-700" id="calcDebito">$0</div>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto mt-4">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-blue-100 text-left">
+                            <tr>
+                                <th class="px-3 py-2">Plan</th>
+                                <th class="px-3 py-2">Cantidad</th>
+                                <th class="px-3 py-2">Cuota financiada</th>
+                                <th class="px-3 py-2">Cuota en efectivo</th>
+                                <th class="px-3 py-2 text-right">Accion</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr class="border-t bg-white">
+                                <td class="px-3 py-2">Diaria</td>
+                                <td class="px-3 py-2" id="calcDiasLabel">144 dias</td>
+                                <td class="px-3 py-2 font-semibold" id="calcDia">$0</td>
+                                <td class="px-3 py-2" id="calcDiaEf">$0</td>
+                                <td class="px-3 py-2 text-right">
+                                    <button type="button"
+                                            class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+                                            data-plan="DAILY">Aplicar</button>
+                                </td>
+                            </tr>
+                            <tr class="border-t bg-white">
+                                <td class="px-3 py-2">Semanal</td>
+                                <td class="px-3 py-2" id="calcSemanasLabel">13 semanas</td>
+                                <td class="px-3 py-2 font-semibold" id="calcSem">$0</td>
+                                <td class="px-3 py-2" id="calcSemEf">$0</td>
+                                <td class="px-3 py-2 text-right">
+                                    <button type="button"
+                                            class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+                                            data-plan="WEEKLY">Aplicar</button>
+                                </td>
+                            </tr>
+                            <tr class="border-t bg-white">
+                                <td class="px-3 py-2">Mensual corto</td>
+                                <td class="px-3 py-2" id="calcMes4Label">4 meses</td>
+                                <td class="px-3 py-2 font-semibold" id="calcMes4">$0</td>
+                                <td class="px-3 py-2" id="calcMes4Ef">$0</td>
+                                <td class="px-3 py-2 text-right">
+                                    <button type="button"
+                                            class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+                                            data-plan="MONTHLY_SHORT">Aplicar</button>
+                                </td>
+                            </tr>
+                            <tr class="border-t bg-white">
+                                <td class="px-3 py-2">Mensual largo</td>
+                                <td class="px-3 py-2" id="calcMes8Label">8 meses</td>
+                                <td class="px-3 py-2 font-semibold" id="calcMes8">$0</td>
+                                <td class="px-3 py-2" id="calcMes8Ef">$0</td>
+                                <td class="px-3 py-2 text-right">
+                                    <button type="button"
+                                            class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
+                                            data-plan="MONTHLY_LONG">Aplicar</button>
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-2 text-xs text-gray-600" id="calcAppliedPlan"></p>
+                </div>
+
                 <label class="block text-sm font-semibold mb-2">Dias de vencimiento</label>
                 <div id="dailyOptions" class="flex flex-wrap gap-3">
                     <label class="inline-flex items-center gap-2">
@@ -240,7 +372,7 @@
                    class="px-5 py-2 rounded border border-gray-300 hover:bg-gray-100">
                     Cancelar
                 </a>
-                <button class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
+                <button type="submit" id="saveSaleBtn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
                     Guardar Venta
                 </button>
             </div>
@@ -265,10 +397,41 @@
             const monthlyOptions = document.getElementById('monthlyOptions');
             const saleNumberBadge = document.getElementById('saleNumberBadge');
             const saleNumberHelp = document.getElementById('saleNumberHelp');
+            const saleForm = document.querySelector('form');
+            const hasFormError = Boolean(document.querySelector('[data-form-error="true"]'));
+            const hasSuccessMessage = Boolean(document.getElementById('saleSuccessMessage'));
+            const formErrorBox = document.getElementById('formErrorBox');
+            const draftKey = 'sales-form-draft-v1';
+            const draftStateInput = document.getElementById('draftStateInput');
+            const firstRowTemplate = body.querySelector('tr') ? body.querySelector('tr').cloneNode(true) : null;
+            const calcFields = [
+                'calcRecargo', 'calcMultContado', 'calcMultDebito',
+                'calcDias', 'calcIntDia', 'calcSemanas', 'calcIntSem',
+                'calcMeses4', 'calcIntMes4', 'calcMeses8', 'calcIntMes8'
+            ].map(id => document.getElementById(id)).filter(Boolean);
+            const weeksCountInput = document.querySelector('input[name="weeksCount"]');
+            const discountInput = document.querySelector('input[name="discountAmount"]');
+            const calcAppliedPlan = document.getElementById('calcAppliedPlan');
+            const firstDueDateInput = document.querySelector('input[name="firstDueDate"]');
+            const weeklyDaySelect = document.querySelector('select[name="weeklyDay"]');
+            const biMonthlyDay1Input = document.querySelector('input[name="biMonthlyDay1"]');
+            const biMonthlyDay2Input = document.querySelector('input[name="biMonthlyDay2"]');
+            const monthlyDayInput = document.querySelector('input[name="monthlyDay"]');
 
             function parseNumber(value) {
                 const num = parseFloat(value);
                 return Number.isFinite(num) ? num : 0;
+            }
+
+            function roundTo50(value) {
+                if (value <= 0) {
+                    return 0;
+                }
+                return Math.ceil(value / 50) * 50;
+            }
+
+            function money(value) {
+                return '$' + (parseNumber(value).toFixed(2));
             }
 
             function getPriceFromOption(option) {
@@ -292,6 +455,164 @@
                 });
                 document.getElementById('totalItems').textContent = totalItems.toString();
                 document.getElementById('totalAmount').textContent = totalAmount.toFixed(2);
+                updateCalculator();
+                saveDraft();
+            }
+
+            function getBaseCartTotal() {
+                let baseTotal = 0;
+                body.querySelectorAll('tr').forEach(row => {
+                    const select = row.querySelector('.product-select');
+                    const option = select ? select.options[select.selectedIndex] : null;
+                    const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
+                    if (!option || !option.value || qty <= 0) {
+                        return;
+                    }
+                    baseTotal += parseNumber(getPriceFromOption(option)) * qty;
+                });
+                const discount = discountInput ? parseNumber(discountInput.value) : 0;
+                return Math.max(0, baseTotal - discount);
+            }
+
+            function getCalcConfig() {
+                function val(id) {
+                    const el = document.getElementById(id);
+                    return el ? el.value : '';
+                }
+                return {
+                    recargo: parseNumber(val('calcRecargo')),
+                    multContado: parseNumber(val('calcMultContado')),
+                    multDebito: parseNumber(val('calcMultDebito')),
+                    dias: Math.max(1, Math.round(parseNumber(val('calcDias')))),
+                    intDia: parseNumber(val('calcIntDia')),
+                    semanas: Math.max(1, Math.round(parseNumber(val('calcSemanas')))),
+                    intSem: parseNumber(val('calcIntSem')),
+                    meses4: Math.max(1, Math.round(parseNumber(val('calcMeses4')))),
+                    intMes4: parseNumber(val('calcIntMes4')),
+                    meses8: Math.max(1, Math.round(parseNumber(val('calcMeses8')))),
+                    intMes8: parseNumber(val('calcIntMes8'))
+                };
+            }
+
+            function setText(id, value) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.textContent = value;
+                }
+            }
+
+            function calculatePlans(base) {
+                const cfg = getCalcConfig();
+                const recargo = cfg.recargo > 0 ? cfg.recargo : 1;
+                const diaria = roundTo50((base * cfg.intDia * recargo) / cfg.dias);
+                const semanal = roundTo50((base * cfg.intSem * recargo) / cfg.semanas);
+                const mensualCorto = roundTo50((base * cfg.intMes4 * recargo) / cfg.meses4);
+                const mensualLargo = roundTo50((base * cfg.intMes8 * recargo) / cfg.meses8);
+
+                return {
+                    cfg,
+                    recargo,
+                    contado: roundTo50(base * cfg.multContado),
+                    debito: roundTo50(base * cfg.multDebito),
+                    plans: {
+                        DAILY: {count: cfg.dias, fee: diaria, cashFee: roundTo50(diaria / recargo), frequency: 'DAILY'},
+                        WEEKLY: {count: cfg.semanas, fee: semanal, cashFee: roundTo50(semanal / recargo), frequency: 'WEEKLY'},
+                        MONTHLY_SHORT: {count: cfg.meses4, fee: mensualCorto, cashFee: roundTo50(mensualCorto / recargo), frequency: 'MONTHLY'},
+                        MONTHLY_LONG: {count: cfg.meses8, fee: mensualLargo, cashFee: roundTo50(mensualLargo / recargo), frequency: 'MONTHLY'}
+                    }
+                };
+            }
+
+            function updateCalculator() {
+                const base = getBaseCartTotal();
+                const data = calculatePlans(base);
+
+                setText('calcContado', money(data.contado));
+                setText('calcDebito', money(data.debito));
+
+                setText('calcDiasLabel', data.cfg.dias + ' dias');
+                setText('calcSemanasLabel', data.cfg.semanas + ' semanas');
+                setText('calcMes4Label', data.cfg.meses4 + ' meses');
+                setText('calcMes8Label', data.cfg.meses8 + ' meses');
+
+                setText('calcDia', money(data.plans.DAILY.fee));
+                setText('calcSem', money(data.plans.WEEKLY.fee));
+                setText('calcMes4', money(data.plans.MONTHLY_SHORT.fee));
+                setText('calcMes8', money(data.plans.MONTHLY_LONG.fee));
+                setText('calcDiaEf', money(data.plans.DAILY.cashFee));
+                setText('calcSemEf', money(data.plans.WEEKLY.cashFee));
+                setText('calcMes4Ef', money(data.plans.MONTHLY_SHORT.cashFee));
+                setText('calcMes8Ef', money(data.plans.MONTHLY_LONG.cashFee));
+            }
+
+            function applyPlanToCart(planKey) {
+                const base = getBaseCartTotal();
+                const data = calculatePlans(base);
+                const plan = data.plans[planKey];
+                if (!plan || plan.count < 1 || plan.fee <= 0) {
+                    return;
+                }
+
+                const rows = Array.from(body.querySelectorAll('tr')).filter(row => {
+                    const select = row.querySelector('.product-select');
+                    const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
+                    return select && select.value && qty > 0;
+                });
+                if (!rows.length) {
+                    return;
+                }
+
+                const targetTotal = plan.fee * plan.count;
+                let baseTotal = 0;
+                const rowBaseTotals = rows.map(row => {
+                    const select = row.querySelector('.product-select');
+                    const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
+                    const option = select.options[select.selectedIndex];
+                    const lineBase = parseNumber(getPriceFromOption(option)) * qty;
+                    baseTotal += lineBase;
+                    return lineBase;
+                });
+                if (baseTotal <= 0) {
+                    return;
+                }
+
+                let accumulated = 0;
+                rows.forEach((row, index) => {
+                    const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
+                    const priceInput = row.querySelector('.unit-price');
+                    let lineTarget;
+                    if (index === rows.length - 1) {
+                        lineTarget = targetTotal - accumulated;
+                    } else {
+                        lineTarget = Number((targetTotal * (rowBaseTotals[index] / baseTotal)).toFixed(2));
+                        accumulated += lineTarget;
+                    }
+                    const unitPrice = qty > 0 ? Number((lineTarget / qty).toFixed(2)) : 0;
+                    priceInput.value = unitPrice.toFixed(2);
+                });
+
+                if (paymentType) {
+                    paymentType.value = 'CREDIT';
+                }
+                if (paymentFrequency) {
+                    paymentFrequency.value = plan.frequency;
+                }
+                if (weeksCountInput) {
+                    weeksCountInput.value = String(plan.count);
+                }
+                toggleCreditFields();
+                toggleFrequencyOptions();
+                updateTotals();
+
+                const label = planKey === 'DAILY'
+                    ? 'Diaria'
+                    : planKey === 'WEEKLY'
+                        ? 'Semanal'
+                        : planKey === 'MONTHLY_SHORT' ? 'Mensual corto' : 'Mensual largo';
+                if (calcAppliedPlan) {
+                    calcAppliedPlan.textContent = 'Plan aplicado: ' + label + ' | ' + plan.count + ' cuotas de ' + money(plan.fee);
+                }
+                saveDraft();
             }
 
             function bindRow(row) {
@@ -329,15 +650,47 @@
                 });
             }
 
+            function buildEmptyRow() {
+                if (!firstRowTemplate) {
+                    return null;
+                }
+                const row = firstRowTemplate.cloneNode(true);
+                row.querySelectorAll('input').forEach(input => input.value = input.name === 'quantities' ? 1 : '');
+                row.querySelector('select').selectedIndex = 0;
+                bindRow(row);
+                return row;
+            }
+
             bindRow(body.querySelector('tr'));
             updateTotals();
+            calcFields.forEach(field => field.addEventListener('input', updateCalculator));
+            if (discountInput) {
+                discountInput.addEventListener('input', updateCalculator);
+            }
+            document.querySelectorAll('.apply-plan').forEach(button => {
+                button.addEventListener('click', function () {
+                    applyPlanToCart(button.dataset.plan);
+                });
+            });
 
             function toggleCreditFields() {
                 const isCredit = paymentType && paymentType.value === 'CREDIT';
                 creditFields.forEach(field => {
                     field.classList.toggle('hidden', !isCredit);
                 });
+                if (firstDueDateInput) {
+                    firstDueDateInput.required = isCredit;
+                }
+                if (paymentFrequency) {
+                    paymentFrequency.required = isCredit;
+                }
+                if (weeksCountInput) {
+                    weeksCountInput.required = isCredit;
+                }
                 if (!isCredit) {
+                    if (firstDueDateInput) {
+                        firstDueDateInput.setCustomValidity('');
+                    }
                     updateSaleNumberBadge();
                     return;
                 }
@@ -354,6 +707,19 @@
                 weeklyOptions.classList.toggle('hidden', freq !== 'WEEKLY');
                 biweeklyOptions.classList.toggle('hidden', freq !== 'BIWEEKLY');
                 monthlyOptions.classList.toggle('hidden', freq !== 'MONTHLY');
+
+                if (weeklyDaySelect) {
+                    weeklyDaySelect.required = freq === 'WEEKLY';
+                }
+                if (biMonthlyDay1Input) {
+                    biMonthlyDay1Input.required = freq === 'BIWEEKLY';
+                }
+                if (biMonthlyDay2Input) {
+                    biMonthlyDay2Input.required = freq === 'BIWEEKLY';
+                }
+                if (monthlyDayInput) {
+                    monthlyDayInput.required = freq === 'MONTHLY';
+                }
             }
 
             if (clientSearch && clientSelect) {
@@ -447,11 +813,10 @@
             }
 
             addRow.addEventListener('click', function () {
-                const row = body.querySelector('tr').cloneNode(true);
-                row.querySelectorAll('input').forEach(input => input.value = input.name === 'quantities' ? 1 : '');
-                row.querySelector('select').selectedIndex = 0;
-                bindRow(row);
-                body.appendChild(row);
+                const row = buildEmptyRow();
+                if (row) {
+                    body.appendChild(row);
+                }
                 updateTotals();
             });
 
@@ -474,7 +839,253 @@
                     saleNumberHelp.textContent = value ? 'Numero: ' + value : '';
                 }
             }
+
+            function showFormError(message) {
+                if (!saleForm) {
+                    return;
+                }
+                let box = formErrorBox || document.getElementById('formErrorBoxRuntime');
+                if (!box) {
+                    box = document.createElement('div');
+                    box.id = 'formErrorBoxRuntime';
+                    box.className = 'mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700';
+                    saleForm.insertBefore(box, saleForm.firstChild);
+                }
+                box.textContent = message;
+                box.scrollIntoView({behavior: 'smooth', block: 'center'});
+            }
+
+            function clearFormError() {
+                const runtimeBox = document.getElementById('formErrorBoxRuntime');
+                if (runtimeBox) {
+                    runtimeBox.remove();
+                }
+            }
+
+            function validateBeforeSubmit() {
+                clearFormError();
+
+                const clientId = getFieldValue('select[name="clientId"]');
+                if (!clientId) {
+                    return 'Debe seleccionar un cliente';
+                }
+
+                const selectedRows = Array.from(body.querySelectorAll('tr')).filter(row => {
+                    const select = row.querySelector('.product-select');
+                    return select && select.value;
+                });
+                if (!selectedRows.length) {
+                    return 'Debe agregar al menos un producto';
+                }
+
+                for (let i = 0; i < selectedRows.length; i++) {
+                    const row = selectedRows[i];
+                    const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
+                    const price = parseNumber(row.querySelector('input[name="unitPrices"]').value);
+                    if (qty <= 0 || price <= 0) {
+                        return 'Cantidad y precio deben ser mayores a cero';
+                    }
+                }
+
+                const isCredit = paymentType && paymentType.value === 'CREDIT';
+                if (!isCredit) {
+                    return '';
+                }
+
+                const firstDueDate = getFieldValue('input[name="firstDueDate"]');
+                if (!firstDueDate) {
+                    return 'Debe seleccionar la fecha de primer vencimiento';
+                }
+
+                const frequency = getFieldValue('select[name="paymentFrequency"]');
+                if (!frequency) {
+                    return 'Debe seleccionar la frecuencia de pago';
+                }
+
+                const installments = parseInt(getFieldValue('input[name="weeksCount"]'), 10);
+                if (!Number.isFinite(installments) || installments < 1 || installments > 365) {
+                    return 'Cantidad de cuotas invalida (1-365)';
+                }
+
+                if (frequency === 'DAILY') {
+                    const dailyChecked = document.querySelectorAll('input[name="dailyDays"]:checked').length;
+                    if (!dailyChecked) {
+                        return 'Debe seleccionar al menos un dia de vencimiento';
+                    }
+                } else if (frequency === 'WEEKLY') {
+                    const weeklyDay = getFieldValue('select[name="weeklyDay"]');
+                    if (!weeklyDay) {
+                        return 'Debe seleccionar el dia de la semana';
+                    }
+                } else if (frequency === 'BIWEEKLY') {
+                    const d1 = parseInt(getFieldValue('input[name="biMonthlyDay1"]'), 10);
+                    const d2 = parseInt(getFieldValue('input[name="biMonthlyDay2"]'), 10);
+                    if (!Number.isFinite(d1) || !Number.isFinite(d2)) {
+                        return 'Debe seleccionar dos dias del mes';
+                    }
+                    if (d1 < 1 || d1 > 28 || d2 < 1 || d2 > 28) {
+                        return 'Dias del mes invalidos (1-28)';
+                    }
+                } else if (frequency === 'MONTHLY') {
+                    const monthlyDay = parseInt(getFieldValue('input[name="monthlyDay"]'), 10);
+                    if (!Number.isFinite(monthlyDay) || monthlyDay < 1 || monthlyDay > 28) {
+                        return 'Dia de vencimiento invalido (1-28)';
+                    }
+                }
+
+                return '';
+            }
+
+            function getFieldValue(selector) {
+                const input = document.querySelector(selector);
+                return input ? input.value : '';
+            }
+
+            function setFieldValue(selector, value) {
+                const input = document.querySelector(selector);
+                if (input && value !== undefined && value !== null) {
+                    input.value = value;
+                }
+            }
+
+            function saveDraft() {
+                if (!saleForm) {
+                    return '';
+                }
+                const rows = Array.from(body.querySelectorAll('tr')).map(row => {
+                    const productSelect = row.querySelector('.product-select');
+                    const quantityInput = row.querySelector('input[name="quantities"]');
+                    const unitPriceInput = row.querySelector('input[name="unitPrices"]');
+                    return {
+                        productId: productSelect ? productSelect.value : '',
+                        quantity: quantityInput ? quantityInput.value : '1',
+                        unitPrice: unitPriceInput ? unitPriceInput.value : ''
+                    };
+                });
+
+                const calculator = {};
+                calcFields.forEach(field => {
+                    calculator[field.id] = field.value;
+                });
+
+                const draft = {
+                    clientId: getFieldValue('select[name="clientId"]'),
+                    paymentType: getFieldValue('select[name="paymentType"]'),
+                    priceMode: getFieldValue('#priceMode'),
+                    saleDate: getFieldValue('input[name="saleDate"]'),
+                    firstDueDate: getFieldValue('input[name="firstDueDate"]'),
+                    paymentFrequency: getFieldValue('select[name="paymentFrequency"]'),
+                    discountAmount: getFieldValue('input[name="discountAmount"]'),
+                    weeksCount: getFieldValue('input[name="weeksCount"]'),
+                    dailyDays: Array.from(document.querySelectorAll('input[name="dailyDays"]:checked')).map(el => el.value),
+                    weeklyDay: getFieldValue('select[name="weeklyDay"]'),
+                    biMonthlyDay1: getFieldValue('input[name="biMonthlyDay1"]'),
+                    biMonthlyDay2: getFieldValue('input[name="biMonthlyDay2"]'),
+                    monthlyDay: getFieldValue('input[name="monthlyDay"]'),
+                    calculator: calculator,
+                    rows
+                };
+
+                const serialized = JSON.stringify(draft);
+                localStorage.setItem(draftKey, serialized);
+                if (draftStateInput) {
+                    draftStateInput.value = serialized;
+                }
+                return serialized;
+            }
+
+            function parseDraft(raw) {
+                if (!raw) {
+                    return null;
+                }
+                try {
+                    return JSON.parse(raw);
+                } catch (e) {
+                    return null;
+                }
+            }
+
+            function restoreDraft(raw) {
+                const draft = parseDraft(raw);
+                if (!draft) {
+                    return;
+                }
+
+                setFieldValue('select[name="clientId"]', draft.clientId);
+                setFieldValue('select[name="paymentType"]', draft.paymentType);
+                setFieldValue('#priceMode', draft.priceMode);
+                setFieldValue('input[name="saleDate"]', draft.saleDate);
+                setFieldValue('input[name="firstDueDate"]', draft.firstDueDate);
+                setFieldValue('select[name="paymentFrequency"]', draft.paymentFrequency);
+                setFieldValue('input[name="discountAmount"]', draft.discountAmount);
+                setFieldValue('input[name="weeksCount"]', draft.weeksCount);
+                setFieldValue('select[name="weeklyDay"]', draft.weeklyDay);
+                setFieldValue('input[name="biMonthlyDay1"]', draft.biMonthlyDay1);
+                setFieldValue('input[name="biMonthlyDay2"]', draft.biMonthlyDay2);
+                setFieldValue('input[name="monthlyDay"]', draft.monthlyDay);
+
+                document.querySelectorAll('input[name="dailyDays"]').forEach(checkbox => {
+                    checkbox.checked = Array.isArray(draft.dailyDays) && draft.dailyDays.includes(checkbox.value);
+                });
+
+                if (draft.calculator) {
+                    calcFields.forEach(field => {
+                        if (Object.prototype.hasOwnProperty.call(draft.calculator, field.id)) {
+                            field.value = draft.calculator[field.id];
+                        }
+                    });
+                }
+
+                if (Array.isArray(draft.rows) && draft.rows.length > 0) {
+                    body.innerHTML = '';
+                    draft.rows.forEach(savedRow => {
+                        const row = buildEmptyRow();
+                        if (!row) {
+                            return;
+                        }
+                        const rowSelect = row.querySelector('.product-select');
+                        const qtyInput = row.querySelector('input[name="quantities"]');
+                        const priceInput = row.querySelector('input[name="unitPrices"]');
+                        if (rowSelect) {
+                            rowSelect.value = savedRow.productId || '';
+                        }
+                        if (qtyInput) {
+                            qtyInput.value = savedRow.quantity || '1';
+                        }
+                        if (priceInput) {
+                            priceInput.value = savedRow.unitPrice || '';
+                        }
+                        body.appendChild(row);
+                    });
+                }
+
+                toggleCreditFields();
+                toggleFrequencyOptions();
+                updateTotals();
+                saveDraft();
+            }
+
+            if (hasSuccessMessage) {
+                localStorage.removeItem(draftKey);
+            }
+            const serverDraft = draftStateInput ? draftStateInput.value : '';
+            if (hasFormError && serverDraft) {
+                restoreDraft(serverDraft);
+            } else if (hasFormError && localStorage.getItem(draftKey)) {
+                restoreDraft(localStorage.getItem(draftKey));
+            } else if (!hasSuccessMessage && localStorage.getItem(draftKey)) {
+                restoreDraft(localStorage.getItem(draftKey));
+            }
+            if (saleForm) {
+                saleForm.addEventListener('input', saveDraft);
+                saleForm.addEventListener('change', saveDraft);
+                saleForm.addEventListener('submit', function (event) {
+                    saveDraft();
+                });
+            }
+
             toggleCreditFields();
+            updateCalculator();
         })();
     </script>
 

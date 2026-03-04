@@ -185,8 +185,8 @@ public class SaleServiceImpl implements SaleService {
                                        List<String> dueDays,
                                        LocalDate firstDueDate,
                                        Integer weeksCount) {
-        if (weeksCount == null || weeksCount < 1 || weeksCount > 12) {
-            throw new InvalidSaleException("Cantidad de cuotas invalida (1-12)");
+        if (weeksCount == null || weeksCount < 1 || weeksCount > 365) {
+            throw new InvalidSaleException("Cantidad de cuotas invalida (1-365)");
         }
         if (firstDueDate == null) {
             throw new InvalidSaleException("Fecha de primer vencimiento invalida");
