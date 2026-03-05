@@ -24,6 +24,19 @@
             <span th:if="${accountNumber}" th:text="${' | Numero de cuenta: ' + accountNumber}"></span>
         </div>
         <input type="hidden" name="draftState" id="draftStateInput" th:value="${draftState}"/>
+        <div id="calcConfig"
+             th:attr="data-recargo=${calculatorConfig.recargo},
+                      data-mult-contado=${calculatorConfig.multContado},
+                      data-mult-debito=${calculatorConfig.multDebito},
+                      data-dias=${calculatorConfig.dias},
+                      data-int-dia=${calculatorConfig.intDia},
+                      data-semanas=${calculatorConfig.semanas},
+                      data-int-sem=${calculatorConfig.intSem},
+                      data-meses-corto=${calculatorConfig.mesesCorto},
+                      data-int-mes-corto=${calculatorConfig.intMesCorto},
+                      data-meses-largo=${calculatorConfig.mesesLargo},
+                      data-int-mes-largo=${calculatorConfig.intMesLargo}"
+             class="hidden"></div>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
@@ -40,6 +53,31 @@
                             th:text="${client.nationalId + ' - ' + client.firstName + ' ' + client.lastName}">
                     </option>
                 </select>
+                <label class="mt-3 inline-flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" id="quickClientToggle" class="rounded"/>
+                    Crear cliente rapido en esta venta
+                </label>
+            </div>
+
+            <div id="quickClientFields" class="hidden md:col-span-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <p class="text-sm font-semibold mb-3">Alta rapida de cliente</p>
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <input type="text" name="quickClientNationalId" id="quickClientNationalId"
+                           placeholder="DNI/CUIT"
+                           class="border rounded px-3 py-2"/>
+                    <input type="text" name="quickClientFirstName" id="quickClientFirstName"
+                           placeholder="Nombre"
+                           class="border rounded px-3 py-2"/>
+                    <input type="text" name="quickClientLastName" id="quickClientLastName"
+                           placeholder="Apellido"
+                           class="border rounded px-3 py-2"/>
+                    <input type="text" name="quickClientPhone"
+                           placeholder="Telefono"
+                           class="border rounded px-3 py-2"/>
+                    <input type="text" name="quickClientAddress"
+                           placeholder="Direccion"
+                           class="border rounded px-3 py-2"/>
+                </div>
             </div>
 
             <div>
@@ -108,71 +146,29 @@
 
             <div class="credit-field md:col-span-3">
                 <div class="mb-6 rounded-xl border border-blue-100 bg-blue-50/60 p-5">
-                    <h3 class="text-base font-semibold text-blue-900 mb-4">Calculadora automatica de cuotas</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Recargo financiero</label>
-                            <input type="number" step="0.01" id="calcRecargo" value="1.26"
-                                   class="w-full border rounded px-3 py-2"/>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Multiplicador contado</label>
-                            <input type="number" step="0.01" id="calcMultContado" value="1.30"
-                                   class="w-full border rounded px-3 py-2"/>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Multiplicador debito</label>
-                            <input type="number" step="0.01" id="calcMultDebito" value="1.50"
-                                   class="w-full border rounded px-3 py-2"/>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Interes diario</label>
-                            <input type="number" step="0.01" id="calcIntDia" value="2"
-                                   class="w-full border rounded px-3 py-2"/>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Dias (plan diario)</label>
-                            <input type="number" min="1" id="calcDias" value="144"
-                                   class="w-full border rounded px-3 py-2"/>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Interes semanal</label>
-                            <input type="number" step="0.01" id="calcIntSem" value="2"
-                                   class="w-full border rounded px-3 py-2"/>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Semanas (plan semanal)</label>
-                            <input type="number" min="1" id="calcSemanas" value="13"
-                                   class="w-full border rounded px-3 py-2"/>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Meses corto / interes</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <input type="number" min="1" id="calcMeses4" value="4"
-                                       class="w-full border rounded px-3 py-2"/>
-                                <input type="number" step="0.01" id="calcIntMes4" value="2"
-                                       class="w-full border rounded px-3 py-2"/>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold mb-1">Meses largo / interes</label>
-                            <div class="grid grid-cols-2 gap-2">
-                                <input type="number" min="1" id="calcMeses8" value="8"
-                                       class="w-full border rounded px-3 py-2"/>
-                                <input type="number" step="0.01" id="calcIntMes8" value="2.5"
-                                       class="w-full border rounded px-3 py-2"/>
-                            </div>
-                        </div>
-                    </div>
+                    <h3 class="text-base font-semibold text-blue-900 mb-4">Opciones automáticas de cobro</h3>
+                    <p class="text-sm text-gray-600 mb-4">
+                        Valores configurados por administracion. Seleccione la opcion y el sistema completa la financiacion automaticamente.
+                    </p>
 
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                         <div class="rounded-lg border border-green-100 bg-white p-4">
                             <div class="text-sm text-gray-600">Contado</div>
                             <div class="text-2xl font-bold text-green-700" id="calcContado">$0</div>
+                            <button type="button"
+                                    id="applyCashBtn"
+                                    class="mt-2 rounded bg-green-600 px-3 py-1 text-white hover:bg-green-700">
+                                Aplicar contado
+                            </button>
                         </div>
                         <div class="rounded-lg border border-indigo-100 bg-white p-4">
                             <div class="text-sm text-gray-600">Debito / Transferencia</div>
                             <div class="text-2xl font-bold text-indigo-700" id="calcDebito">$0</div>
+                            <button type="button"
+                                    id="applyDebitBtn"
+                                    class="mt-2 rounded bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700">
+                                Aplicar debito/transf
+                            </button>
                         </div>
                     </div>
 
@@ -218,7 +214,7 @@
                                 <td class="px-3 py-2 text-right">
                                     <button type="button"
                                             class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
-                                            data-plan="MONTHLY_SHORT">Aplicar</button>
+                                            data-plan="MONTHLY_SHORT">Aplicar 4 meses</button>
                                 </td>
                             </tr>
                             <tr class="border-t bg-white">
@@ -229,7 +225,7 @@
                                 <td class="px-3 py-2 text-right">
                                     <button type="button"
                                             class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
-                                            data-plan="MONTHLY_LONG">Aplicar</button>
+                                            data-plan="MONTHLY_LONG">Aplicar 8 meses</button>
                                 </td>
                             </tr>
                             </tbody>
@@ -328,6 +324,7 @@
                                     th:value="${product.id}"
                                     th:data-retail="${product.priceRetail}"
                                     th:data-wholesale="${product.priceWholesale}"
+                                    th:data-cost-vat="${product.cost * (100 + product.vatRate) / 100}"
                                     th:data-barcode="${product.barcode}"
                                     th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
                             </option>
@@ -387,6 +384,11 @@
             const clientSearch = document.getElementById('clientSearch');
             const productSearch = document.getElementById('productSearch');
             const clientSelect = document.querySelector('select[name="clientId"]');
+            const quickClientToggle = document.getElementById('quickClientToggle');
+            const quickClientFields = document.getElementById('quickClientFields');
+            const quickClientNationalId = document.getElementById('quickClientNationalId');
+            const quickClientFirstName = document.getElementById('quickClientFirstName');
+            const quickClientLastName = document.getElementById('quickClientLastName');
             const priceMode = document.getElementById('priceMode');
             const paymentType = document.getElementById('paymentType');
             const paymentFrequency = document.getElementById('paymentFrequency');
@@ -404,14 +406,13 @@
             const draftKey = 'sales-form-draft-v1';
             const draftStateInput = document.getElementById('draftStateInput');
             const firstRowTemplate = body.querySelector('tr') ? body.querySelector('tr').cloneNode(true) : null;
-            const calcFields = [
-                'calcRecargo', 'calcMultContado', 'calcMultDebito',
-                'calcDias', 'calcIntDia', 'calcSemanas', 'calcIntSem',
-                'calcMeses4', 'calcIntMes4', 'calcMeses8', 'calcIntMes8'
-            ].map(id => document.getElementById(id)).filter(Boolean);
+            const calcConfigEl = document.getElementById('calcConfig');
+            const applyCashBtn = document.getElementById('applyCashBtn');
+            const applyDebitBtn = document.getElementById('applyDebitBtn');
             const weeksCountInput = document.querySelector('input[name="weeksCount"]');
             const discountInput = document.querySelector('input[name="discountAmount"]');
             const calcAppliedPlan = document.getElementById('calcAppliedPlan');
+            const saleDateInput = document.querySelector('input[name="saleDate"]');
             const firstDueDateInput = document.querySelector('input[name="firstDueDate"]');
             const weeklyDaySelect = document.querySelector('select[name="weeklyDay"]');
             const biMonthlyDay1Input = document.querySelector('input[name="biMonthlyDay1"]');
@@ -442,6 +443,39 @@
                 return mode === 'WHOLESALE' ? option.dataset.wholesale : option.dataset.retail;
             }
 
+            function getCalcBaseFromOption(option) {
+                if (!option) {
+                    return 0;
+                }
+                const costWithVat = parseNumber(option.dataset.costVat);
+                if (costWithVat > 0) {
+                    return costWithVat;
+                }
+                return parseNumber(getPriceFromOption(option));
+            }
+
+            function toggleQuickClientMode() {
+                const enabled = Boolean(quickClientToggle && quickClientToggle.checked);
+                if (quickClientFields) {
+                    quickClientFields.classList.toggle('hidden', !enabled);
+                }
+                if (clientSelect) {
+                    clientSelect.required = !enabled;
+                    if (enabled) {
+                        clientSelect.value = '';
+                    }
+                }
+                if (quickClientNationalId) {
+                    quickClientNationalId.required = enabled;
+                }
+                if (quickClientFirstName) {
+                    quickClientFirstName.required = enabled;
+                }
+                if (quickClientLastName) {
+                    quickClientLastName.required = enabled;
+                }
+            }
+
             function updateTotals() {
                 let totalItems = 0;
                 let totalAmount = 0;
@@ -468,29 +502,32 @@
                     if (!option || !option.value || qty <= 0) {
                         return;
                     }
-                    baseTotal += parseNumber(getPriceFromOption(option)) * qty;
+                    baseTotal += getCalcBaseFromOption(option) * qty;
                 });
                 const discount = discountInput ? parseNumber(discountInput.value) : 0;
                 return Math.max(0, baseTotal - discount);
             }
 
             function getCalcConfig() {
-                function val(id) {
-                    const el = document.getElementById(id);
-                    return el ? el.value : '';
+                function data(name, fallback) {
+                    if (!calcConfigEl) {
+                        return fallback;
+                    }
+                    const value = calcConfigEl.dataset[name];
+                    return value === undefined || value === '' ? fallback : value;
                 }
                 return {
-                    recargo: parseNumber(val('calcRecargo')),
-                    multContado: parseNumber(val('calcMultContado')),
-                    multDebito: parseNumber(val('calcMultDebito')),
-                    dias: Math.max(1, Math.round(parseNumber(val('calcDias')))),
-                    intDia: parseNumber(val('calcIntDia')),
-                    semanas: Math.max(1, Math.round(parseNumber(val('calcSemanas')))),
-                    intSem: parseNumber(val('calcIntSem')),
-                    meses4: Math.max(1, Math.round(parseNumber(val('calcMeses4')))),
-                    intMes4: parseNumber(val('calcIntMes4')),
-                    meses8: Math.max(1, Math.round(parseNumber(val('calcMeses8')))),
-                    intMes8: parseNumber(val('calcIntMes8'))
+                    recargo: parseNumber(data('recargo', '1.26')),
+                    multContado: parseNumber(data('multContado', '1.30')),
+                    multDebito: parseNumber(data('multDebito', '1.50')),
+                    dias: Math.max(1, Math.round(parseNumber(data('dias', '144')))),
+                    intDia: parseNumber(data('intDia', '2')),
+                    semanas: Math.max(1, Math.round(parseNumber(data('semanas', '13')))),
+                    intSem: parseNumber(data('intSem', '2')),
+                    mesesCorto: Math.max(1, Math.round(parseNumber(data('mesesCorto', '4')))),
+                    intMesCorto: parseNumber(data('intMesCorto', '2')),
+                    mesesLargo: Math.max(1, Math.round(parseNumber(data('mesesLargo', '8')))),
+                    intMesLargo: parseNumber(data('intMesLargo', '2.5'))
                 };
             }
 
@@ -506,8 +543,8 @@
                 const recargo = cfg.recargo > 0 ? cfg.recargo : 1;
                 const diaria = roundTo50((base * cfg.intDia * recargo) / cfg.dias);
                 const semanal = roundTo50((base * cfg.intSem * recargo) / cfg.semanas);
-                const mensualCorto = roundTo50((base * cfg.intMes4 * recargo) / cfg.meses4);
-                const mensualLargo = roundTo50((base * cfg.intMes8 * recargo) / cfg.meses8);
+                const mensualCorto = roundTo50((base * cfg.intMesCorto * recargo) / cfg.mesesCorto);
+                const mensualLargo = roundTo50((base * cfg.intMesLargo * recargo) / cfg.mesesLargo);
 
                 return {
                     cfg,
@@ -517,8 +554,8 @@
                     plans: {
                         DAILY: {count: cfg.dias, fee: diaria, cashFee: roundTo50(diaria / recargo), frequency: 'DAILY'},
                         WEEKLY: {count: cfg.semanas, fee: semanal, cashFee: roundTo50(semanal / recargo), frequency: 'WEEKLY'},
-                        MONTHLY_SHORT: {count: cfg.meses4, fee: mensualCorto, cashFee: roundTo50(mensualCorto / recargo), frequency: 'MONTHLY'},
-                        MONTHLY_LONG: {count: cfg.meses8, fee: mensualLargo, cashFee: roundTo50(mensualLargo / recargo), frequency: 'MONTHLY'}
+                        MONTHLY_SHORT: {count: cfg.mesesCorto, fee: mensualCorto, cashFee: roundTo50(mensualCorto / recargo), frequency: 'MONTHLY'},
+                        MONTHLY_LONG: {count: cfg.mesesLargo, fee: mensualLargo, cashFee: roundTo50(mensualLargo / recargo), frequency: 'MONTHLY'}
                     }
                 };
             }
@@ -532,8 +569,8 @@
 
                 setText('calcDiasLabel', data.cfg.dias + ' dias');
                 setText('calcSemanasLabel', data.cfg.semanas + ' semanas');
-                setText('calcMes4Label', data.cfg.meses4 + ' meses');
-                setText('calcMes8Label', data.cfg.meses8 + ' meses');
+                setText('calcMes4Label', data.cfg.mesesCorto + ' meses');
+                setText('calcMes8Label', data.cfg.mesesLargo + ' meses');
 
                 setText('calcDia', money(data.plans.DAILY.fee));
                 setText('calcSem', money(data.plans.WEEKLY.fee));
@@ -545,35 +582,27 @@
                 setText('calcMes8Ef', money(data.plans.MONTHLY_LONG.cashFee));
             }
 
-            function applyPlanToCart(planKey) {
-                const base = getBaseCartTotal();
-                const data = calculatePlans(base);
-                const plan = data.plans[planKey];
-                if (!plan || plan.count < 1 || plan.fee <= 0) {
-                    return;
-                }
-
+            function applyTargetTotal(targetTotal) {
                 const rows = Array.from(body.querySelectorAll('tr')).filter(row => {
                     const select = row.querySelector('.product-select');
                     const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
                     return select && select.value && qty > 0;
                 });
                 if (!rows.length) {
-                    return;
+                    return false;
                 }
 
-                const targetTotal = plan.fee * plan.count;
                 let baseTotal = 0;
                 const rowBaseTotals = rows.map(row => {
                     const select = row.querySelector('.product-select');
                     const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
                     const option = select.options[select.selectedIndex];
-                    const lineBase = parseNumber(getPriceFromOption(option)) * qty;
+                    const lineBase = getCalcBaseFromOption(option) * qty;
                     baseTotal += lineBase;
                     return lineBase;
                 });
                 if (baseTotal <= 0) {
-                    return;
+                    return false;
                 }
 
                 let accumulated = 0;
@@ -590,6 +619,42 @@
                     const unitPrice = qty > 0 ? Number((lineTarget / qty).toFixed(2)) : 0;
                     priceInput.value = unitPrice.toFixed(2);
                 });
+                return true;
+            }
+
+            function toDateOnly(value) {
+                if (!value) {
+                    return new Date();
+                }
+                const parts = value.split('-');
+                if (parts.length !== 3) {
+                    return new Date();
+                }
+                return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+            }
+
+            function toIsoDate(date) {
+                const y = date.getFullYear();
+                const m = String(date.getMonth() + 1).padStart(2, '0');
+                const d = String(date.getDate()).padStart(2, '0');
+                return y + '-' + m + '-' + d;
+            }
+
+            function dayName(date) {
+                return ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][date.getDay()];
+            }
+
+            function applyPlanToCart(planKey) {
+                const base = getBaseCartTotal();
+                const data = calculatePlans(base);
+                const plan = data.plans[planKey];
+                if (!plan || plan.count < 1 || plan.fee <= 0) {
+                    return;
+                }
+                const targetTotal = plan.fee * plan.count;
+                if (!applyTargetTotal(targetTotal)) {
+                    return;
+                }
 
                 if (paymentType) {
                     paymentType.value = 'CREDIT';
@@ -600,6 +665,33 @@
                 if (weeksCountInput) {
                     weeksCountInput.value = String(plan.count);
                 }
+
+                const saleDate = toDateOnly(saleDateInput ? saleDateInput.value : '');
+                let dueDate = new Date(saleDate);
+                if (planKey === 'DAILY') {
+                    dueDate.setDate(dueDate.getDate() + 1);
+                } else if (planKey === 'WEEKLY') {
+                    dueDate.setDate(dueDate.getDate() + 7);
+                } else {
+                    dueDate.setMonth(dueDate.getMonth() + 1);
+                }
+                if (firstDueDateInput) {
+                    firstDueDateInput.value = toIsoDate(dueDate);
+                }
+                if (planKey === 'DAILY') {
+                    document.querySelectorAll('input[name="dailyDays"]').forEach(checkbox => {
+                        checkbox.checked = checkbox.value === dayName(dueDate);
+                    });
+                } else if (planKey === 'WEEKLY') {
+                    if (weeklyDaySelect) {
+                        weeklyDaySelect.value = dayName(dueDate);
+                    }
+                } else {
+                    if (monthlyDayInput) {
+                        monthlyDayInput.value = String(Math.min(28, dueDate.getDate()));
+                    }
+                }
+
                 toggleCreditFields();
                 toggleFrequencyOptions();
                 updateTotals();
@@ -663,9 +755,42 @@
 
             bindRow(body.querySelector('tr'));
             updateTotals();
-            calcFields.forEach(field => field.addEventListener('input', updateCalculator));
             if (discountInput) {
                 discountInput.addEventListener('input', updateCalculator);
+            }
+            if (applyCashBtn) {
+                applyCashBtn.addEventListener('click', function () {
+                    const data = calculatePlans(getBaseCartTotal());
+                    if (!applyTargetTotal(data.contado)) {
+                        return;
+                    }
+                    if (paymentType) {
+                        paymentType.value = 'CASH';
+                    }
+                    toggleCreditFields();
+                    updateTotals();
+                    if (calcAppliedPlan) {
+                        calcAppliedPlan.textContent = 'Modo aplicado: Contado ' + money(data.contado);
+                    }
+                    saveDraft();
+                });
+            }
+            if (applyDebitBtn) {
+                applyDebitBtn.addEventListener('click', function () {
+                    const data = calculatePlans(getBaseCartTotal());
+                    if (!applyTargetTotal(data.debito)) {
+                        return;
+                    }
+                    if (paymentType) {
+                        paymentType.value = 'CASH';
+                    }
+                    toggleCreditFields();
+                    updateTotals();
+                    if (calcAppliedPlan) {
+                        calcAppliedPlan.textContent = 'Modo aplicado: Debito/Transferencia ' + money(data.debito);
+                    }
+                    saveDraft();
+                });
             }
             document.querySelectorAll('.apply-plan').forEach(button => {
                 button.addEventListener('click', function () {
@@ -703,10 +828,33 @@
                     return;
                 }
                 const freq = paymentFrequency.value;
-                dailyOptions.classList.toggle('hidden', freq !== 'DAILY');
+                dailyOptions.classList.add('hidden');
                 weeklyOptions.classList.toggle('hidden', freq !== 'WEEKLY');
                 biweeklyOptions.classList.toggle('hidden', freq !== 'BIWEEKLY');
                 monthlyOptions.classList.toggle('hidden', freq !== 'MONTHLY');
+
+                if (freq === 'BIWEEKLY') {
+                    if (biMonthlyDay1Input && !biMonthlyDay1Input.value) {
+                        biMonthlyDay1Input.value = '10';
+                    }
+                    if (biMonthlyDay2Input && !biMonthlyDay2Input.value) {
+                        biMonthlyDay2Input.value = '25';
+                    }
+                    if (firstDueDateInput && !firstDueDateInput.value) {
+                        const baseDate = toDateOnly(saleDateInput ? saleDateInput.value : '');
+                        const month = baseDate.getMonth();
+                        const year = baseDate.getFullYear();
+                        const tenth = new Date(year, month, 10);
+                        const twentyFifth = new Date(year, month, 25);
+                        let first = tenth;
+                        if (baseDate > tenth && baseDate <= twentyFifth) {
+                            first = twentyFifth;
+                        } else if (baseDate > twentyFifth) {
+                            first = new Date(year, month + 1, 10);
+                        }
+                        firstDueDateInput.value = toIsoDate(first);
+                    }
+                }
 
                 if (weeklyDaySelect) {
                     weeklyDaySelect.required = freq === 'WEEKLY';
@@ -963,13 +1111,14 @@
                     };
                 });
 
-                const calculator = {};
-                calcFields.forEach(field => {
-                    calculator[field.id] = field.value;
-                });
-
                 const draft = {
                     clientId: getFieldValue('select[name="clientId"]'),
+                    quickClientEnabled: quickClientToggle ? quickClientToggle.checked : false,
+                    quickClientNationalId: getFieldValue('input[name="quickClientNationalId"]'),
+                    quickClientFirstName: getFieldValue('input[name="quickClientFirstName"]'),
+                    quickClientLastName: getFieldValue('input[name="quickClientLastName"]'),
+                    quickClientPhone: getFieldValue('input[name="quickClientPhone"]'),
+                    quickClientAddress: getFieldValue('input[name="quickClientAddress"]'),
                     paymentType: getFieldValue('select[name="paymentType"]'),
                     priceMode: getFieldValue('#priceMode'),
                     saleDate: getFieldValue('input[name="saleDate"]'),
@@ -982,7 +1131,6 @@
                     biMonthlyDay1: getFieldValue('input[name="biMonthlyDay1"]'),
                     biMonthlyDay2: getFieldValue('input[name="biMonthlyDay2"]'),
                     monthlyDay: getFieldValue('input[name="monthlyDay"]'),
-                    calculator: calculator,
                     rows
                 };
 
@@ -1012,6 +1160,11 @@
                 }
 
                 setFieldValue('select[name="clientId"]', draft.clientId);
+                setFieldValue('input[name="quickClientNationalId"]', draft.quickClientNationalId);
+                setFieldValue('input[name="quickClientFirstName"]', draft.quickClientFirstName);
+                setFieldValue('input[name="quickClientLastName"]', draft.quickClientLastName);
+                setFieldValue('input[name="quickClientPhone"]', draft.quickClientPhone);
+                setFieldValue('input[name="quickClientAddress"]', draft.quickClientAddress);
                 setFieldValue('select[name="paymentType"]', draft.paymentType);
                 setFieldValue('#priceMode', draft.priceMode);
                 setFieldValue('input[name="saleDate"]', draft.saleDate);
@@ -1027,14 +1180,10 @@
                 document.querySelectorAll('input[name="dailyDays"]').forEach(checkbox => {
                     checkbox.checked = Array.isArray(draft.dailyDays) && draft.dailyDays.includes(checkbox.value);
                 });
-
-                if (draft.calculator) {
-                    calcFields.forEach(field => {
-                        if (Object.prototype.hasOwnProperty.call(draft.calculator, field.id)) {
-                            field.value = draft.calculator[field.id];
-                        }
-                    });
+                if (quickClientToggle) {
+                    quickClientToggle.checked = Boolean(draft.quickClientEnabled);
                 }
+                toggleQuickClientMode();
 
                 if (Array.isArray(draft.rows) && draft.rows.length > 0) {
                     body.innerHTML = '';
@@ -1083,8 +1232,15 @@
                     saveDraft();
                 });
             }
+            if (quickClientToggle) {
+                quickClientToggle.addEventListener('change', function () {
+                    toggleQuickClientMode();
+                    saveDraft();
+                });
+            }
 
             toggleCreditFields();
+            toggleQuickClientMode();
             updateCalculator();
         })();
     </script>

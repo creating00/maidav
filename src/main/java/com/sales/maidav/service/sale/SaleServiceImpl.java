@@ -160,7 +160,7 @@ public class SaleServiceImpl implements SaleService {
         }
         sale.setStatus(SaleStatus.VOID);
 
-        List<SaleItem> items = saleItemRepository.findBySale_Id(id);
+        List<SaleItem> items = saleItemRepository.findBySale_IdOrderByIdAsc(id);
         for (SaleItem item : items) {
             Product product = item.getProduct();
             product.setStockAvailable(product.getStockAvailable() + item.getQuantity());
@@ -252,12 +252,11 @@ public class SaleServiceImpl implements SaleService {
         LocalDate cursor = firstDueDate;
         switch (frequency) {
             case DAILY -> {
-                Set<DayOfWeek> days = parseDaysOfWeek(dueDays);
-                if (!days.contains(firstDueDate.getDayOfWeek())) {
-                    throw new InvalidSaleException("La fecha de primer vencimiento no coincide con los dias seleccionados");
+                if (firstDueDate.getDayOfWeek() == DayOfWeek.SUNDAY) {
+                    throw new InvalidSaleException("La primera cuota diaria no puede caer en domingo");
                 }
                 while (dates.size() < count) {
-                    if (days.contains(cursor.getDayOfWeek())) {
+                    if (cursor.getDayOfWeek() != DayOfWeek.SUNDAY) {
                         dates.add(cursor);
                     }
                     cursor = cursor.plusDays(1);

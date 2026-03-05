@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Detalle de venta')">
+
+<section th:fragment="content">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">Detalle de venta</h1>
+        <p class="text-gray-500 text-sm">
+            <span th:text="${'Numero: ' + (sale.saleNumber != null ? sale.saleNumber : sale.id)}"></span>
+            <span th:text="${' | Cliente: ' + sale.client.firstName + ' ' + sale.client.lastName}"></span>
+        </p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded shadow p-4">
+            <p class="text-xs text-gray-500">Fecha</p>
+            <p class="text-sm font-semibold" th:text="${#temporals.format(sale.saleDate, 'yyyy-MM-dd HH:mm')}"></p>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+            <p class="text-xs text-gray-500">Forma de pago</p>
+            <p class="text-sm font-semibold" th:text="${sale.paymentType.name() == 'CREDIT' ? 'Credito' : 'Contado'}"></p>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+            <p class="text-xs text-gray-500">Vendedor</p>
+            <p class="text-sm font-semibold" th:text="${sale.seller.email}"></p>
+        </div>
+        <div class="bg-white rounded shadow p-4">
+            <p class="text-xs text-gray-500">Total</p>
+            <p class="text-sm font-semibold" th:text="${sale.totalAmount}"></p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded shadow overflow-x-auto">
+        <table class="min-w-full text-sm">
+            <thead class="bg-gray-100 text-left">
+            <tr>
+                <th class="px-4 py-3">Foto</th>
+                <th class="px-4 py-3">Producto</th>
+                <th class="px-4 py-3">Cantidad</th>
+                <th class="px-4 py-3">Precio unitario</th>
+                <th class="px-4 py-3">Total</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${items}" class="border-t hover:bg-gray-50">
+                <td class="px-4 py-3">
+                    <a th:href="@{/products(productId=${item.product.id})}" class="inline-flex">
+                        <img th:if="${item.product.imagePath != null}"
+                             th:src="${item.product.imagePath}"
+                             alt="Producto"
+                             class="h-12 w-12 rounded object-cover border"/>
+                        <span th:if="${item.product.imagePath == null}"
+                              class="h-12 w-12 rounded border inline-flex items-center justify-center text-xs text-gray-500">
+                            Sin foto
+                        </span>
+                    </a>
+                </td>
+                <td class="px-4 py-3">
+                    <a th:href="@{/products(productId=${item.product.id})}" class="text-blue-600 hover:underline"
+                       th:text="${item.product.productCode + ' - ' + item.product.description}">
+                    </a>
+                </td>
+                <td class="px-4 py-3" th:text="${item.quantity}"></td>
+                <td class="px-4 py-3" th:text="${item.unitPrice}"></td>
+                <td class="px-4 py-3" th:text="${item.lineTotal}"></td>
+            </tr>
+            <tr th:if="${#lists.isEmpty(items)}">
+                <td colspan="5" class="px-4 py-6 text-center text-gray-500">No hay items para esta venta</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="mt-6">
+        <a th:href="@{/sales}" class="text-gray-600 hover:text-gray-900">Volver a ventas</a>
+    </div>
+
+</section>
+</html>

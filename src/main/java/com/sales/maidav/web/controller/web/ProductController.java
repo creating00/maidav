@@ -18,6 +18,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Controller
@@ -32,14 +34,34 @@ public class ProductController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('PRODUCT_READ')")
-    public String list(@RequestParam(required = false) Boolean lowStock, Model model) {
+    public String list(@RequestParam(required = false) Boolean lowStock,
+                       @RequestParam(required = false) String q,
+                       @RequestParam(required = false) Long productId,
+                       Model model) {
+        List<Product> products;
         if (Boolean.TRUE.equals(lowStock)) {
-            model.addAttribute("products", productService.findLowStock());
+            products = productService.findLowStock();
             model.addAttribute("lowStockOnly", true);
         } else {
-            model.addAttribute("products", productService.findAll());
+            products = productService.findAll();
         }
+        if (q != null && !q.isBlank()) {
+            String term = q.trim().toLowerCase(Locale.ROOT);
+            products = products.stream()
+                    .filter(p -> contains(p.getProductCode(), term)
+                            || contains(p.getBarcode(), term)
+                            || contains(p.getDescription(), term)
+                            || (p.getProvider() != null && contains(p.getProvider().getName(), term)))
+                    .toList();
+        }
+        model.addAttribute("q", q);
+        model.addAttribute("products", products);
+        model.addAttribute("focusProductId", productId);
         return "pages/products/index";
+    }
+
+    private boolean contains(String value, String term) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(term);
     }
 
     @GetMapping("/new")

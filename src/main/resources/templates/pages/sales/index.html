@@ -25,6 +25,12 @@
         <span th:if="${accountNumber}" th:text="${' | Numero de cuenta: ' + accountNumber}"></span>
     </div>
 
+    <form method="get" th:action="@{/sales}" class="mb-4 flex gap-2">
+        <input type="text" name="q" th:value="${q}" placeholder="Buscar por numero, cliente, vendedor o estado"
+               class="w-full md:w-96 border rounded px-4 py-2"/>
+        <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
+    </form>
+
     <div class="bg-white rounded shadow overflow-x-auto">
         <table class="min-w-full text-sm">
             <thead class="bg-gray-100 text-left">
@@ -54,6 +60,11 @@
                     th:classappend="${sale.status.name() == 'VOID'} ? ' text-red-600 font-semibold' : ' text-green-600 font-semibold'"></td>
                 <td class="px-4 py-3" th:text="${sale.totalAmount}"></td>
                 <td class="px-4 py-3 text-right space-x-2">
+                    <a sec:authorize="hasAuthority('SALES_READ')"
+                       th:href="@{/sales/{id}(id=${sale.id})}"
+                       class="text-slate-700 hover:underline">
+                        Ver detalle
+                    </a>
                     <a sec:authorize="hasAuthority('ARREARS_READ')"
                        th:if="${sale.paymentType.name() == 'CREDIT'}"
                        th:href="@{/accounts/by-sale/{id}(id=${sale.id})}"

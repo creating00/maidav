@@ -15,8 +15,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @Controller
@@ -30,8 +32,18 @@ public class CreditAccountController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('ARREARS_READ')")
-    public String list(Model model) {
+    public String list(@RequestParam(required = false) String q, Model model) {
         List<CreditAccount> accounts = creditAccountService.findAll();
+        if (q != null && !q.isBlank()) {
+            String term = q.trim().toLowerCase(Locale.ROOT);
+            accounts = accounts.stream()
+                    .filter(a -> contains(a.getAccountNumber(), term)
+                            || contains(a.getClient() != null ? a.getClient().getNationalId() : null, term)
+                            || contains(a.getClient() != null ? a.getClient().getFirstName() : null, term)
+                            || contains(a.getClient() != null ? a.getClient().getLastName() : null, term)
+                            || contains(a.getStatus() != null ? a.getStatus().name() : null, term))
+                    .toList();
+        }
         Map<Long, BigDecimal> currentInstallments = new HashMap<>();
         Map<Long, String> dueSchedules = new HashMap<>();
         for (CreditAccount account : accounts) {
@@ -45,6 +57,7 @@ public class CreditAccountController {
             currentInstallments.put(account.getId(), currentAmount);
             dueSchedules.put(account.getId(), formatDueSchedule(account));
         }
+        model.addAttribute("q", q);
         model.addAttribute("accounts", accounts);
         model.addAttribute("currentInstallments", currentInstallments);
         model.addAttribute("dueSchedules", dueSchedules);
@@ -92,6 +105,37 @@ public class CreditAccountController {
         return "redirect:/accounts/" + id;
     }
 
+    @PostMapping("/{id}/payments/{paymentId}/update")
+    @PreAuthorize("hasAuthority('ARREARS_UPDATE_PAYMENT')")
+    public String updatePayment(@PathVariable Long id,
+                                @PathVariable Long paymentId,
+                                @RequestParam BigDecimal amount,
+                                @RequestParam LocalDate paidAt,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            creditAccountService.updatePayment(id, paymentId, amount, paidAt);
+            redirectAttributes.addFlashAttribute("successMessage", "Pago actualizado correctamente");
+        } catch (InvalidSaleException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/accounts/" + id;
+    }
+
+    @PostMapping("/{id}/installments/{installmentId}/due-date")
+    @PreAuthorize("hasAuthority('ARREARS_UPDATE_DUE_DATE')")
+    public String updateDueDate(@PathVariable Long id,
+                                @PathVariable Long installmentId,
+                                @RequestParam LocalDate dueDate,
+                                RedirectAttributes redirectAttributes) {
+        try {
+            creditAccountService.updateInstallmentDueDate(id, installmentId, dueDate);
+            redirectAttributes.addFlashAttribute("successMessage", "Vencimiento actualizado correctamente");
+        } catch (InvalidSaleException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+        }
+        return "redirect:/accounts/" + id;
+    }
+
     private BigDecimal remainingAmount(BigDecimal amount, BigDecimal paidAmount) {
         if (amount == null) {
             return null;
@@ -107,7 +151,7 @@ public class CreditAccountController {
         }
         String[] parts = account.getDueDays().split(",");
         return switch (account.getPaymentFrequency()) {
-            case DAILY -> "Diario: " + joinDaysOfWeek(parts);
+            case DAILY -> "Diario (domingo excluido)";
             case WEEKLY -> "Semanal: " + dayOfWeekLabel(parts[0]);
             case BIWEEKLY -> "Quincenal: " + joinDaysOfMonth(parts);
             case MONTHLY -> "Mensual: " + joinDaysOfMonth(parts);
@@ -157,5 +201,9 @@ public class CreditAccountController {
             case "SUNDAY" -> "Domingo";
             default -> raw;
         };
+    }
+
+    private boolean contains(String value, String term) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(term);
     }
 }

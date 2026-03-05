@@ -16,6 +16,10 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     @EntityGraph(attributePaths = {"client", "seller"})
     List<Sale> findAll();
 
+    @Override
+    @EntityGraph(attributePaths = {"client", "seller"})
+    java.util.Optional<Sale> findById(Long id);
+
     @Query(value = "select coalesce(max(id), 0) + 1 from sales", nativeQuery = true)
     Long nextSaleId();
 }

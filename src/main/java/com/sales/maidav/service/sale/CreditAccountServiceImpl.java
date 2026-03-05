@@ -121,11 +121,103 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         }
     }
 
+    @Override
+    public void updatePayment(Long accountId, Long paymentId, BigDecimal amount, LocalDate paidAt) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidSaleException("El pago debe ser mayor a cero");
+        }
+        if (paidAt == null) {
+            throw new InvalidSaleException("La fecha de pago es obligatoria");
+        }
+
+        CreditAccount account = findById(accountId);
+        CreditPayment payment = creditPaymentRepository.findById(paymentId)
+                .orElseThrow(() -> new InvalidSaleException("Pago no encontrado"));
+        if (!payment.getAccount().getId().equals(accountId)) {
+            throw new InvalidSaleException("El pago no pertenece a la cuenta");
+        }
+
+        payment.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
+        payment.setPaidAt(paidAt);
+
+        BigDecimal totalPaid = creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(accountId).stream()
+                .map(CreditPayment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (totalPaid.compareTo(account.getTotalAmount()) > 0) {
+            throw new InvalidSaleException("La suma de pagos no puede superar el total de la cuenta");
+        }
+
+        recalculateAccountState(account);
+    }
+
+    @Override
+    public void updateInstallmentDueDate(Long accountId, Long installmentId, LocalDate dueDate) {
+        if (dueDate == null) {
+            throw new InvalidSaleException("La fecha de vencimiento es obligatoria");
+        }
+        CreditInstallment installment = creditInstallmentRepository.findById(installmentId)
+                .orElseThrow(() -> new InvalidSaleException("Cuota no encontrada"));
+        if (!installment.getAccount().getId().equals(accountId)) {
+            throw new InvalidSaleException("La cuota no pertenece a la cuenta");
+        }
+        installment.setDueDate(dueDate);
+    }
+
     private List<CreditInstallment> resolveInstallments(Long accountId, List<Long> installmentIds) {
         if (installmentIds == null || installmentIds.isEmpty()) {
             return creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(accountId);
         }
         return creditInstallmentRepository.findByAccount_IdAndIdInOrderByInstallmentNumber(accountId, installmentIds);
+    }
+
+    private void recalculateAccountState(CreditAccount account) {
+        List<CreditInstallment> installments = creditInstallmentRepository
+                .findByAccount_IdOrderByInstallmentNumber(account.getId());
+        List<CreditPayment> payments = creditPaymentRepository
+                .findByAccount_IdOrderByPaidAtAscIdAsc(account.getId());
+
+        for (CreditInstallment installment : installments) {
+            installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+            installment.setStatus(InstallmentStatus.PENDING);
+            installment.setPaidAt(null);
+        }
+
+        for (CreditPayment payment : payments) {
+            BigDecimal remaining = payment.getAmount();
+            for (CreditInstallment installment : installments) {
+                if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+                    break;
+                }
+                BigDecimal installmentRemaining = installment.getAmount().subtract(installment.getPaidAmount());
+                if (installmentRemaining.compareTo(BigDecimal.ZERO) <= 0) {
+                    continue;
+                }
+                if (remaining.compareTo(installmentRemaining) >= 0) {
+                    installment.setPaidAmount(installment.getAmount().setScale(2, RoundingMode.HALF_UP));
+                    installment.setStatus(InstallmentStatus.PAID);
+                    installment.setPaidAt(payment.getPaidAt());
+                    remaining = remaining.subtract(installmentRemaining);
+                } else {
+                    installment.setPaidAmount(
+                            installment.getPaidAmount().add(remaining).setScale(2, RoundingMode.HALF_UP)
+                    );
+                    installment.setStatus(InstallmentStatus.PARTIAL);
+                    remaining = BigDecimal.ZERO;
+                }
+            }
+        }
+
+        BigDecimal totalPaid = payments.stream()
+                .map(CreditPayment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal newBalance = account.getTotalAmount().subtract(totalPaid).setScale(2, RoundingMode.HALF_UP);
+        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidSaleException("La suma de pagos no puede superar el total de la cuenta");
+        }
+        account.setBalance(newBalance);
+        account.setStatus(newBalance.compareTo(BigDecimal.ZERO) == 0 ? AccountStatus.CLOSED : AccountStatus.OPEN);
     }
 
     @Override
