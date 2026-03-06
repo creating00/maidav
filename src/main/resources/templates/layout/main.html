@@ -5,24 +5,48 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${pageTitle} ?: 'Maidav'">Maidav</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex flex-col">
+<body x-data="{ sidebarOpen: false, sidebarCollapsed: false }"
+      @open-sidebar.window="sidebarOpen = true"
+      @close-sidebar.window="sidebarOpen = false"
+      @toggle-sidebar.window="sidebarCollapsed = !sidebarCollapsed"
+      class="bg-gray-100 min-h-screen flex flex-col overflow-x-hidden">
 
 <!-- HEADER -->
 <div th:replace="fragments/header :: header"></div>
 
 <!-- BODY -->
-<div class="flex flex-1">
+<div class="flex flex-1 relative">
 
-    <!-- SIDEBAR -->
-    <div th:replace="fragments/sidebar :: sidebar"></div>
+    <!-- MOBILE BACKDROP -->
+    <div x-cloak
+         x-show="sidebarOpen"
+         x-transition.opacity
+         class="fixed inset-0 bg-black/40 z-30 md:hidden"
+         @click="$dispatch('close-sidebar')"></div>
+
+    <!-- SIDEBAR MOBILE -->
+    <div class="fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 md:hidden"
+         :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
+        <div th:replace="fragments/sidebar :: sidebar"></div>
+    </div>
+
+    <!-- SIDEBAR DESKTOP -->
+    <div class="hidden md:block transition-all duration-200"
+         :class="sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64'">
+        <div th:replace="fragments/sidebar :: sidebar"></div>
+    </div>
 
     <!-- CONTENT -->
-    <main class="flex-1 p-6">
+    <main class="flex-1 p-4 md:p-6 min-w-0">
         <div th:replace="${content}"></div>
     </main>
 

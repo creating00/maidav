@@ -31,8 +31,8 @@ public class Product extends BaseEntity {
     @Column(name = "price_retail_net", nullable = false, precision = 12, scale = 2)
     private BigDecimal priceRetailNet;
 
-    @Column(name = "vat_rate", nullable = false)
-    private Integer vatRate;
+    @Column(name = "vat_rate", nullable = false, precision = 5, scale = 2)
+    private BigDecimal vatRate;
 
     @Column(name = "price_wholesale", nullable = false, precision = 12, scale = 2)
     private BigDecimal priceWholesale;
@@ -75,8 +75,8 @@ public class Product extends BaseEntity {
     public BigDecimal getPriceRetailNet() { return priceRetailNet; }
     public void setPriceRetailNet(BigDecimal priceRetailNet) { this.priceRetailNet = priceRetailNet; }
 
-    public Integer getVatRate() { return vatRate; }
-    public void setVatRate(Integer vatRate) { this.vatRate = vatRate; }
+    public BigDecimal getVatRate() { return vatRate; }
+    public void setVatRate(BigDecimal vatRate) { this.vatRate = vatRate; }
 
     public BigDecimal getPriceWholesale() { return priceWholesale; }
     public void setPriceWholesale(BigDecimal priceWholesale) { this.priceWholesale = priceWholesale; }

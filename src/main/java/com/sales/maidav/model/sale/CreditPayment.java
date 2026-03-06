@@ -20,6 +20,16 @@ public class CreditPayment extends BaseEntity {
     @Column(name = "paid_at", nullable = false)
     private LocalDate paidAt;
 
+    @Column(name = "registered_by", length = 150)
+    private String registeredBy;
+
+    @Column(name = "allocation_summary", length = 255)
+    private String allocationSummary;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", length = 20)
+    private PaymentCollectionMethod paymentMethod;
+
     public CreditPayment() {}
 
     public CreditAccount getAccount() { return account; }
@@ -30,4 +40,13 @@ public class CreditPayment extends BaseEntity {
 
     public LocalDate getPaidAt() { return paidAt; }
     public void setPaidAt(LocalDate paidAt) { this.paidAt = paidAt; }
+
+    public String getRegisteredBy() { return registeredBy; }
+    public void setRegisteredBy(String registeredBy) { this.registeredBy = registeredBy; }
+
+    public String getAllocationSummary() { return allocationSummary; }
+    public void setAllocationSummary(String allocationSummary) { this.allocationSummary = allocationSummary; }
+
+    public PaymentCollectionMethod getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(PaymentCollectionMethod paymentMethod) { this.paymentMethod = paymentMethod; }
 }

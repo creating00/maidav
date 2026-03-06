@@ -2,6 +2,7 @@ package com.sales.maidav.service.product;
 
 import com.sales.maidav.model.product.Product;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface ProductService {
@@ -13,4 +14,5 @@ public interface ProductService {
     long count();
     long countLowStock();
     List<Product> findLowStock();
+    long bulkIncreasePrices(BigDecimal percentage, Long providerId);
 }

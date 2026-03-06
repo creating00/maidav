@@ -1,12 +1,38 @@
 <header th:fragment="header"
         xmlns:th="http://www.thymeleaf.org"
         xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
-        class="bg-white shadow h-14 flex items-center justify-between px-6">
+        class="bg-white shadow h-14 flex items-center justify-between px-4 md:px-6">
 
-    <!-- LOGO -->
-    <span class="font-bold text-lg text-gray-800">
-        Maidav
-    </span>
+    <div class="flex items-center gap-2">
+        <button type="button"
+                class="md:hidden inline-flex items-center justify-center rounded p-2 text-gray-700 hover:bg-gray-100"
+                @click="$dispatch('open-sidebar')"
+                aria-label="Abrir menu">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 6h18"></path>
+                <path d="M3 12h18"></path>
+                <path d="M3 18h18"></path>
+            </svg>
+        </button>
+
+        <button type="button"
+                class="hidden md:inline-flex items-center justify-center rounded p-2 text-gray-700 hover:bg-gray-100"
+                @click="$dispatch('toggle-sidebar')"
+                aria-label="Ocultar o mostrar menu">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6h16"></path>
+                <path d="M4 12h10"></path>
+                <path d="M4 18h16"></path>
+            </svg>
+        </button>
+
+        <!-- LOGO -->
+        <span class="font-bold text-lg text-gray-800">
+            Maidav
+        </span>
+    </div>
 
     <!-- USER DROPDOWN -->
     <div class="relative"

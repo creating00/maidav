@@ -19,6 +19,11 @@
           method="post"
           class="bg-white p-8 rounded-lg shadow max-w-3xl">
 
+        <div th:if="${formError}"
+             class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700"
+             th:text="${formError}">
+        </div>
+
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
             <!-- DNI/CUIT -->

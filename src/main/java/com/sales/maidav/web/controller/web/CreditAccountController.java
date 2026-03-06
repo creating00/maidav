@@ -5,10 +5,14 @@ import com.sales.maidav.repository.sale.CreditPaymentRepository;
 import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.model.sale.CreditInstallment;
 import com.sales.maidav.model.sale.InstallmentStatus;
+import com.sales.maidav.model.sale.PaymentCollectionMethod;
+import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.sale.InvalidSaleException;
+import com.sales.maidav.service.settings.CompanySettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +33,7 @@ public class CreditAccountController {
     private final CreditAccountService creditAccountService;
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final CreditPaymentRepository creditPaymentRepository;
+    private final CompanySettingsService companySettingsService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('ARREARS_READ')")
@@ -79,7 +84,9 @@ public class CreditAccountController {
         model.addAttribute("account", creditAccountService.findById(id));
         model.addAttribute("installments", installments);
         model.addAttribute("currentInstallmentAmount", currentInstallment);
-        model.addAttribute("payments", creditPaymentRepository.findByAccount_IdOrderByPaidAtDesc(id));
+        model.addAttribute("payments", creditPaymentRepository.findByAccount_IdOrderByPaidAtDescIdDesc(id));
+        model.addAttribute("paymentMethods", PaymentCollectionMethod.values());
+        model.addAttribute("cashRecargo", resolveCashRecargo());
         return "pages/accounts/detail";
     }
 
@@ -95,9 +102,12 @@ public class CreditAccountController {
     public String pay(@PathVariable Long id,
                       @RequestParam BigDecimal amount,
                       @RequestParam(required = false) java.util.List<Long> installmentIds,
+                      @RequestParam(required = false, defaultValue = "BANK") PaymentCollectionMethod paymentMethod,
+                      Authentication authentication,
                       RedirectAttributes redirectAttributes) {
         try {
-            creditAccountService.registerPayment(id, amount, installmentIds);
+            String registeredBy = authentication != null ? authentication.getName() : null;
+            creditAccountService.registerPayment(id, amount, installmentIds, registeredBy, paymentMethod);
             redirectAttributes.addFlashAttribute("successMessage", "Pago registrado correctamente");
         } catch (InvalidSaleException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -111,9 +121,10 @@ public class CreditAccountController {
                                 @PathVariable Long paymentId,
                                 @RequestParam BigDecimal amount,
                                 @RequestParam LocalDate paidAt,
+                                @RequestParam(required = false, defaultValue = "BANK") PaymentCollectionMethod paymentMethod,
                                 RedirectAttributes redirectAttributes) {
         try {
-            creditAccountService.updatePayment(id, paymentId, amount, paidAt);
+            creditAccountService.updatePayment(id, paymentId, amount, paidAt, paymentMethod);
             redirectAttributes.addFlashAttribute("successMessage", "Pago actualizado correctamente");
         } catch (InvalidSaleException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -205,5 +216,14 @@ public class CreditAccountController {
 
     private boolean contains(String value, String term) {
         return value != null && value.toLowerCase(Locale.ROOT).contains(term);
+    }
+
+    private BigDecimal resolveCashRecargo() {
+        CompanySettings settings = companySettingsService.getSettings();
+        BigDecimal recargo = settings.getCalcRecargo();
+        if (recargo == null || recargo.compareTo(BigDecimal.ZERO) <= 0) {
+            return new BigDecimal("1.26");
+        }
+        return recargo;
     }
 }

@@ -25,4 +25,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query("select p from Product p join fetch p.provider where p.stockAvailable <= p.stockMin")
     List<Product> findLowStock();
+
+    @EntityGraph(attributePaths = "provider")
+    List<Product> findByProvider_Id(Long providerId);
 }

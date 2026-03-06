@@ -7,5 +7,6 @@ import java.util.List;
 
 public interface CreditPaymentRepository extends JpaRepository<CreditPayment, Long> {
     List<CreditPayment> findByAccount_IdOrderByPaidAtDesc(Long accountId);
+    List<CreditPayment> findByAccount_IdOrderByPaidAtDescIdDesc(Long accountId);
     List<CreditPayment> findByAccount_IdOrderByPaidAtAscIdAsc(Long accountId);
 }

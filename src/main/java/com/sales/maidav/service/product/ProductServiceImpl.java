@@ -79,6 +79,34 @@ public class ProductServiceImpl implements ProductService {
         return productRepository.findLowStock();
     }
 
+    @Override
+    public long bulkIncreasePrices(BigDecimal percentage, Long providerId) {
+        if (percentage == null || percentage.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidProductException("El porcentaje de aumento debe ser mayor a cero");
+        }
+
+        List<Product> products = providerId == null
+                ? productRepository.findAll()
+                : productRepository.findByProvider_Id(providerId);
+
+        if (products.isEmpty()) {
+            throw new InvalidProductException("No hay productos para actualizar");
+        }
+
+        BigDecimal factor = BigDecimal.ONE.add(
+                percentage.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)
+        );
+
+        for (Product product : products) {
+            product.setCost(product.getCost().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+            product.setPriceWholesaleNet(product.getPriceWholesaleNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+            product.setPriceRetailNet(product.getPriceRetailNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+            recalcPrices(product);
+        }
+
+        return products.size();
+    }
+
     private void ensureUniqueCode(Long providerId, String productCode, Long id) {
         if (providerId == null || productCode == null || productCode.isBlank()) {
             return;
@@ -107,7 +135,7 @@ public class ProductServiceImpl implements ProductService {
         if (product.getPriceWholesaleNet() == null || product.getPriceRetailNet() == null) {
             throw new InvalidProductException("Los precios sin IVA son obligatorios");
         }
-        if (product.getVatRate() == null || (product.getVatRate() != 0 && product.getVatRate() != 21)) {
+        if (!isValidVatRate(product.getVatRate())) {
             throw new InvalidProductException("IVA invalido");
         }
         if (product.getStockAvailable() == null || product.getStockMin() == null || product.getStockMax() == null) {
@@ -126,7 +154,7 @@ public class ProductServiceImpl implements ProductService {
 
     private void recalcPrices(Product product) {
         BigDecimal vatMultiplier = BigDecimal.ONE
-                .add(BigDecimal.valueOf(product.getVatRate()).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
+                .add(product.getVatRate().divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
 
         product.setPriceWholesale(
                 product.getPriceWholesaleNet().multiply(vatMultiplier).setScale(2, RoundingMode.HALF_UP)
@@ -134,5 +162,14 @@ public class ProductServiceImpl implements ProductService {
         product.setPriceRetail(
                 product.getPriceRetailNet().multiply(vatMultiplier).setScale(2, RoundingMode.HALF_UP)
         );
+    }
+
+    private boolean isValidVatRate(BigDecimal vatRate) {
+        if (vatRate == null) {
+            return false;
+        }
+        return vatRate.compareTo(BigDecimal.ZERO) == 0
+                || vatRate.compareTo(new BigDecimal("10.50")) == 0
+                || vatRate.compareTo(new BigDecimal("21.00")) == 0;
     }
 }

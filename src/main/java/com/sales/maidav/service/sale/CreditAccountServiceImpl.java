@@ -15,6 +15,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -46,11 +47,17 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     @Override
     public void registerPayment(Long accountId, BigDecimal amount) {
-        registerPayment(accountId, amount, null);
+        registerPayment(accountId, amount, null, null, PaymentCollectionMethod.BANK);
     }
 
     @Override
     public void registerPayment(Long accountId, BigDecimal amount, List<Long> installmentIds) {
+        registerPayment(accountId, amount, installmentIds, null, PaymentCollectionMethod.BANK);
+    }
+
+    @Override
+    public void registerPayment(Long accountId, BigDecimal amount, List<Long> installmentIds, String registeredBy,
+                                PaymentCollectionMethod paymentMethod) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidSaleException("El pago debe ser mayor a cero");
         }
@@ -68,6 +75,8 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         payment.setAccount(account);
         payment.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
         payment.setPaidAt(LocalDate.now());
+        payment.setRegisteredBy(trimToNull(registeredBy));
+        payment.setPaymentMethod(paymentMethod == null ? PaymentCollectionMethod.BANK : paymentMethod);
         creditPaymentRepository.save(payment);
 
         List<CreditInstallment> installments = resolveInstallments(accountId, installmentIds);
@@ -89,6 +98,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         }
 
         BigDecimal remaining = amount;
+        Map<Integer, String> paymentReferences = new LinkedHashMap<>();
 
         for (CreditInstallment installment : installments) {
             if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
@@ -108,13 +118,23 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 installment.setStatus(InstallmentStatus.PAID);
                 installment.setPaidAt(LocalDate.now());
                 remaining = remaining.subtract(installmentRemaining);
+                paymentReferences.put(
+                        installment.getInstallmentNumber(),
+                        "Cuota #" + installment.getInstallmentNumber() + " total"
+                );
             } else {
                 installment.setPaidAmount(paidAmount.add(remaining).setScale(2, RoundingMode.HALF_UP));
                 installment.setStatus(InstallmentStatus.PARTIAL);
+                installment.setPaidAt(LocalDate.now());
+                paymentReferences.put(
+                        installment.getInstallmentNumber(),
+                        "Cuota #" + installment.getInstallmentNumber() + " parcial"
+                );
                 remaining = BigDecimal.ZERO;
             }
         }
 
+        payment.setAllocationSummary(buildAllocationSummary(paymentReferences));
         account.setBalance(newBalance.setScale(2, RoundingMode.HALF_UP));
         if (account.getBalance().compareTo(BigDecimal.ZERO) == 0) {
             account.setStatus(AccountStatus.CLOSED);
@@ -122,7 +142,8 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     }
 
     @Override
-    public void updatePayment(Long accountId, Long paymentId, BigDecimal amount, LocalDate paidAt) {
+    public void updatePayment(Long accountId, Long paymentId, BigDecimal amount, LocalDate paidAt,
+                              PaymentCollectionMethod paymentMethod) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidSaleException("El pago debe ser mayor a cero");
         }
@@ -139,6 +160,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
         payment.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
         payment.setPaidAt(paidAt);
+        payment.setPaymentMethod(paymentMethod == null ? PaymentCollectionMethod.BANK : paymentMethod);
 
         BigDecimal totalPaid = creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(accountId).stream()
                 .map(CreditPayment::getAmount)
@@ -185,6 +207,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
         for (CreditPayment payment : payments) {
             BigDecimal remaining = payment.getAmount();
+            Map<Integer, String> paymentReferences = new LinkedHashMap<>();
             for (CreditInstallment installment : installments) {
                 if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
                     break;
@@ -198,14 +221,24 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                     installment.setStatus(InstallmentStatus.PAID);
                     installment.setPaidAt(payment.getPaidAt());
                     remaining = remaining.subtract(installmentRemaining);
+                    paymentReferences.put(
+                            installment.getInstallmentNumber(),
+                            "Cuota #" + installment.getInstallmentNumber() + " total"
+                    );
                 } else {
                     installment.setPaidAmount(
                             installment.getPaidAmount().add(remaining).setScale(2, RoundingMode.HALF_UP)
                     );
                     installment.setStatus(InstallmentStatus.PARTIAL);
+                    installment.setPaidAt(payment.getPaidAt());
+                    paymentReferences.put(
+                            installment.getInstallmentNumber(),
+                            "Cuota #" + installment.getInstallmentNumber() + " parcial"
+                    );
                     remaining = BigDecimal.ZERO;
                 }
             }
+            payment.setAllocationSummary(buildAllocationSummary(paymentReferences));
         }
 
         BigDecimal totalPaid = payments.stream()
@@ -302,5 +335,20 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         private ClientAggregate(com.sales.maidav.model.client.Client client) {
             this.client = client;
         }
+    }
+
+    private String buildAllocationSummary(Map<Integer, String> paymentReferences) {
+        if (paymentReferences == null || paymentReferences.isEmpty()) {
+            return null;
+        }
+        return String.join(" | ", paymentReferences.values());
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

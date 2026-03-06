@@ -1,9 +1,24 @@
 <aside th:fragment="sidebar"
        xmlns:th="http://www.thymeleaf.org"
        xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
-       class="w-64 bg-gray-800 text-white min-h-screen">
+       class="w-64 bg-gray-800 text-white h-full overflow-y-auto">
 
-    <ul class="p-4 space-y-1">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700 md:hidden">
+        <span class="font-semibold">Menu</span>
+        <button type="button"
+                class="inline-flex items-center justify-center rounded p-2 text-gray-200 hover:bg-gray-700"
+                @click="$dispatch('close-sidebar')"
+                aria-label="Cerrar menu">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+            </svg>
+        </button>
+    </div>
+
+    <ul class="p-4 space-y-1"
+        @click="if (window.innerWidth < 768 && $event.target.closest('a')) { $dispatch('close-sidebar'); }">
 
         <!-- DASHBOARD (todos los logueados) -->
         <li>

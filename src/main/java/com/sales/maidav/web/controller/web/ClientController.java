@@ -9,6 +9,7 @@ import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.service.client.ClientService;
 import com.sales.maidav.service.client.DuplicateNationalIdException;
+import com.sales.maidav.service.client.InvalidClientException;
 import com.sales.maidav.service.client.InvalidNationalIdException;
 import com.sales.maidav.service.client.ZoneService;
 import com.sales.maidav.service.user.UserService;
@@ -104,9 +105,13 @@ public class ClientController {
             clientService.create(client);
             redirectAttributes.addFlashAttribute("successMessage", "Cliente guardado correctamente");
             return "redirect:/clients";
-        } catch (DuplicateNationalIdException | InvalidNationalIdException ex) {
+        } catch (DuplicateNationalIdException | InvalidNationalIdException | InvalidClientException ex) {
             model.addAttribute("client", client);
-            model.addAttribute("nationalIdError", ex.getMessage());
+            if (ex instanceof DuplicateNationalIdException || ex instanceof InvalidNationalIdException) {
+                model.addAttribute("nationalIdError", ex.getMessage());
+            } else {
+                model.addAttribute("formError", ex.getMessage());
+            }
             populateFormModel(model, client);
             return "pages/clients/form";
         }
@@ -128,10 +133,14 @@ public class ClientController {
             clientService.update(id, client);
             redirectAttributes.addFlashAttribute("successMessage", "Cliente guardado correctamente");
             return "redirect:/clients";
-        } catch (DuplicateNationalIdException | InvalidNationalIdException ex) {
+        } catch (DuplicateNationalIdException | InvalidNationalIdException | InvalidClientException ex) {
             client.setId(id);
             model.addAttribute("client", client);
-            model.addAttribute("nationalIdError", ex.getMessage());
+            if (ex instanceof DuplicateNationalIdException || ex instanceof InvalidNationalIdException) {
+                model.addAttribute("nationalIdError", ex.getMessage());
+            } else {
+                model.addAttribute("formError", ex.getMessage());
+            }
             populateFormModel(model, client);
             return "pages/clients/form";
         }
