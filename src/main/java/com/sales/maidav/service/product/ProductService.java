@@ -2,6 +2,7 @@ package com.sales.maidav.service.product;
 
 import com.sales.maidav.model.product.Product;
 import com.sales.maidav.model.product.ProductPriceAdjustment;
+import com.sales.maidav.model.product.PriceAdjustmentScope;
 import com.sales.maidav.model.product.PriceAdjustmentType;
 
 import java.math.BigDecimal;
@@ -17,7 +18,7 @@ public interface ProductService {
     long count();
     long countLowStock();
     List<Product> findLowStock();
-    long bulkAdjustPrices(BigDecimal percentage, Long providerId, PriceAdjustmentType adjustmentType);
+    long bulkAdjustPrices(BigDecimal percentage, Long providerId, PriceAdjustmentType adjustmentType, PriceAdjustmentScope scope);
     List<ProductPriceAdjustment> findRecentAdjustments();
     Map<Long, String> findAdjustmentProductCodes(List<Long> adjustmentIds);
     void undoAdjustment(Long adjustmentId);

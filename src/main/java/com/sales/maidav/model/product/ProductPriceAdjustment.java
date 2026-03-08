@@ -20,6 +20,10 @@ public class ProductPriceAdjustment extends BaseEntity {
     @Column(name = "factor_applied", nullable = false, precision = 16, scale = 8)
     private BigDecimal factorApplied;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "scope", nullable = false, length = 20)
+    private PriceAdjustmentScope scope;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "provider_id")
     private Provider provider;
@@ -65,6 +69,14 @@ public class ProductPriceAdjustment extends BaseEntity {
 
     public Provider getProvider() {
         return provider;
+    }
+
+    public PriceAdjustmentScope getScope() {
+        return scope;
+    }
+
+    public void setScope(PriceAdjustmentScope scope) {
+        this.scope = scope;
     }
 
     public void setProvider(Provider provider) {

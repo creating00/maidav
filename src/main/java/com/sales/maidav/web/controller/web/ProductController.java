@@ -2,6 +2,7 @@ package com.sales.maidav.web.controller.web;
 
 import com.sales.maidav.model.product.Product;
 import com.sales.maidav.model.product.ProductPriceAdjustment;
+import com.sales.maidav.model.product.PriceAdjustmentScope;
 import com.sales.maidav.model.product.PriceAdjustmentType;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.service.product.DuplicateProductCodeException;
@@ -187,9 +188,10 @@ public class ProductController {
     public String bulkIncrease(@RequestParam BigDecimal percentage,
                                @RequestParam(required = false) Long providerId,
                                @RequestParam(defaultValue = "INCREASE") PriceAdjustmentType adjustmentType,
+                               @RequestParam(defaultValue = "ALL") PriceAdjustmentScope scope,
                                RedirectAttributes redirectAttributes) {
         try {
-            long updated = productService.bulkAdjustPrices(percentage, providerId, adjustmentType);
+            long updated = productService.bulkAdjustPrices(percentage, providerId, adjustmentType, scope);
             redirectAttributes.addFlashAttribute("successMessage", "Precios actualizados: " + updated + " producto(s)");
         } catch (InvalidProductException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());

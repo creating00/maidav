@@ -75,6 +75,14 @@
             </select>
         </div>
         <div>
+            <label class="block text-xs text-gray-600 mb-1">Aplicar a</label>
+            <select name="scope" class="border rounded px-3 py-2 min-w-44">
+                <option value="ALL">Todos</option>
+                <option value="WHOLESALE">Mayorista</option>
+                <option value="RETAIL">Minorista</option>
+            </select>
+        </div>
+        <div>
             <label class="block text-xs text-gray-600 mb-1">Porcentaje (%)</label>
             <input type="number" name="percentage" step="0.01" min="0.01" placeholder="Ej: 5"
                    class="border rounded px-3 py-2 w-32" required/>
@@ -116,6 +124,7 @@
                     <th class="px-3 py-2">Fecha</th>
                     <th class="px-3 py-2">Usuario</th>
                     <th class="px-3 py-2">Tipo</th>
+                    <th class="px-3 py-2">Aplicar a</th>
                     <th class="px-3 py-2">Porcentaje</th>
                     <th class="px-3 py-2">Proveedor</th>
                     <th class="px-3 py-2">Codigos</th>
@@ -127,12 +136,14 @@
                 <tbody id="adjustments-history-body">
                 <tr th:each="adjustment : ${adjustments}"
                     class="border-t adjustment-row"
-                    th:attr="data-search=${#temporals.format(adjustment.createdAt, 'yyyy-MM-dd HH:mm') + ' ' + adjustment.createdBy + ' ' + (adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : 'Descuento') + ' ' + #numbers.formatDecimal(adjustment.percentage,1,2) + ' ' + (adjustment.provider != null ? adjustment.provider.name : 'Todos') + ' ' + (adjustment.undone ? 'Deshecho' : 'Aplicado') + ' ' + adjustmentProductCodes[adjustment.id]}">
+                    th:attr="data-search=${#temporals.format(adjustment.createdAt, 'yyyy-MM-dd HH:mm') + ' ' + adjustment.createdBy + ' ' + (adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : 'Descuento') + ' ' + (adjustment.scope == null || adjustment.scope.name() == 'ALL' ? 'Todos' : (adjustment.scope.name() == 'WHOLESALE' ? 'Mayorista' : 'Minorista')) + ' ' + #numbers.formatDecimal(adjustment.percentage,1,2) + ' ' + (adjustment.provider != null ? adjustment.provider.name : 'Todos') + ' ' + (adjustment.undone ? 'Deshecho' : 'Aplicado') + ' ' + adjustmentProductCodes[adjustment.id]}">
                     <td class="px-3 py-2"
                         th:text="${#temporals.format(adjustment.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
                     <td class="px-3 py-2" th:text="${adjustment.createdBy}"></td>
                     <td class="px-3 py-2"
                         th:text="${adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : 'Descuento'}"></td>
+                    <td class="px-3 py-2"
+                        th:text="${adjustment.scope == null || adjustment.scope.name() == 'ALL' ? 'Todos' : (adjustment.scope.name() == 'WHOLESALE' ? 'Mayorista' : 'Minorista')}"></td>
                     <td class="px-3 py-2"
                         th:text="${#numbers.formatDecimal(adjustment.percentage,1,2) + '%'}"></td>
                     <td class="px-3 py-2"
@@ -154,7 +165,7 @@
                     </td>
                 </tr>
                 <tr th:if="${#lists.isEmpty(adjustments)}">
-                    <td colspan="9" class="px-3 py-3 text-center text-gray-500">Sin ajustes registrados</td>
+                    <td colspan="10" class="px-3 py-3 text-center text-gray-500">Sin ajustes registrados</td>
                 </tr>
                 </tbody>
             </table>

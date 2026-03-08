@@ -3,6 +3,7 @@ package com.sales.maidav.service.product;
 import com.sales.maidav.model.product.Product;
 import com.sales.maidav.model.product.ProductPriceAdjustment;
 import com.sales.maidav.model.product.ProductPriceAdjustmentItem;
+import com.sales.maidav.model.product.PriceAdjustmentScope;
 import com.sales.maidav.model.product.PriceAdjustmentType;
 import com.sales.maidav.repository.product.ProductPriceAdjustmentItemRepository;
 import com.sales.maidav.repository.product.ProductPriceAdjustmentRepository;
@@ -93,12 +94,15 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public long bulkAdjustPrices(BigDecimal percentage, Long providerId, PriceAdjustmentType adjustmentType) {
+    public long bulkAdjustPrices(BigDecimal percentage, Long providerId, PriceAdjustmentType adjustmentType, PriceAdjustmentScope scope) {
         if (percentage == null || percentage.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidProductException("El porcentaje debe ser mayor a cero");
         }
         if (adjustmentType == null) {
             throw new InvalidProductException("Tipo de ajuste invalido");
+        }
+        if (scope == null) {
+            throw new InvalidProductException("Alcance de ajuste invalido");
         }
 
         List<Product> products = providerId == null
@@ -112,13 +116,14 @@ public class ProductServiceImpl implements ProductService {
         BigDecimal factor = calculateFactor(percentage, adjustmentType);
 
         for (Product product : products) {
-            applyFactor(product, factor);
+            applyFactor(product, factor, scope);
         }
 
         ProductPriceAdjustment adjustment = new ProductPriceAdjustment();
         adjustment.setAdjustmentType(adjustmentType);
         adjustment.setPercentage(percentage.setScale(4, RoundingMode.HALF_UP));
         adjustment.setFactorApplied(factor.setScale(8, RoundingMode.HALF_UP));
+        adjustment.setScope(scope);
         adjustment.setProvider(providerId == null ? null : products.get(0).getProvider());
         adjustment.setProductsAffected(products.size());
         adjustment.setCreatedBy(currentUsername());
@@ -198,8 +203,9 @@ public class ProductServiceImpl implements ProductService {
         BigDecimal inverseFactor = BigDecimal.ONE.divide(adjustment.getFactorApplied(), 12, RoundingMode.HALF_UP);
         List<Product> products = productRepository.findAllById(productIds);
 
+        PriceAdjustmentScope scope = adjustment.getScope() == null ? PriceAdjustmentScope.ALL : adjustment.getScope();
         for (Product product : products) {
-            applyFactor(product, inverseFactor);
+            applyFactor(product, inverseFactor, scope);
         }
 
         adjustment.setUndone(true);
@@ -275,10 +281,16 @@ public class ProductServiceImpl implements ProductService {
         return BigDecimal.ONE.subtract(decimalPercentage);
     }
 
-    private void applyFactor(Product product, BigDecimal factor) {
-        product.setCost(product.getCost().multiply(factor).setScale(2, RoundingMode.HALF_UP));
-        product.setPriceWholesaleNet(product.getPriceWholesaleNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
-        product.setPriceRetailNet(product.getPriceRetailNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+    private void applyFactor(Product product, BigDecimal factor, PriceAdjustmentScope scope) {
+        if (scope == PriceAdjustmentScope.ALL) {
+            product.setCost(product.getCost().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+            product.setPriceWholesaleNet(product.getPriceWholesaleNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+            product.setPriceRetailNet(product.getPriceRetailNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+        } else if (scope == PriceAdjustmentScope.WHOLESALE) {
+            product.setPriceWholesaleNet(product.getPriceWholesaleNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+        } else if (scope == PriceAdjustmentScope.RETAIL) {
+            product.setPriceRetailNet(product.getPriceRetailNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+        }
         recalcPrices(product);
     }
 
