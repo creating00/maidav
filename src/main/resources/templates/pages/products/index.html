@@ -8,11 +8,19 @@
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Productos</h1>
 
-        <a sec:authorize="hasAuthority('PRODUCT_CREATE')"
-           th:href="@{/products/new}"
-           class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-            + Nuevo Producto
-        </a>
+        <div class="flex items-center gap-2">
+            <button sec:authorize="hasAuthority('PRODUCT_UPDATE')"
+                    type="button"
+                    id="open-adjustments-history"
+                    class="bg-slate-700 text-white px-4 py-2 rounded hover:bg-slate-800">
+                Ver historial de ajustes
+            </button>
+            <a sec:authorize="hasAuthority('PRODUCT_CREATE')"
+               th:href="@{/products/new}"
+               class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+                + Nuevo Producto
+            </a>
+        </div>
     </div>
 
     <div th:if="${successMessage}"
@@ -50,6 +58,14 @@
           th:action="@{/products/bulk-increase}"
           class="mb-4 rounded border border-blue-200 bg-blue-50 p-4 flex flex-wrap gap-3 items-end">
         <div>
+            <label class="block text-xs text-gray-600 mb-1">Tipo</label>
+            <select name="adjustmentType" class="border rounded px-3 py-2 min-w-44" required>
+                <option th:each="type : ${adjustmentTypes}"
+                        th:value="${type.name()}"
+                        th:text="${type.name() == 'INCREASE' ? 'Aumento' : 'Descuento'}"></option>
+            </select>
+        </div>
+        <div>
             <label class="block text-xs text-gray-600 mb-1">Proveedor</label>
             <select name="providerId" class="border rounded px-3 py-2 min-w-56">
                 <option value="">Todos</option>
@@ -59,17 +75,106 @@
             </select>
         </div>
         <div>
-            <label class="block text-xs text-gray-600 mb-1">Aumento (%)</label>
+            <label class="block text-xs text-gray-600 mb-1">Porcentaje (%)</label>
             <input type="number" name="percentage" step="0.01" min="0.01" placeholder="Ej: 5"
                    class="border rounded px-3 py-2 w-32" required/>
         </div>
         <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-            Aplicar aumento
+            Aplicar ajuste
         </button>
         <p class="text-xs text-gray-600">
-            Actualiza costo y precios netos en bloque; luego recalcula precios con IVA.
+            El sistema aplica aumento o descuento en bloque y guarda historial para poder deshacer con precision.
         </p>
     </form>
+
+    <div sec:authorize="hasAuthority('PRODUCT_UPDATE')"
+         id="adjustments-history-backdrop"
+         class="hidden fixed inset-0 bg-black/40 z-40"></div>
+
+    <aside sec:authorize="hasAuthority('PRODUCT_UPDATE')"
+           id="adjustments-history-panel"
+           class="hidden fixed right-2 top-16 h-[82vh] w-[96vw] md:w-[560px] bg-white rounded-lg border border-slate-200 shadow-2xl z-50 flex flex-col">
+        <div class="flex items-center justify-between border-b px-4 py-3">
+            <h2 class="text-base font-semibold">Historial de ajustes de precios</h2>
+            <button type="button"
+                    id="close-adjustments-history"
+                    class="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100">
+                Cerrar
+            </button>
+        </div>
+        <div class="px-4 py-2 text-xs text-slate-600 border-b space-y-2">
+            <p>Ultimos 20 ajustes. Usa el buscador y la paginacion para navegar rapido.</p>
+            <input type="text"
+                   id="adjustments-history-search"
+                   placeholder="Buscar por usuario, proveedor, tipo o codigo..."
+                   class="w-full border rounded px-3 py-2 text-sm"/>
+        </div>
+        <div class="overflow-auto p-4 flex-1">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-100 text-left sticky top-0">
+                <tr>
+                    <th class="px-3 py-2">Fecha</th>
+                    <th class="px-3 py-2">Usuario</th>
+                    <th class="px-3 py-2">Tipo</th>
+                    <th class="px-3 py-2">Porcentaje</th>
+                    <th class="px-3 py-2">Proveedor</th>
+                    <th class="px-3 py-2">Codigos</th>
+                    <th class="px-3 py-2">Productos</th>
+                    <th class="px-3 py-2">Estado</th>
+                    <th class="px-3 py-2 text-right">Accion</th>
+                </tr>
+                </thead>
+                <tbody id="adjustments-history-body">
+                <tr th:each="adjustment : ${adjustments}"
+                    class="border-t adjustment-row"
+                    th:attr="data-search=${#temporals.format(adjustment.createdAt, 'yyyy-MM-dd HH:mm') + ' ' + adjustment.createdBy + ' ' + (adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : 'Descuento') + ' ' + #numbers.formatDecimal(adjustment.percentage,1,2) + ' ' + (adjustment.provider != null ? adjustment.provider.name : 'Todos') + ' ' + (adjustment.undone ? 'Deshecho' : 'Aplicado') + ' ' + adjustmentProductCodes[adjustment.id]}">
+                    <td class="px-3 py-2"
+                        th:text="${#temporals.format(adjustment.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                    <td class="px-3 py-2" th:text="${adjustment.createdBy}"></td>
+                    <td class="px-3 py-2"
+                        th:text="${adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : 'Descuento'}"></td>
+                    <td class="px-3 py-2"
+                        th:text="${#numbers.formatDecimal(adjustment.percentage,1,2) + '%'}"></td>
+                    <td class="px-3 py-2"
+                        th:text="${adjustment.provider != null ? adjustment.provider.name : 'Todos'}"></td>
+                    <td class="px-3 py-2 text-xs text-slate-700"
+                        th:text="${adjustmentProductCodes[adjustment.id]}"></td>
+                    <td class="px-3 py-2" th:text="${adjustment.productsAffected}"></td>
+                    <td class="px-3 py-2">
+                        <span th:if="${!adjustment.undone}" class="text-green-700">Aplicado</span>
+                        <span th:if="${adjustment.undone}" class="text-slate-600">Deshecho</span>
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                        <form th:if="${!adjustment.undone}"
+                              th:action="@{/products/adjustments/{id}/undo(id=${adjustment.id})}"
+                              method="post"
+                              onsubmit="return confirm('Deshacer este ajuste? Esta accion aplica la inversa exacta solo sobre los productos afectados originalmente.');">
+                            <button class="text-blue-600 hover:underline">Deshacer</button>
+                        </form>
+                    </td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(adjustments)}">
+                    <td colspan="9" class="px-3 py-3 text-center text-gray-500">Sin ajustes registrados</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="border-t px-4 py-2 flex items-center justify-between text-sm">
+            <span id="adjustments-history-page-info" class="text-slate-600">Pagina 1</span>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        id="adjustments-history-prev"
+                        class="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100">
+                    Anterior
+                </button>
+                <button type="button"
+                        id="adjustments-history-next"
+                        class="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100">
+                    Siguiente
+                </button>
+            </div>
+        </div>
+    </aside>
 
     <div id="calcConfig"
          th:attr="data-recargo=${calculatorConfig.recargo},
@@ -413,6 +518,110 @@
                     }
                 });
             });
+
+            const openHistoryButton = document.getElementById('open-adjustments-history');
+            const closeHistoryButton = document.getElementById('close-adjustments-history');
+            const historyPanel = document.getElementById('adjustments-history-panel');
+            const historyBackdrop = document.getElementById('adjustments-history-backdrop');
+            const historySearchInput = document.getElementById('adjustments-history-search');
+            const historyRows = Array.from(document.querySelectorAll('#adjustments-history-body .adjustment-row'));
+            const historyPrevButton = document.getElementById('adjustments-history-prev');
+            const historyNextButton = document.getElementById('adjustments-history-next');
+            const historyPageInfo = document.getElementById('adjustments-history-page-info');
+            const historyPageSize = 6;
+            let historyCurrentPage = 1;
+            let historyFilteredRows = historyRows;
+
+            function renderHistoryRows() {
+                const totalRows = historyFilteredRows.length;
+                const totalPages = Math.max(1, Math.ceil(totalRows / historyPageSize));
+                historyCurrentPage = Math.min(historyCurrentPage, totalPages);
+                const start = (historyCurrentPage - 1) * historyPageSize;
+                const end = start + historyPageSize;
+
+                historyRows.forEach(row => row.classList.add('hidden'));
+                historyFilteredRows.slice(start, end).forEach(row => row.classList.remove('hidden'));
+
+                if (historyPageInfo) {
+                    historyPageInfo.textContent = totalRows === 0
+                        ? 'Sin resultados'
+                        : ('Pagina ' + historyCurrentPage + ' de ' + totalPages);
+                }
+                if (historyPrevButton) {
+                    historyPrevButton.disabled = historyCurrentPage <= 1 || totalRows === 0;
+                    historyPrevButton.classList.toggle('opacity-50', historyPrevButton.disabled);
+                    historyPrevButton.classList.toggle('cursor-not-allowed', historyPrevButton.disabled);
+                }
+                if (historyNextButton) {
+                    historyNextButton.disabled = historyCurrentPage >= totalPages || totalRows === 0;
+                    historyNextButton.classList.toggle('opacity-50', historyNextButton.disabled);
+                    historyNextButton.classList.toggle('cursor-not-allowed', historyNextButton.disabled);
+                }
+            }
+
+            function filterHistoryRows() {
+                const query = (historySearchInput?.value || '').trim().toLowerCase();
+                historyFilteredRows = historyRows.filter(row => {
+                    const haystack = (row.dataset.search || '').toLowerCase();
+                    return haystack.includes(query);
+                });
+                historyCurrentPage = 1;
+                renderHistoryRows();
+            }
+
+            function openHistoryPanel() {
+                if (!historyPanel || !historyBackdrop) {
+                    return;
+                }
+                historyPanel.classList.remove('hidden');
+                historyBackdrop.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            }
+
+            function closeHistoryPanel() {
+                if (!historyPanel || !historyBackdrop) {
+                    return;
+                }
+                historyPanel.classList.add('hidden');
+                historyBackdrop.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+
+            if (openHistoryButton) {
+                openHistoryButton.addEventListener('click', openHistoryPanel);
+            }
+            if (closeHistoryButton) {
+                closeHistoryButton.addEventListener('click', closeHistoryPanel);
+            }
+            if (historyBackdrop) {
+                historyBackdrop.addEventListener('click', closeHistoryPanel);
+            }
+            if (historySearchInput) {
+                historySearchInput.addEventListener('input', filterHistoryRows);
+            }
+            if (historyPrevButton) {
+                historyPrevButton.addEventListener('click', function () {
+                    if (historyCurrentPage > 1) {
+                        historyCurrentPage -= 1;
+                        renderHistoryRows();
+                    }
+                });
+            }
+            if (historyNextButton) {
+                historyNextButton.addEventListener('click', function () {
+                    const totalPages = Math.max(1, Math.ceil(historyFilteredRows.length / historyPageSize));
+                    if (historyCurrentPage < totalPages) {
+                        historyCurrentPage += 1;
+                        renderHistoryRows();
+                    }
+                });
+            }
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeHistoryPanel();
+                }
+            });
+            renderHistoryRows();
         })();
     </script>
 

@@ -9,7 +9,7 @@
         <p class="text-gray-500 text-sm">Seleccione cliente, productos y forma de pago</p>
     </div>
 
-    <form th:action="@{/sales}" method="post" class="bg-white p-8 rounded-lg shadow">
+    <form id="saleForm" th:action="@{/sales}" method="post" class="bg-white p-8 rounded-lg shadow">
 
         <div th:if="${formError}"
              data-form-error="true"
@@ -50,6 +50,7 @@
                             th:value="${client.id}"
                             th:data-dni="${client.nationalId}"
                             th:data-name="${client.firstName + ' ' + client.lastName}"
+                            th:data-address="${client.address}"
                             th:text="${client.nationalId + ' - ' + client.firstName + ' ' + client.lastName}">
                     </option>
                 </select>
@@ -377,6 +378,57 @@
 
     </form>
 
+    <div id="saleConfirmModal"
+         class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 px-4">
+        <div class="w-full max-w-3xl rounded-xl bg-white shadow-xl">
+            <div class="border-b px-6 py-4">
+                <h3 class="text-lg font-semibold text-gray-900">Confirmar datos antes de guardar</h3>
+                <p class="mt-1 text-sm text-gray-600">Revise estos datos para evitar errores.</p>
+            </div>
+            <div class="max-h-[70vh] overflow-y-auto px-6 py-4">
+                <div class="grid grid-cols-1 gap-3 md:grid-cols-2 text-sm">
+                    <div><span class="font-semibold">Cliente:</span> <span id="confirmClient">-</span></div>
+                    <div><span class="font-semibold">Direccion:</span> <span id="confirmAddress">-</span></div>
+                    <div><span class="font-semibold">Forma de pago:</span> <span id="confirmPaymentType">-</span></div>
+                    <div><span class="font-semibold">Fecha de venta:</span> <span id="confirmSaleDate">-</span></div>
+                    <div><span class="font-semibold">Fecha 1er vencimiento:</span> <span id="confirmFirstDueDate">-</span></div>
+                    <div><span class="font-semibold">Frecuencia:</span> <span id="confirmFrequency">-</span></div>
+                    <div><span class="font-semibold">Cuotas:</span> <span id="confirmInstallments">-</span></div>
+                    <div><span class="font-semibold">Vencimientos:</span> <span id="confirmDueDays">-</span></div>
+                    <div><span class="font-semibold">Descuento:</span> <span id="confirmDiscount">-</span></div>
+                    <div><span class="font-semibold">Total carrito:</span> <span id="confirmTotal">-</span></div>
+                </div>
+
+                <div class="mt-4">
+                    <h4 class="text-sm font-semibold text-gray-900 mb-2">Productos</h4>
+                    <div class="overflow-x-auto rounded border border-gray-200">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Producto</th>
+                                <th class="px-3 py-2 text-left">Cantidad</th>
+                                <th class="px-3 py-2 text-left">Precio unitario</th>
+                                <th class="px-3 py-2 text-left">Subtotal</th>
+                            </tr>
+                            </thead>
+                            <tbody id="confirmItemsBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center justify-end gap-3 border-t px-6 py-4">
+                <button type="button" id="confirmBackBtn"
+                        class="rounded border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50">
+                    Volver y corregir
+                </button>
+                <button type="button" id="confirmSaveBtn"
+                        class="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700">
+                    Confirmar y guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function () {
             const body = document.getElementById('itemsBody');
@@ -399,7 +451,7 @@
             const monthlyOptions = document.getElementById('monthlyOptions');
             const saleNumberBadge = document.getElementById('saleNumberBadge');
             const saleNumberHelp = document.getElementById('saleNumberHelp');
-            const saleForm = document.querySelector('form');
+            const saleForm = document.getElementById('saleForm');
             const hasFormError = Boolean(document.querySelector('[data-form-error="true"]'));
             const hasSuccessMessage = Boolean(document.getElementById('saleSuccessMessage'));
             const formErrorBox = document.getElementById('formErrorBox');
@@ -418,6 +470,11 @@
             const biMonthlyDay1Input = document.querySelector('input[name="biMonthlyDay1"]');
             const biMonthlyDay2Input = document.querySelector('input[name="biMonthlyDay2"]');
             const monthlyDayInput = document.querySelector('input[name="monthlyDay"]');
+            const saleConfirmModal = document.getElementById('saleConfirmModal');
+            const confirmItemsBody = document.getElementById('confirmItemsBody');
+            const confirmBackBtn = document.getElementById('confirmBackBtn');
+            const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+            let confirmedSubmit = false;
 
             function parseNumber(value) {
                 const num = parseFloat(value);
@@ -1014,7 +1071,15 @@
                 clearFormError();
 
                 const clientId = getFieldValue('select[name="clientId"]');
-                if (!clientId) {
+                const quickClientEnabled = Boolean(quickClientToggle && quickClientToggle.checked);
+                if (quickClientEnabled) {
+                    const quickNationalId = getFieldValue('input[name="quickClientNationalId"]').trim();
+                    const quickFirstName = getFieldValue('input[name="quickClientFirstName"]').trim();
+                    const quickLastName = getFieldValue('input[name="quickClientLastName"]').trim();
+                    if (!quickNationalId || !quickFirstName || !quickLastName) {
+                        return 'Para cliente rapido debe completar DNI, nombre y apellido';
+                    }
+                } else if (!clientId) {
                     return 'Debe seleccionar un cliente';
                 }
 
@@ -1094,6 +1159,136 @@
                 if (input && value !== undefined && value !== null) {
                     input.value = value;
                 }
+            }
+
+            function toLabel(value, map) {
+                if (!value) {
+                    return '-';
+                }
+                return map[value] || value;
+            }
+
+            function formatDate(value) {
+                if (!value) {
+                    return '-';
+                }
+                const date = new Date(value + 'T00:00:00');
+                if (Number.isNaN(date.getTime())) {
+                    return value;
+                }
+                return date.toLocaleDateString('es-AR');
+            }
+
+            function setConfirmField(id, value) {
+                const el = document.getElementById(id);
+                if (el) {
+                    el.textContent = value || '-';
+                }
+            }
+
+            function getSelectedRows() {
+                return Array.from(body.querySelectorAll('tr')).filter(row => {
+                    const select = row.querySelector('.product-select');
+                    return select && select.value;
+                });
+            }
+
+            function getDueDaysLabel(frequency) {
+                const dayMap = {
+                    MONDAY: 'Lunes',
+                    TUESDAY: 'Martes',
+                    WEDNESDAY: 'Miercoles',
+                    THURSDAY: 'Jueves',
+                    FRIDAY: 'Viernes',
+                    SATURDAY: 'Sabado',
+                    SUNDAY: 'Domingo'
+                };
+                if (frequency === 'DAILY') {
+                    const days = Array.from(document.querySelectorAll('input[name="dailyDays"]:checked'))
+                        .map(input => toLabel(input.value, dayMap));
+                    return days.length ? days.join(', ') : '-';
+                }
+                if (frequency === 'WEEKLY') {
+                    return toLabel(getFieldValue('select[name="weeklyDay"]'), dayMap);
+                }
+                if (frequency === 'BIWEEKLY') {
+                    const d1 = getFieldValue('input[name="biMonthlyDay1"]');
+                    const d2 = getFieldValue('input[name="biMonthlyDay2"]');
+                    return [d1, d2].filter(Boolean).join(' y ') || '-';
+                }
+                if (frequency === 'MONTHLY') {
+                    const day = getFieldValue('input[name="monthlyDay"]');
+                    return day ? ('Dia ' + day) : '-';
+                }
+                return '-';
+            }
+
+            function fillConfirmModal() {
+                const paymentMap = {CASH: 'Contado', CREDIT: 'Credito'};
+                const frequencyMap = {DAILY: 'Diario', WEEKLY: 'Semanal', BIWEEKLY: 'Quincenal', MONTHLY: 'Mensual'};
+                const quickClientEnabled = Boolean(quickClientToggle && quickClientToggle.checked);
+                const selectedClientOption = clientSelect && clientSelect.selectedIndex >= 0
+                    ? clientSelect.options[clientSelect.selectedIndex]
+                    : null;
+                const quickClientName = [getFieldValue('input[name="quickClientFirstName"]'), getFieldValue('input[name="quickClientLastName"]')]
+                    .filter(Boolean)
+                    .join(' ')
+                    .trim();
+                const clientName = quickClientEnabled
+                    ? (quickClientName || '-')
+                    : (selectedClientOption && selectedClientOption.value ? (selectedClientOption.dataset.name || selectedClientOption.textContent) : '-');
+                const clientAddress = quickClientEnabled
+                    ? getFieldValue('input[name="quickClientAddress"]')
+                    : (selectedClientOption ? (selectedClientOption.dataset.address || '') : '');
+
+                setConfirmField('confirmClient', clientName);
+                setConfirmField('confirmAddress', clientAddress || '-');
+                setConfirmField('confirmPaymentType', toLabel(getFieldValue('select[name="paymentType"]'), paymentMap));
+                setConfirmField('confirmSaleDate', formatDate(getFieldValue('input[name="saleDate"]')));
+                setConfirmField('confirmFirstDueDate', formatDate(getFieldValue('input[name="firstDueDate"]')));
+                const frequencyValue = getFieldValue('select[name="paymentFrequency"]');
+                setConfirmField('confirmFrequency', toLabel(frequencyValue, frequencyMap));
+                setConfirmField('confirmInstallments', getFieldValue('input[name="weeksCount"]') || '-');
+                setConfirmField('confirmDueDays', getDueDaysLabel(frequencyValue));
+                setConfirmField('confirmDiscount', money(getFieldValue('input[name="discountAmount"]') || 0));
+                setConfirmField('confirmTotal', document.getElementById('totalAmount') ? money(document.getElementById('totalAmount').textContent) : '-');
+
+                if (confirmItemsBody) {
+                    confirmItemsBody.innerHTML = '';
+                    getSelectedRows().forEach(row => {
+                        const select = row.querySelector('.product-select');
+                        const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
+                        const price = parseNumber(row.querySelector('input[name="unitPrices"]').value);
+                        const subtotal = qty * price;
+                        const option = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex] : null;
+                        const productName = option ? option.textContent.trim() : '-';
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-t';
+                        tr.innerHTML =
+                            '<td class="px-3 py-2">' + productName + '</td>' +
+                            '<td class="px-3 py-2">' + qty + '</td>' +
+                            '<td class="px-3 py-2">' + money(price) + '</td>' +
+                            '<td class="px-3 py-2">' + money(subtotal) + '</td>';
+                        confirmItemsBody.appendChild(tr);
+                    });
+                }
+            }
+
+            function openConfirmModal() {
+                fillConfirmModal();
+                if (!saleConfirmModal) {
+                    return;
+                }
+                saleConfirmModal.classList.remove('hidden');
+                saleConfirmModal.classList.add('flex');
+            }
+
+            function closeConfirmModal() {
+                if (!saleConfirmModal) {
+                    return;
+                }
+                saleConfirmModal.classList.remove('flex');
+                saleConfirmModal.classList.add('hidden');
             }
 
             function saveDraft() {
@@ -1230,8 +1425,45 @@
                 saleForm.addEventListener('change', saveDraft);
                 saleForm.addEventListener('submit', function (event) {
                     saveDraft();
+                    if (confirmedSubmit) {
+                        return;
+                    }
+                    const validationError = validateBeforeSubmit();
+                    if (validationError) {
+                        event.preventDefault();
+                        showFormError(validationError);
+                        return;
+                    }
+                    event.preventDefault();
+                    openConfirmModal();
                 });
             }
+            if (confirmBackBtn) {
+                confirmBackBtn.addEventListener('click', closeConfirmModal);
+            }
+            if (confirmSaveBtn && saleForm) {
+                confirmSaveBtn.addEventListener('click', function () {
+                    confirmedSubmit = true;
+                    closeConfirmModal();
+                    if (typeof saleForm.requestSubmit === 'function') {
+                        saleForm.requestSubmit();
+                    } else {
+                        saleForm.submit();
+                    }
+                });
+            }
+            if (saleConfirmModal) {
+                saleConfirmModal.addEventListener('click', function (event) {
+                    if (event.target === saleConfirmModal) {
+                        closeConfirmModal();
+                    }
+                });
+            }
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && saleConfirmModal && !saleConfirmModal.classList.contains('hidden')) {
+                    closeConfirmModal();
+                }
+            });
             if (quickClientToggle) {
                 quickClientToggle.addEventListener('change', function () {
                     toggleQuickClientMode();

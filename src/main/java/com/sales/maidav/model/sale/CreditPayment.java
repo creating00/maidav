@@ -17,6 +17,9 @@ public class CreditPayment extends BaseEntity {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "impact_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal impactAmount;
+
     @Column(name = "paid_at", nullable = false)
     private LocalDate paidAt;
 
@@ -37,6 +40,9 @@ public class CreditPayment extends BaseEntity {
 
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
+
+    public BigDecimal getImpactAmount() { return impactAmount; }
+    public void setImpactAmount(BigDecimal impactAmount) { this.impactAmount = impactAmount; }
 
     public LocalDate getPaidAt() { return paidAt; }
     public void setPaidAt(LocalDate paidAt) { this.paidAt = paidAt; }

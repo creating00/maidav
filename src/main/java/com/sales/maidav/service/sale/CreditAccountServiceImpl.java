@@ -4,6 +4,7 @@ import com.sales.maidav.model.sale.*;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
+import com.sales.maidav.service.settings.CompanySettingsService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final CreditPaymentRepository creditPaymentRepository;
+    private final CompanySettingsService companySettingsService;
 
     @Override
     public List<CreditAccount> findAll() {
@@ -66,75 +68,39 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             throw new InvalidSaleException("La cuenta ya esta saldada");
         }
 
-        BigDecimal newBalance = account.getBalance().subtract(amount);
-        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-            throw new InvalidSaleException("El pago supera el saldo");
-        }
-
         CreditPayment payment = new CreditPayment();
         payment.setAccount(account);
         payment.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
         payment.setPaidAt(LocalDate.now());
         payment.setRegisteredBy(trimToNull(registeredBy));
-        payment.setPaymentMethod(paymentMethod == null ? PaymentCollectionMethod.BANK : paymentMethod);
-        creditPaymentRepository.save(payment);
+        PaymentCollectionMethod resolvedMethod = paymentMethod == null ? PaymentCollectionMethod.BANK : paymentMethod;
+        payment.setPaymentMethod(resolvedMethod);
 
         List<CreditInstallment> installments = resolveInstallments(accountId, installmentIds);
-        if (installmentIds != null && !installmentIds.isEmpty()) {
-            BigDecimal selectableRemaining = BigDecimal.ZERO;
-            for (CreditInstallment installment : installments) {
-                if (installment.getStatus() == InstallmentStatus.PAID) {
-                    continue;
-                }
-                BigDecimal paidAmount = installment.getPaidAmount() == null ? BigDecimal.ZERO : installment.getPaidAmount();
-                BigDecimal installmentRemaining = installment.getAmount().subtract(paidAmount);
-                if (installmentRemaining.compareTo(BigDecimal.ZERO) > 0) {
-                    selectableRemaining = selectableRemaining.add(installmentRemaining);
-                }
-            }
-            if (amount.compareTo(selectableRemaining) > 0) {
-                throw new InvalidSaleException("El pago supera el saldo de las cuotas seleccionadas");
-            }
+        BigDecimal maxPayable = calculateMaxPayable(installments, resolvedMethod);
+        if (amount.compareTo(maxPayable) > 0) {
+            throw new InvalidSaleException("El pago supera el saldo de las cuotas seleccionadas");
         }
-
-        BigDecimal remaining = amount;
         Map<Integer, String> paymentReferences = new LinkedHashMap<>();
+        BigDecimal impactAmount = applyPaymentToInstallments(
+                installments,
+                amount.setScale(2, RoundingMode.HALF_UP),
+                resolvedMethod,
+                LocalDate.now(),
+                paymentReferences
+        );
 
-        for (CreditInstallment installment : installments) {
-            if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-                break;
-            }
-            if (installment.getStatus() == InstallmentStatus.PAID) {
-                continue;
-            }
-            BigDecimal paidAmount = installment.getPaidAmount() == null ? BigDecimal.ZERO : installment.getPaidAmount();
-            BigDecimal installmentRemaining = installment.getAmount().subtract(paidAmount);
-            if (installmentRemaining.compareTo(BigDecimal.ZERO) <= 0) {
-                installment.setStatus(InstallmentStatus.PAID);
-                continue;
-            }
-            if (remaining.compareTo(installmentRemaining) >= 0) {
-                installment.setPaidAmount(installment.getAmount());
-                installment.setStatus(InstallmentStatus.PAID);
-                installment.setPaidAt(LocalDate.now());
-                remaining = remaining.subtract(installmentRemaining);
-                paymentReferences.put(
-                        installment.getInstallmentNumber(),
-                        "Cuota #" + installment.getInstallmentNumber() + " total"
-                );
-            } else {
-                installment.setPaidAmount(paidAmount.add(remaining).setScale(2, RoundingMode.HALF_UP));
-                installment.setStatus(InstallmentStatus.PARTIAL);
-                installment.setPaidAt(LocalDate.now());
-                paymentReferences.put(
-                        installment.getInstallmentNumber(),
-                        "Cuota #" + installment.getInstallmentNumber() + " parcial"
-                );
-                remaining = BigDecimal.ZERO;
-            }
+        if (impactAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new InvalidSaleException("El pago no pudo aplicarse a cuotas pendientes");
+        }
+        BigDecimal newBalance = account.getBalance().subtract(impactAmount);
+        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidSaleException("El pago supera el saldo");
         }
 
+        payment.setImpactAmount(impactAmount.setScale(2, RoundingMode.HALF_UP));
         payment.setAllocationSummary(buildAllocationSummary(paymentReferences));
+        creditPaymentRepository.save(payment);
         account.setBalance(newBalance.setScale(2, RoundingMode.HALF_UP));
         if (account.getBalance().compareTo(BigDecimal.ZERO) == 0) {
             account.setStatus(AccountStatus.CLOSED);
@@ -162,14 +128,6 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         payment.setPaidAt(paidAt);
         payment.setPaymentMethod(paymentMethod == null ? PaymentCollectionMethod.BANK : paymentMethod);
 
-        BigDecimal totalPaid = creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(accountId).stream()
-                .map(CreditPayment::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        if (totalPaid.compareTo(account.getTotalAmount()) > 0) {
-            throw new InvalidSaleException("La suma de pagos no puede superar el total de la cuenta");
-        }
-
         recalculateAccountState(account);
     }
 
@@ -193,6 +151,116 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         return creditInstallmentRepository.findByAccount_IdAndIdInOrderByInstallmentNumber(accountId, installmentIds);
     }
 
+    private BigDecimal applyPaymentToInstallments(List<CreditInstallment> installments,
+                                                  BigDecimal inputAmount,
+                                                  PaymentCollectionMethod paymentMethod,
+                                                  LocalDate paidAt,
+                                                  Map<Integer, String> paymentReferences) {
+        BigDecimal remainingInput = inputAmount == null ? BigDecimal.ZERO : inputAmount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal impactAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal cashRecargo = resolveCashRecargo();
+
+        for (CreditInstallment installment : installments) {
+            if (remainingInput.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+            if (installment.getStatus() == InstallmentStatus.PAID) {
+                continue;
+            }
+
+            BigDecimal paidAmount = installment.getPaidAmount() == null
+                    ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                    : installment.getPaidAmount().setScale(2, RoundingMode.HALF_UP);
+            BigDecimal financedRemaining = installment.getAmount().subtract(paidAmount).setScale(2, RoundingMode.HALF_UP);
+            if (financedRemaining.compareTo(BigDecimal.ZERO) <= 0) {
+                installment.setStatus(InstallmentStatus.PAID);
+                continue;
+            }
+
+            if (paymentMethod == PaymentCollectionMethod.CASH) {
+                BigDecimal cashRemaining = financedRemaining.divide(cashRecargo, 2, RoundingMode.HALF_UP);
+                if (remainingInput.compareTo(cashRemaining) >= 0) {
+                    installment.setPaidAmount(installment.getAmount().setScale(2, RoundingMode.HALF_UP));
+                    installment.setStatus(InstallmentStatus.PAID);
+                    installment.setPaidAt(paidAt);
+                    remainingInput = remainingInput.subtract(cashRemaining).setScale(2, RoundingMode.HALF_UP);
+                    impactAmount = impactAmount.add(financedRemaining).setScale(2, RoundingMode.HALF_UP);
+                    paymentReferences.put(
+                            installment.getInstallmentNumber(),
+                            "Cuota #" + installment.getInstallmentNumber() + " total (efectivo con descuento)"
+                    );
+                } else {
+                    BigDecimal partialImpact = remainingInput.min(financedRemaining).setScale(2, RoundingMode.HALF_UP);
+                    installment.setPaidAmount(paidAmount.add(partialImpact).setScale(2, RoundingMode.HALF_UP));
+                    installment.setStatus(InstallmentStatus.PARTIAL);
+                    installment.setPaidAt(paidAt);
+                    impactAmount = impactAmount.add(partialImpact).setScale(2, RoundingMode.HALF_UP);
+                    paymentReferences.put(
+                            installment.getInstallmentNumber(),
+                            "Cuota #" + installment.getInstallmentNumber() + " parcial (efectivo sin descuento)"
+                    );
+                    remainingInput = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                }
+            } else {
+                if (remainingInput.compareTo(financedRemaining) >= 0) {
+                    installment.setPaidAmount(installment.getAmount().setScale(2, RoundingMode.HALF_UP));
+                    installment.setStatus(InstallmentStatus.PAID);
+                    installment.setPaidAt(paidAt);
+                    remainingInput = remainingInput.subtract(financedRemaining).setScale(2, RoundingMode.HALF_UP);
+                    impactAmount = impactAmount.add(financedRemaining).setScale(2, RoundingMode.HALF_UP);
+                    paymentReferences.put(
+                            installment.getInstallmentNumber(),
+                            "Cuota #" + installment.getInstallmentNumber() + " total"
+                    );
+                } else {
+                    BigDecimal partialImpact = remainingInput.min(financedRemaining).setScale(2, RoundingMode.HALF_UP);
+                    installment.setPaidAmount(paidAmount.add(partialImpact).setScale(2, RoundingMode.HALF_UP));
+                    installment.setStatus(InstallmentStatus.PARTIAL);
+                    installment.setPaidAt(paidAt);
+                    impactAmount = impactAmount.add(partialImpact).setScale(2, RoundingMode.HALF_UP);
+                    paymentReferences.put(
+                            installment.getInstallmentNumber(),
+                            "Cuota #" + installment.getInstallmentNumber() + " parcial"
+                    );
+                    remainingInput = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                }
+            }
+        }
+
+        return impactAmount;
+    }
+
+    private BigDecimal calculateMaxPayable(List<CreditInstallment> installments, PaymentCollectionMethod paymentMethod) {
+        BigDecimal total = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal cashRecargo = resolveCashRecargo();
+        for (CreditInstallment installment : installments) {
+            if (installment.getStatus() == InstallmentStatus.PAID) {
+                continue;
+            }
+            BigDecimal paidAmount = installment.getPaidAmount() == null
+                    ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                    : installment.getPaidAmount().setScale(2, RoundingMode.HALF_UP);
+            BigDecimal financedRemaining = installment.getAmount().subtract(paidAmount).setScale(2, RoundingMode.HALF_UP);
+            if (financedRemaining.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            if (paymentMethod == PaymentCollectionMethod.CASH) {
+                total = total.add(financedRemaining.divide(cashRecargo, 2, RoundingMode.HALF_UP)).setScale(2, RoundingMode.HALF_UP);
+            } else {
+                total = total.add(financedRemaining).setScale(2, RoundingMode.HALF_UP);
+            }
+        }
+        return total;
+    }
+
+    private BigDecimal resolveCashRecargo() {
+        BigDecimal recargo = companySettingsService.getSettings().getCalcRecargo();
+        if (recargo == null || recargo.compareTo(BigDecimal.ZERO) <= 0) {
+            return new BigDecimal("1.26");
+        }
+        return recargo;
+    }
+
     private void recalculateAccountState(CreditAccount account) {
         List<CreditInstallment> installments = creditInstallmentRepository
                 .findByAccount_IdOrderByInstallmentNumber(account.getId());
@@ -206,43 +274,20 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         }
 
         for (CreditPayment payment : payments) {
-            BigDecimal remaining = payment.getAmount();
             Map<Integer, String> paymentReferences = new LinkedHashMap<>();
-            for (CreditInstallment installment : installments) {
-                if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-                    break;
-                }
-                BigDecimal installmentRemaining = installment.getAmount().subtract(installment.getPaidAmount());
-                if (installmentRemaining.compareTo(BigDecimal.ZERO) <= 0) {
-                    continue;
-                }
-                if (remaining.compareTo(installmentRemaining) >= 0) {
-                    installment.setPaidAmount(installment.getAmount().setScale(2, RoundingMode.HALF_UP));
-                    installment.setStatus(InstallmentStatus.PAID);
-                    installment.setPaidAt(payment.getPaidAt());
-                    remaining = remaining.subtract(installmentRemaining);
-                    paymentReferences.put(
-                            installment.getInstallmentNumber(),
-                            "Cuota #" + installment.getInstallmentNumber() + " total"
-                    );
-                } else {
-                    installment.setPaidAmount(
-                            installment.getPaidAmount().add(remaining).setScale(2, RoundingMode.HALF_UP)
-                    );
-                    installment.setStatus(InstallmentStatus.PARTIAL);
-                    installment.setPaidAt(payment.getPaidAt());
-                    paymentReferences.put(
-                            installment.getInstallmentNumber(),
-                            "Cuota #" + installment.getInstallmentNumber() + " parcial"
-                    );
-                    remaining = BigDecimal.ZERO;
-                }
-            }
+            BigDecimal impactAmount = applyPaymentToInstallments(
+                    installments,
+                    payment.getAmount(),
+                    payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod(),
+                    payment.getPaidAt(),
+                    paymentReferences
+            );
+            payment.setImpactAmount(impactAmount.setScale(2, RoundingMode.HALF_UP));
             payment.setAllocationSummary(buildAllocationSummary(paymentReferences));
         }
 
         BigDecimal totalPaid = payments.stream()
-                .map(CreditPayment::getAmount)
+                .map(CreditPayment::getImpactAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
         BigDecimal newBalance = account.getTotalAmount().subtract(totalPaid).setScale(2, RoundingMode.HALF_UP);

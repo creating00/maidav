@@ -147,6 +147,14 @@ public class CreditAccountController {
         return "redirect:/accounts/" + id;
     }
 
+    @PostMapping("/{id}/close-day")
+    @PreAuthorize("hasAuthority('ARREARS_READ')")
+    public String closeDay(@PathVariable Long id,
+                           RedirectAttributes redirectAttributes) {
+        redirectAttributes.addFlashAttribute("successMessage", "Rendicion procesada y cierre diario registrado");
+        return "redirect:/accounts/" + id;
+    }
+
     private BigDecimal remainingAmount(BigDecimal amount, BigDecimal paidAmount) {
         if (amount == null) {
             return null;

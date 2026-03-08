@@ -1,14 +1,25 @@
 package com.sales.maidav.service.product;
 
 import com.sales.maidav.model.product.Product;
+import com.sales.maidav.model.product.ProductPriceAdjustment;
+import com.sales.maidav.model.product.ProductPriceAdjustmentItem;
+import com.sales.maidav.model.product.PriceAdjustmentType;
+import com.sales.maidav.repository.product.ProductPriceAdjustmentItemRepository;
+import com.sales.maidav.repository.product.ProductPriceAdjustmentRepository;
 import com.sales.maidav.repository.product.ProductRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -16,6 +27,8 @@ import java.util.List;
 public class ProductServiceImpl implements ProductService {
 
     private final ProductRepository productRepository;
+    private final ProductPriceAdjustmentRepository productPriceAdjustmentRepository;
+    private final ProductPriceAdjustmentItemRepository productPriceAdjustmentItemRepository;
 
     @Override
     public List<Product> findAll() {
@@ -80,9 +93,12 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public long bulkIncreasePrices(BigDecimal percentage, Long providerId) {
+    public long bulkAdjustPrices(BigDecimal percentage, Long providerId, PriceAdjustmentType adjustmentType) {
         if (percentage == null || percentage.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidProductException("El porcentaje de aumento debe ser mayor a cero");
+            throw new InvalidProductException("El porcentaje debe ser mayor a cero");
+        }
+        if (adjustmentType == null) {
+            throw new InvalidProductException("Tipo de ajuste invalido");
         }
 
         List<Product> products = providerId == null
@@ -93,18 +109,102 @@ public class ProductServiceImpl implements ProductService {
             throw new InvalidProductException("No hay productos para actualizar");
         }
 
-        BigDecimal factor = BigDecimal.ONE.add(
-                percentage.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)
-        );
+        BigDecimal factor = calculateFactor(percentage, adjustmentType);
 
         for (Product product : products) {
-            product.setCost(product.getCost().multiply(factor).setScale(2, RoundingMode.HALF_UP));
-            product.setPriceWholesaleNet(product.getPriceWholesaleNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
-            product.setPriceRetailNet(product.getPriceRetailNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
-            recalcPrices(product);
+            applyFactor(product, factor);
         }
 
+        ProductPriceAdjustment adjustment = new ProductPriceAdjustment();
+        adjustment.setAdjustmentType(adjustmentType);
+        adjustment.setPercentage(percentage.setScale(4, RoundingMode.HALF_UP));
+        adjustment.setFactorApplied(factor.setScale(8, RoundingMode.HALF_UP));
+        adjustment.setProvider(providerId == null ? null : products.get(0).getProvider());
+        adjustment.setProductsAffected(products.size());
+        adjustment.setCreatedBy(currentUsername());
+        adjustment.setUndone(false);
+        productPriceAdjustmentRepository.save(adjustment);
+
+        List<ProductPriceAdjustmentItem> items = products.stream()
+                .map(product -> {
+                    ProductPriceAdjustmentItem item = new ProductPriceAdjustmentItem();
+                    item.setAdjustment(adjustment);
+                    item.setProduct(product);
+                    return item;
+                })
+                .toList();
+        productPriceAdjustmentItemRepository.saveAll(items);
+
         return products.size();
+    }
+
+    @Override
+    public List<ProductPriceAdjustment> findRecentAdjustments() {
+        return productPriceAdjustmentRepository.findTop20ByOrderByCreatedAtDesc();
+    }
+
+    @Override
+    public Map<Long, String> findAdjustmentProductCodes(List<Long> adjustmentIds) {
+        if (adjustmentIds == null || adjustmentIds.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, List<String>> codesByAdjustment = productPriceAdjustmentItemRepository
+                .findByAdjustment_IdIn(adjustmentIds)
+                .stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getAdjustment().getId(),
+                        LinkedHashMap::new,
+                        Collectors.mapping(item -> item.getProduct().getProductCode(), Collectors.toList())
+                ));
+
+        Map<Long, String> result = new LinkedHashMap<>();
+        for (Long adjustmentId : adjustmentIds) {
+            List<String> codes = codesByAdjustment.getOrDefault(adjustmentId, List.of()).stream()
+                    .distinct()
+                    .toList();
+            if (codes.isEmpty()) {
+                result.put(adjustmentId, "-");
+                continue;
+            }
+            int maxVisible = 3;
+            String visibleCodes = String.join(", ", codes.stream().limit(maxVisible).toList());
+            if (codes.size() > maxVisible) {
+                visibleCodes = visibleCodes + " +" + (codes.size() - maxVisible);
+            }
+            result.put(adjustmentId, visibleCodes);
+        }
+        return result;
+    }
+
+    @Override
+    public void undoAdjustment(Long adjustmentId) {
+        ProductPriceAdjustment adjustment = productPriceAdjustmentRepository.findById(adjustmentId)
+                .orElseThrow(() -> new InvalidProductException("Ajuste no encontrado"));
+
+        if (adjustment.isUndone()) {
+            throw new InvalidProductException("El ajuste ya fue deshecho");
+        }
+
+        List<Long> productIds = productPriceAdjustmentItemRepository.findByAdjustment_Id(adjustmentId).stream()
+                .map(item -> item.getProduct().getId())
+                .distinct()
+                .toList();
+
+        if (productIds.isEmpty()) {
+            throw new InvalidProductException("No hay productos para deshacer el ajuste");
+        }
+
+        BigDecimal inverseFactor = BigDecimal.ONE.divide(adjustment.getFactorApplied(), 12, RoundingMode.HALF_UP);
+        List<Product> products = productRepository.findAllById(productIds);
+
+        for (Product product : products) {
+            applyFactor(product, inverseFactor);
+        }
+
+        adjustment.setUndone(true);
+        adjustment.setUndoneAt(LocalDateTime.now());
+        adjustment.setUndoneBy(currentUsername());
     }
 
     private void ensureUniqueCode(Long providerId, String productCode, Long id) {
@@ -162,6 +262,32 @@ public class ProductServiceImpl implements ProductService {
         product.setPriceRetail(
                 product.getPriceRetailNet().multiply(vatMultiplier).setScale(2, RoundingMode.HALF_UP)
         );
+    }
+
+    private BigDecimal calculateFactor(BigDecimal percentage, PriceAdjustmentType adjustmentType) {
+        BigDecimal decimalPercentage = percentage.divide(BigDecimal.valueOf(100), 8, RoundingMode.HALF_UP);
+        if (adjustmentType == PriceAdjustmentType.INCREASE) {
+            return BigDecimal.ONE.add(decimalPercentage);
+        }
+        if (decimalPercentage.compareTo(BigDecimal.ONE) >= 0) {
+            throw new InvalidProductException("El descuento debe ser menor a 100%");
+        }
+        return BigDecimal.ONE.subtract(decimalPercentage);
+    }
+
+    private void applyFactor(Product product, BigDecimal factor) {
+        product.setCost(product.getCost().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+        product.setPriceWholesaleNet(product.getPriceWholesaleNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+        product.setPriceRetailNet(product.getPriceRetailNet().multiply(factor).setScale(2, RoundingMode.HALF_UP));
+        recalcPrices(product);
+    }
+
+    private String currentUsername() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return "sistema";
+        }
+        return authentication.getName();
     }
 
     private boolean isValidVatRate(BigDecimal vatRate) {

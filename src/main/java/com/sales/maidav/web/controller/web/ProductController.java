@@ -1,6 +1,8 @@
 package com.sales.maidav.web.controller.web;
 
 import com.sales.maidav.model.product.Product;
+import com.sales.maidav.model.product.ProductPriceAdjustment;
+import com.sales.maidav.model.product.PriceAdjustmentType;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.service.product.DuplicateProductCodeException;
 import com.sales.maidav.service.product.InvalidProductException;
@@ -70,6 +72,12 @@ public class ProductController {
         model.addAttribute("providerId", providerId);
         model.addAttribute("products", products);
         model.addAttribute("providers", providerService.findAll());
+        model.addAttribute("adjustmentTypes", PriceAdjustmentType.values());
+        List<ProductPriceAdjustment> adjustments = productService.findRecentAdjustments();
+        model.addAttribute("adjustments", adjustments);
+        model.addAttribute("adjustmentProductCodes", productService.findAdjustmentProductCodes(
+                adjustments.stream().map(ProductPriceAdjustment::getId).toList()
+        ));
         model.addAttribute("focusProductId", productId);
         model.addAttribute("calculatorConfig", buildCalculatorConfig());
         return "pages/products/index";
@@ -178,15 +186,29 @@ public class ProductController {
     @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
     public String bulkIncrease(@RequestParam BigDecimal percentage,
                                @RequestParam(required = false) Long providerId,
+                               @RequestParam(defaultValue = "INCREASE") PriceAdjustmentType adjustmentType,
                                RedirectAttributes redirectAttributes) {
         try {
-            long updated = productService.bulkIncreasePrices(percentage, providerId);
+            long updated = productService.bulkAdjustPrices(percentage, providerId, adjustmentType);
             redirectAttributes.addFlashAttribute("successMessage", "Precios actualizados: " + updated + " producto(s)");
         } catch (InvalidProductException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
         if (providerId != null) {
             return "redirect:/products?providerId=" + providerId;
+        }
+        return "redirect:/products";
+    }
+
+    @PostMapping("/adjustments/{id}/undo")
+    @PreAuthorize("hasAuthority('PRODUCT_UPDATE')")
+    public String undoAdjustment(@PathVariable Long id,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            productService.undoAdjustment(id);
+            redirectAttributes.addFlashAttribute("successMessage", "Ajuste deshecho correctamente");
+        } catch (InvalidProductException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
         return "redirect:/products";
     }
