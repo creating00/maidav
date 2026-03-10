@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hoja de etiquetas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .label-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12mm 8mm;
+        }
+
+        .label-card {
+            min-height: 42mm;
+            break-inside: avoid;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { margin: 0; background: white; }
+            .page-shell {
+                max-width: none !important;
+                padding: 0 !important;
+            }
+            .label-grid {
+                gap: 8mm 6mm;
+            }
+            .label-card {
+                box-shadow: none !important;
+                border-color: #cbd5e1 !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 p-6">
+<div class="page-shell mx-auto max-w-5xl">
+    <div class="no-print mb-4 flex items-center justify-between">
+        <div>
+            <h1 class="text-xl font-semibold text-slate-900">Hoja de etiquetas</h1>
+            <p class="text-sm text-slate-500" th:text="${copies + ' etiqueta(s) listas para imprimir'}"></p>
+        </div>
+        <button onclick="window.print()" class="rounded-lg bg-slate-900 px-4 py-2 text-white hover:bg-slate-700">
+            Imprimir hoja
+        </button>
+    </div>
+
+    <div class="label-grid">
+        <article th:each="item : ${labels}" class="label-card rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-sm">
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <p class="text-[10px] uppercase tracking-[0.25em] text-slate-500">Maidav</p>
+                    <h2 class="mt-1 truncate text-sm font-semibold text-slate-900"
+                        th:text="${description != null && !description.isBlank() ? description : 'Producto sin descripcion'}"></h2>
+                    <p class="text-[11px] text-slate-500"
+                       th:text="${productCode != null && !productCode.isBlank() ? 'Cod. ' + productCode : 'Sin codigo interno'}"></p>
+                </div>
+                <span class="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600"
+                      th:text="${'Etiqueta ' + (item + 1)}"></span>
+            </div>
+
+            <div class="mt-2 flex justify-center" th:utext="${barcodeSvg}"></div>
+            <p class="mt-1 text-center font-mono text-xs tracking-[0.25em] text-slate-800" th:text="${barcode}"></p>
+        </article>
+    </div>
+</div>
+</body>
+</html>

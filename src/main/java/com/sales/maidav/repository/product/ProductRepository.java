@@ -19,6 +19,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     boolean existsByProvider_IdAndProductCode(Long providerId, String productCode);
     boolean existsByProvider_IdAndProductCodeAndIdNot(Long providerId, String productCode, Long id);
+    boolean existsByBarcode(String barcode);
+    boolean existsByBarcodeAndIdNot(String barcode, Long id);
 
     @Query("select count(p) from Product p where p.stockAvailable <= p.stockMin")
     long countLowStock();

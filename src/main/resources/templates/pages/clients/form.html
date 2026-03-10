@@ -110,7 +110,7 @@
             </div>
 
             <!-- Vendedor asignado -->
-            <div>
+            <div th:if="${canAssignSeller}">
                 <label class="block text-sm font-semibold mb-1">
                     Vendedor asignado
                 </label>
@@ -124,6 +124,18 @@
                             th:text="${vendor.email}">
                     </option>
                 </select>
+            </div>
+
+            <div th:if="${!canAssignSeller}">
+                <label class="block text-sm font-semibold mb-1">
+                    Vendedor asignado
+                </label>
+                <div class="w-full rounded border bg-slate-50 px-4 py-2 text-sm text-slate-700"
+                     th:text="${client.seller != null ? client.seller.email : currentUser.email}">
+                </div>
+                <p class="mt-1 text-xs text-slate-500">
+                    Solo el admin puede cambiar la asignacion de vendedor.
+                </p>
             </div>
 
             <!-- Email -->

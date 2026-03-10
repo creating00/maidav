@@ -2,8 +2,11 @@ package com.sales.maidav.service.client;
 
 import com.sales.maidav.model.client.Client;
 import com.sales.maidav.repository.client.ClientRepository;
+import com.sales.maidav.repository.user.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,20 +17,31 @@ import java.util.List;
 public class ClientServiceImpl implements ClientService {
 
     private final ClientRepository clientRepository;
+    private final UserRepository userRepository;
 
     @Override
     public List<Client> findAll() {
-        return clientRepository.findAll();
+        if (isCurrentUserAdmin()) {
+            return clientRepository.findAll();
+        }
+        Long sellerId = currentUserId();
+        return sellerId == null ? List.of() : clientRepository.findBySeller_Id(sellerId);
     }
 
     @Override
     public Client findById(Long id) {
-        return clientRepository.findWithRelationsById(id)
+        if (isCurrentUserAdmin()) {
+            return clientRepository.findWithRelationsById(id)
+                    .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
+        }
+        Long sellerId = currentUserId();
+        return clientRepository.findWithRelationsByIdAndSeller_Id(id, sellerId == null ? -1L : sellerId)
                 .orElseThrow(() -> new RuntimeException("Cliente no encontrado"));
     }
 
     @Override
     public Client create(Client client) {
+        assignSellerIfNeeded(client);
         normalizeAndValidate(client);
         String nationalId = client.getNationalId();
         validateNationalId(nationalId);
@@ -39,6 +53,7 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public Client update(Long id, Client data) {
+        assignSellerIfNeeded(data);
         normalizeAndValidate(data);
         String nationalId = data.getNationalId();
         validateNationalId(nationalId);
@@ -64,18 +79,29 @@ public class ClientServiceImpl implements ClientService {
 
     @Override
     public void delete(Long id) {
+        findById(id);
         clientRepository.deleteById(id);
     }
 
     @Override
     public List<Client> search(String term) {
         if (term == null || term.isBlank()) {
-            return clientRepository.findAll();
+            return findAll();
         }
 
+        if (isCurrentUserAdmin()) {
+            return clientRepository
+                    .findByNationalIdContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
+                            term, term, term
+                    );
+        }
+        Long sellerId = currentUserId();
+        if (sellerId == null) {
+            return List.of();
+        }
         return clientRepository
-                .findByNationalIdContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
-                        term, term, term
+                .findBySeller_IdAndNationalIdContainingIgnoreCaseOrSeller_IdAndFirstNameContainingIgnoreCaseOrSeller_IdAndLastNameContainingIgnoreCase(
+                        sellerId, term, sellerId, term, sellerId, term
                 );
     }
 
@@ -121,6 +147,37 @@ public class ClientServiceImpl implements ClientService {
         if (client.getSeller() == null || client.getSeller().getId() == null) {
             throw new InvalidClientException("Debe seleccionar un vendedor asignado");
         }
+    }
+
+    private void assignSellerIfNeeded(Client client) {
+        if (isCurrentUserAdmin()) {
+            return;
+        }
+        Long sellerId = currentUserId();
+        if (sellerId == null) {
+            throw new InvalidClientException("No se pudo resolver el vendedor actual");
+        }
+        client.setSeller(userRepository.findById(sellerId)
+                .orElseThrow(() -> new InvalidClientException("Vendedor no encontrado")));
+    }
+
+    private boolean isCurrentUserAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+    }
+
+    private Long currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return null;
+        }
+        return userRepository.findByEmail(authentication.getName())
+                .map(user -> user.getId())
+                .orElse(null);
     }
 
     private String trimToNull(String value) {

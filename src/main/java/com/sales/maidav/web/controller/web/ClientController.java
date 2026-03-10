@@ -15,6 +15,7 @@ import com.sales.maidav.service.client.ZoneService;
 import com.sales.maidav.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -159,7 +160,17 @@ public class ClientController {
                 .filter(existing -> client.getId() == null || !existing.getId().equals(client.getId()))
                 .collect(Collectors.toList());
         model.addAttribute("recommendedByOptions", recommendedByOptions);
-        model.addAttribute("vendors", userService.findByRoleName("VENDEDOR"));
+        model.addAttribute("canAssignSeller", currentUserIsAdmin());
+        model.addAttribute("vendors", currentUserIsAdmin() ? userService.findByRoleName("VENDEDOR") : List.of());
         model.addAttribute("zones", zoneService.findAll());
+    }
+
+    private boolean currentUserIsAdmin() {
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 }

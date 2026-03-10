@@ -18,6 +18,7 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.MediaType;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -213,6 +214,44 @@ public class ProductController {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
         return "redirect:/products";
+    }
+
+    @GetMapping("/barcode/generate")
+    @ResponseBody
+    @PreAuthorize("hasAuthority('PRODUCT_UPDATE') or hasAuthority('PRODUCT_CREATE')")
+    public Map<String, String> generateBarcode() {
+        return Map.of("barcode", productService.generateSystemBarcode());
+    }
+
+    @GetMapping(value = "/barcode/label", produces = MediaType.TEXT_HTML_VALUE)
+    @PreAuthorize("hasAuthority('PRODUCT_READ')")
+    public String barcodeLabel(@RequestParam String barcode,
+                               @RequestParam(required = false) String description,
+                               @RequestParam(required = false) String productCode,
+                               Model model) {
+        model.addAttribute("barcode", barcode);
+        model.addAttribute("description", description);
+        model.addAttribute("productCode", productCode);
+        model.addAttribute("barcodeSvg", productService.renderBarcodeLabelSvg(barcode));
+        return "pages/products/barcode-label";
+    }
+
+    @GetMapping(value = "/barcode/sheet", produces = MediaType.TEXT_HTML_VALUE)
+    @PreAuthorize("hasAuthority('PRODUCT_READ')")
+    public String barcodeSheet(@RequestParam String barcode,
+                               @RequestParam(required = false) String description,
+                               @RequestParam(required = false) String productCode,
+                               @RequestParam(defaultValue = "12") Integer copies,
+                               Model model) {
+        int safeCopies = copies == null ? 12 : Math.max(1, Math.min(copies, 65));
+        List<Integer> labels = java.util.stream.IntStream.range(0, safeCopies).boxed().toList();
+        model.addAttribute("barcode", barcode);
+        model.addAttribute("description", description);
+        model.addAttribute("productCode", productCode);
+        model.addAttribute("copies", safeCopies);
+        model.addAttribute("labels", labels);
+        model.addAttribute("barcodeSvg", productService.renderBarcodeLabelSvg(barcode));
+        return "pages/products/barcode-sheet";
     }
 
     private void attachImage(Product product, MultipartFile image) {

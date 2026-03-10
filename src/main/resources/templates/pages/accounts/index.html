@@ -9,56 +9,127 @@
         <h1 class="text-2xl font-bold">Cuentas de credito</h1>
     </div>
 
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
+    <div th:if="${errorMessage}"
+         class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+        <span th:text="${errorMessage}"></span>
+    </div>
+
     <form method="get" th:action="@{/accounts}" class="mb-4 flex gap-2">
-        <input type="text" name="q" th:value="${q}" placeholder="Buscar por cuenta, DNI, nombre o estado"
+        <input type="text" name="q" th:value="${q}" placeholder="Buscar por ID, cuenta, DNI, nombre o estado"
                class="w-full md:w-96 border rounded px-4 py-2"/>
         <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
     </form>
 
-    <div class="bg-white rounded shadow overflow-x-auto">
-        <table class="min-w-full text-sm">
-            <thead class="bg-gray-100 text-left">
-            <tr>
-                <th class="px-4 py-3">Cliente</th>
-                <th class="px-4 py-3">Total credito</th>
-                <th class="px-4 py-3">Cuota actual</th>
-                <th class="px-4 py-3">Saldo</th>
-                <th class="px-4 py-3">Cuotas</th>
-                <th class="px-4 py-3">Vencimientos</th>
-                <th class="px-4 py-3">Estado</th>
-                <th class="px-4 py-3 text-right">Acciones</th>
-            </tr>
-            </thead>
-            <tbody>
-            <tr th:each="account : ${accounts}" class="border-t hover:bg-gray-50">
-                <td class="px-4 py-3"
-                    th:text="${account.client.nationalId + ' - ' + account.client.firstName + ' ' + account.client.lastName}">
-                </td>
-                <td class="px-4 py-3" th:text="${account.totalAmount}"></td>
-                <td class="px-4 py-3"
-                    th:text="${currentInstallments[account.id] != null ? currentInstallments[account.id] : '-'}">
-                </td>
-                <td class="px-4 py-3" th:text="${account.balance}"></td>
-                <td class="px-4 py-3" th:text="${account.weeksCount}"></td>
-                <td class="px-4 py-3" th:text="${dueSchedules[account.id]}"></td>
-                <td class="px-4 py-3"
-                    th:text="${account.status.name() == 'CLOSED' ? 'Cerrado' : 'Abierto'}"
-                    th:classappend="${account.status.name() == 'CLOSED'} ? ' text-green-600 font-semibold' : ' text-red-600 font-semibold'"></td>
-                <td class="px-4 py-3 text-right">
-                    <a th:href="@{/accounts/{id}(id=${account.id})}"
-                       class="text-blue-600 hover:underline">
-                        Ver detalle
-                    </a>
-                </td>
-            </tr>
+    <div class="mb-6 rounded bg-white p-6 shadow">
+        <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+            <div>
+                <h2 class="text-lg font-semibold">Carga rapida de pagos</h2>
+                <p class="text-sm text-gray-600">
+                    Pegá desde Excel la fila completa de la planilla o una lista simple con <strong>ID credito</strong> y <strong>Pago</strong>.
+                </p>
+            </div>
+            <div class="rounded bg-gray-100 px-3 py-2 text-xs text-gray-600">
+                Ejemplo: <span th:text="${bulkPaymentTemplate}"></span>
+            </div>
+        </div>
+        <form th:action="@{/accounts/bulk-pay}" method="post" class="mt-4 grid gap-3">
+            <textarea name="entries"
+                      rows="7"
+                      class="w-full rounded border px-4 py-3 font-mono text-sm"
+                      placeholder="35\t20000&#10;40\t5000"
+                      required></textarea>
+            <div class="flex flex-col gap-3 md:flex-row md:items-center">
+                <select name="paymentMethod" class="rounded border px-3 py-2">
+                    <option value="BANK">Debito/Transferencia</option>
+                    <option value="CASH">Efectivo</option>
+                </select>
+                <button class="w-full rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 md:w-auto">
+                    Impactar pagos
+                </button>
+            </div>
+            <p class="text-xs text-gray-600">
+                Se acepta pegar filas completas de la planilla de cobranza, o columnas separadas por tabulacion, coma o punto y coma. Cada linea impacta sobre el credito indicado.
+            </p>
+        </form>
+    </div>
 
-            <tr th:if="${#lists.isEmpty(accounts)}">
-                <td colspan="8" class="px-4 py-6 text-center text-gray-500">
-                    No hay cuentas registradas
-                </td>
-            </tr>
-            </tbody>
-        </table>
+    <div class="grid gap-4">
+        <article th:each="group : ${clientGroups}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold text-slate-900" th:text="${group.clientName}"></h2>
+                    <p class="text-sm text-slate-500" th:text="${group.nationalId}"></p>
+                </div>
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-xl bg-slate-50 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-slate-500">Saldo total</p>
+                        <p class="text-lg font-bold text-slate-900" th:text="${group.totalBalance}"></p>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-slate-500">Creditos activos</p>
+                        <p class="text-lg font-bold text-slate-900" th:text="${group.activeCredits}"></p>
+                    </div>
+                    <div class="rounded-xl bg-slate-50 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-slate-500">Estado</p>
+                        <p class="text-sm font-semibold" th:text="${group.badgeLabel}" th:classappend="${' ' + group.badgeClass}"></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 grid gap-3">
+                <div th:each="account : ${group.accounts}"
+                     class="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-500">ID credito</p>
+                                <p class="font-mono text-sm font-semibold text-slate-900" th:text="${account.id}"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-500">Nro. cuenta</p>
+                                <p class="text-sm font-semibold text-slate-900"
+                                   th:text="${account.accountNumber != null ? account.accountNumber : '-'}"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-500">Cuota actual</p>
+                                <p class="text-sm font-semibold text-slate-900"
+                                   th:text="${account.currentInstallment != null ? account.currentInstallment : '-'}"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-500">Frecuencia</p>
+                                <p class="text-sm text-slate-700" th:text="${account.paymentFrequency}"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-500">Saldo</p>
+                                <p class="text-sm font-semibold text-slate-900" th:text="${account.balance}"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs uppercase tracking-wide text-slate-500">Vencimientos</p>
+                                <p class="text-sm text-slate-700" th:text="${account.dueSchedule}"></p>
+                            </div>
+                        </div>
+
+                        <div class="flex flex-col items-start gap-3 lg:items-end">
+                            <span class="text-sm font-semibold" th:text="${account.badgeLabel}"
+                                  th:classappend="${' ' + account.badgeClass}"></span>
+                            <a th:href="@{/accounts/{id}(id=${account.id})}"
+                               class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                                Ver detalle
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <div th:if="${#lists.isEmpty(clientGroups)}"
+             class="rounded-xl bg-white px-4 py-8 text-center text-gray-500 shadow">
+            No hay cuentas registradas
+        </div>
     </div>
 
 </section>

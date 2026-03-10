@@ -8,9 +8,25 @@ import java.util.List;
 import java.util.Optional;
 
 public interface ClientRepository extends JpaRepository<Client, Long> {
+    @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
+    List<Client> findAll();
+
     List<Client> findByNationalIdContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
             String nationalId,
             String firstName,
+            String lastName
+    );
+
+    @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
+    List<Client> findBySeller_Id(Long sellerId);
+
+    @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
+    List<Client> findBySeller_IdAndNationalIdContainingIgnoreCaseOrSeller_IdAndFirstNameContainingIgnoreCaseOrSeller_IdAndLastNameContainingIgnoreCase(
+            Long sellerIdForNationalId,
+            String nationalId,
+            Long sellerIdForFirstName,
+            String firstName,
+            Long sellerIdForLastName,
             String lastName
     );
 
@@ -20,5 +36,8 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
 
     @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
     Optional<Client> findWithRelationsById(Long id);
+
+    @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
+    Optional<Client> findWithRelationsByIdAndSeller_Id(Long id, Long sellerId);
 }
 

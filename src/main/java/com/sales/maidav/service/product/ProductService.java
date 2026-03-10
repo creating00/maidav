@@ -22,4 +22,6 @@ public interface ProductService {
     List<ProductPriceAdjustment> findRecentAdjustments();
     Map<Long, String> findAdjustmentProductCodes(List<Long> adjustmentIds);
     void undoAdjustment(Long adjustmentId);
+    String generateSystemBarcode();
+    String renderBarcodeLabelSvg(String barcode);
 }

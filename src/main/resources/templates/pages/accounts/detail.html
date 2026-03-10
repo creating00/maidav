@@ -40,7 +40,7 @@
         </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
         <div class="bg-white p-4 rounded shadow">
             <p class="text-sm text-gray-500">Total credito</p>
             <p class="text-xl font-bold" th:text="${account.totalAmount}"></p>
@@ -53,6 +53,10 @@
         <div class="bg-white p-4 rounded shadow">
             <p class="text-sm text-gray-500">Saldo</p>
             <p class="text-xl font-bold" th:text="${account.balance}"></p>
+        </div>
+        <div class="bg-white p-4 rounded shadow">
+            <p class="text-sm text-gray-500">Frecuencia</p>
+            <p class="text-xl font-bold" th:text="${paymentFrequencyLabel}"></p>
         </div>
         <div class="bg-white p-4 rounded shadow">
             <p class="text-sm text-gray-500">Estado</p>
@@ -85,7 +89,7 @@
             </button>
         </form>
         <p class="mt-2 text-xs text-gray-600">
-            Efectivo total de cuota aplica descuento automatico y cancela la cuota financiada. Efectivo parcial y transferencia impactan sin descuento.
+            El descuento en efectivo solo aplica si la cuota se cancela completa de una sola vez. Si hubo un pago parcial, el saldo restante pasa a cobrarse al valor financiado.
         </p>
     </div>
 
@@ -109,7 +113,7 @@
                 th:with="remaining=${inst.amount - (inst.paidAmount != null ? inst.paidAmount : 0)}">
                 <td class="px-4 py-3">
                     <input type="checkbox" name="installmentIds" th:value="${inst.id}"
-                           th:attr="data-remaining=${remaining}"
+                           th:attr="data-remaining=${remaining},data-cash-remaining=${cashAmounts[inst.id]}"
                            form="paymentForm"
                            th:disabled="${inst.status.name() == 'PAID'}"/>
                 </td>
@@ -286,8 +290,6 @@
             const closingTotalCashEl = document.getElementById('closing-total-cash');
             const closingTotalBankEl = document.getElementById('closing-total-bank');
             const closingTotalGeneralEl = document.getElementById('closing-total-general');
-            const recargo = parseNumber(paymentForm.dataset.recargo || '1.26');
-
             function parseNumber(value) {
                 const num = parseFloat(value);
                 return Number.isFinite(num) ? num : 0;
@@ -303,11 +305,10 @@
                     if (!checkbox.checked) {
                         return;
                     }
-                    total += parseNumber(checkbox.dataset.remaining);
+                    total += methodSelect && methodSelect.value === 'CASH'
+                        ? parseNumber(checkbox.dataset.cashRemaining)
+                        : parseNumber(checkbox.dataset.remaining);
                 });
-                if (methodSelect && methodSelect.value === 'CASH' && recargo > 0) {
-                    total = total / recargo;
-                }
                 if (amountInput) {
                     amountInput.value = total > 0 ? total.toFixed(2) : '';
                 }

@@ -53,6 +53,23 @@
         <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
     </form>
 
+    <div class="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+                <h2 class="text-base font-semibold text-sky-950">Escanear producto</h2>
+                <p class="text-sm text-sky-800">
+                    Desde el celular podés escanear el codigo de barras para ubicar el producto y ver stock, precio y financiacion.
+                </p>
+            </div>
+            <button type="button"
+                    id="scanProductLookupBtn"
+                    class="rounded-lg bg-sky-700 px-4 py-2 text-white hover:bg-sky-800">
+                Abrir camara
+            </button>
+        </div>
+        <div id="scanLookupResult" class="mt-3 hidden rounded-lg border border-sky-200 bg-white px-4 py-3 text-sm text-slate-700"></div>
+    </div>
+
     <form sec:authorize="hasAuthority('PRODUCT_UPDATE')"
           method="post"
           th:action="@{/products/bulk-increase}"
@@ -136,16 +153,16 @@
                 <tbody id="adjustments-history-body">
                 <tr th:each="adjustment : ${adjustments}"
                     class="border-t adjustment-row"
-                    th:attr="data-search=${#temporals.format(adjustment.createdAt, 'yyyy-MM-dd HH:mm') + ' ' + adjustment.createdBy + ' ' + (adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : 'Descuento') + ' ' + (adjustment.scope == null || adjustment.scope.name() == 'ALL' ? 'Todos' : (adjustment.scope.name() == 'WHOLESALE' ? 'Mayorista' : 'Minorista')) + ' ' + #numbers.formatDecimal(adjustment.percentage,1,2) + ' ' + (adjustment.provider != null ? adjustment.provider.name : 'Todos') + ' ' + (adjustment.undone ? 'Deshecho' : 'Aplicado') + ' ' + adjustmentProductCodes[adjustment.id]}">
+                    th:attr="data-search=${#temporals.format(adjustment.createdAt, 'yyyy-MM-dd HH:mm') + ' ' + adjustment.createdBy + ' ' + (adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : (adjustment.adjustmentType.name() == 'DISCOUNT' ? 'Descuento' : 'Cambio manual')) + ' ' + (adjustment.scope == null || adjustment.scope.name() == 'ALL' ? 'Todos' : (adjustment.scope.name() == 'WHOLESALE' ? 'Mayorista' : 'Minorista')) + ' ' + (adjustment.percentage != null ? #numbers.formatDecimal(adjustment.percentage,1,2) : '') + ' ' + (adjustment.provider != null ? adjustment.provider.name : 'Todos') + ' ' + (adjustment.undone ? 'Deshecho' : 'Aplicado') + ' ' + adjustmentProductCodes[adjustment.id]}">
                     <td class="px-3 py-2"
                         th:text="${#temporals.format(adjustment.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
                     <td class="px-3 py-2" th:text="${adjustment.createdBy}"></td>
                     <td class="px-3 py-2"
-                        th:text="${adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : 'Descuento'}"></td>
+                        th:text="${adjustment.adjustmentType.name() == 'INCREASE' ? 'Aumento' : (adjustment.adjustmentType.name() == 'DISCOUNT' ? 'Descuento' : 'Cambio manual')}"></td>
                     <td class="px-3 py-2"
                         th:text="${adjustment.scope == null || adjustment.scope.name() == 'ALL' ? 'Todos' : (adjustment.scope.name() == 'WHOLESALE' ? 'Mayorista' : 'Minorista')}"></td>
                     <td class="px-3 py-2"
-                        th:text="${#numbers.formatDecimal(adjustment.percentage,1,2) + '%'}"></td>
+                        th:text="${adjustment.percentage != null ? #numbers.formatDecimal(adjustment.percentage,1,2) + '%' : '-'}"></td>
                     <td class="px-3 py-2"
                         th:text="${adjustment.provider != null ? adjustment.provider.name : 'Todos'}"></td>
                     <td class="px-3 py-2 text-xs text-slate-700"
@@ -219,7 +236,8 @@
             </thead>
             <tbody>
             <th:block th:each="product : ${products}">
-                <tr class="border-t hover:bg-gray-50"
+                <tr class="border-t hover:bg-gray-50 product-row"
+                    th:attr="data-product-id=${product.id},data-barcode=${product.barcode},data-description=${product.description}"
                     th:classappend="${focusProductId != null and product.id == focusProductId} ? ' bg-amber-50' : ''">
                     <td class="px-4 py-3">
                         <img th:if="${product.imagePath}"
@@ -250,6 +268,20 @@
                                 th:attr="data-target='financing-' + ${product.id}">
                             Financiacion
                         </button>
+                        <a th:if="${product.barcode != null and #strings.length(product.barcode) == 13}"
+                           th:href="@{/products/barcode/label(barcode=${product.barcode},description=${product.description},productCode=${product.productCode})}"
+                           target="_blank"
+                           rel="noopener"
+                           class="text-indigo-700 hover:underline">
+                            Etiqueta
+                        </a>
+                        <a th:if="${product.barcode != null and #strings.length(product.barcode) == 13}"
+                           th:href="@{/products/barcode/sheet(barcode=${product.barcode},description=${product.description},productCode=${product.productCode},copies=12)}"
+                           target="_blank"
+                           rel="noopener"
+                           class="text-fuchsia-700 hover:underline">
+                            Hoja
+                        </a>
                         <a sec:authorize="hasAuthority('PRODUCT_UPDATE')"
                            th:href="@{/products/{id}/edit(id=${product.id})}"
                            class="text-blue-600 hover:underline">
@@ -350,9 +382,36 @@
         </table>
     </div>
 
+    <div id="productScanModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/80 px-4">
+        <div class="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
+            <div class="flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900">Escanear producto</h2>
+                    <p class="text-sm text-slate-500">Cuando detecte el codigo, va a abrir el detalle del producto.</p>
+                </div>
+                <button type="button" id="closeProductScanBtn" class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                    Cerrar
+                </button>
+            </div>
+            <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-black">
+                <video id="productScanVideo" autoplay playsinline class="h-72 w-full object-cover"></video>
+            </div>
+            <p id="productScanStatus" class="mt-3 text-sm text-slate-600">Preparando camara...</p>
+        </div>
+    </div>
+
     <script>
         (function () {
             const calcConfigEl = document.getElementById('calcConfig');
+            const scanProductLookupBtn = document.getElementById('scanProductLookupBtn');
+            const productScanModal = document.getElementById('productScanModal');
+            const closeProductScanBtn = document.getElementById('closeProductScanBtn');
+            const productScanVideo = document.getElementById('productScanVideo');
+            const productScanStatus = document.getElementById('productScanStatus');
+            const scanLookupResult = document.getElementById('scanLookupResult');
+            const productRows = Array.from(document.querySelectorAll('.product-row'));
+            let productScanStream = null;
+            let productScanInterval = null;
 
             function parseNumber(value) {
                 if (value === null || value === undefined || value === '') {
@@ -433,16 +492,25 @@
                 const code = panel.dataset.code || '';
                 const description = panel.dataset.description || '';
                 return [
-                    'Financiacion de producto',
-                    code + (description ? ' - ' + description : ''),
+                    (code ? code + ' - ' : '') + description,
                     '',
-                    'Contado: ' + money(data.contado),
-                    'Debito/Transferencia: ' + money(data.debito),
+                    '💰 OPCIONES DE PAGO',
                     '',
-                    'Plan diaria: ' + data.plans.DAILY.count + ' cuotas de ' + money(data.plans.DAILY.fee),
-                    'Plan semanal: ' + data.plans.WEEKLY.count + ' cuotas de ' + money(data.plans.WEEKLY.fee),
-                    'Plan mensual corto: ' + data.plans.MONTHLY_SHORT.count + ' cuotas de ' + money(data.plans.MONTHLY_SHORT.fee),
-                    'Plan mensual largo: ' + data.plans.MONTHLY_LONG.count + ' cuotas de ' + money(data.plans.MONTHLY_LONG.fee)
+                    '📅 Diaria ' + data.plans.DAILY.count + ' dias:',
+                    money(data.plans.DAILY.fee) + ' financiado',
+                    '👉 Pagando la cuota en efectivo: ' + money(data.plans.DAILY.cashFee),
+                    '',
+                    '📆 Semanal ' + data.plans.WEEKLY.count + ' semanas:',
+                    money(data.plans.WEEKLY.fee) + ' financiado',
+                    '👉 Pagando la cuota en efectivo: ' + money(data.plans.WEEKLY.cashFee),
+                    '',
+                    '🗓 Mensual ' + data.plans.MONTHLY_SHORT.count + ' meses:',
+                    money(data.plans.MONTHLY_SHORT.fee) + ' financiado',
+                    '👉 Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_SHORT.cashFee),
+                    '',
+                    '🗓 Mensual ' + data.plans.MONTHLY_LONG.count + ' meses:',
+                    money(data.plans.MONTHLY_LONG.fee) + ' financiado',
+                    '👉 Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_LONG.cashFee)
                 ].join('\n');
             }
 
@@ -483,6 +551,106 @@
                 setPanelText(panel, '.js-mensual-largo-ef', money(data.plans.MONTHLY_LONG.cashFee));
 
                 panel.dataset.whatsappText = buildWhatsAppText(panel, data);
+            }
+
+            function openFinancingRowByProductId(productId) {
+                const row = document.querySelector('.product-row[data-product-id="' + productId + '"]');
+                if (!row) {
+                    return;
+                }
+                document.querySelectorAll('.product-row').forEach(item => item.classList.remove('bg-amber-100'));
+                row.classList.add('bg-amber-100');
+                row.scrollIntoView({behavior: 'smooth', block: 'center'});
+                const button = row.querySelector('.toggle-financing-btn');
+                const targetId = button ? button.dataset.target : null;
+                const targetRow = targetId ? document.getElementById(targetId) : null;
+                if (button && targetRow && targetRow.classList.contains('hidden')) {
+                    button.click();
+                }
+            }
+
+            function resolveProductByBarcode(barcode) {
+                const normalized = String(barcode || '').trim().toLowerCase();
+                return productRows.find(row => (row.dataset.barcode || '').trim().toLowerCase() === normalized) || null;
+            }
+
+            function showLookupResult(message, isError) {
+                if (!scanLookupResult) {
+                    return;
+                }
+                scanLookupResult.textContent = message;
+                scanLookupResult.classList.remove('hidden');
+                scanLookupResult.classList.toggle('border-red-200', !!isError);
+                scanLookupResult.classList.toggle('bg-red-50', !!isError);
+                scanLookupResult.classList.toggle('text-red-700', !!isError);
+                scanLookupResult.classList.toggle('border-sky-200', !isError);
+                scanLookupResult.classList.toggle('bg-white', !isError);
+                scanLookupResult.classList.toggle('text-slate-700', !isError);
+            }
+
+            async function openProductScanner() {
+                if (!window.BarcodeDetector) {
+                    showLookupResult('Este navegador no soporta escaneo nativo. Probá con Chrome en Android.', true);
+                    return;
+                }
+                try {
+                    productScanStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' } },
+                        audio: false
+                    });
+                    if (productScanVideo) {
+                        productScanVideo.srcObject = productScanStream;
+                    }
+                    if (productScanStatus) {
+                        productScanStatus.textContent = 'Escaneando...';
+                    }
+                    if (productScanModal) {
+                        productScanModal.classList.remove('hidden');
+                        productScanModal.classList.add('flex');
+                    }
+
+                    const detector = new BarcodeDetector({
+                        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
+                    });
+                    productScanInterval = window.setInterval(async function () {
+                        if (!productScanVideo || productScanVideo.readyState < 2) {
+                            return;
+                        }
+                        const barcodes = await detector.detect(productScanVideo);
+                        if (!barcodes.length) {
+                            return;
+                        }
+                        const code = barcodes[0].rawValue || '';
+                        const row = resolveProductByBarcode(code);
+                        closeProductScanner();
+                        if (!row) {
+                            showLookupResult('No se encontró un producto con el codigo ' + code + '.', true);
+                            return;
+                        }
+                        showLookupResult('Producto encontrado: ' + (row.dataset.description || code), false);
+                        openFinancingRowByProductId(row.dataset.productId);
+                    }, 500);
+                } catch (error) {
+                    showLookupResult('No se pudo acceder a la camara.', true);
+                }
+            }
+
+            function closeProductScanner() {
+                if (productScanInterval) {
+                    window.clearInterval(productScanInterval);
+                    productScanInterval = null;
+                }
+                if (productScanStream) {
+                    productScanStream.getTracks().forEach(track => track.stop());
+                    productScanStream = null;
+                }
+                if (productScanVideo) {
+                    productScanVideo.srcObject = null;
+                }
+                if (productScanModal) {
+                    productScanModal.classList.add('hidden');
+                    productScanModal.classList.remove('flex');
+                }
             }
 
             document.querySelectorAll('.toggle-financing-btn').forEach(button => {
@@ -529,6 +697,20 @@
                     }
                 });
             });
+
+            if (scanProductLookupBtn) {
+                scanProductLookupBtn.addEventListener('click', openProductScanner);
+            }
+            if (closeProductScanBtn) {
+                closeProductScanBtn.addEventListener('click', closeProductScanner);
+            }
+            if (productScanModal) {
+                productScanModal.addEventListener('click', function (event) {
+                    if (event.target === productScanModal) {
+                        closeProductScanner();
+                    }
+                });
+            }
 
             const openHistoryButton = document.getElementById('open-adjustments-history');
             const closeHistoryButton = document.getElementById('close-adjustments-history');

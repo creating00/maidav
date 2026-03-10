@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class ProductServiceImpl implements ProductService {
 
+    private static final Ean13BarcodeSvgRenderer BARCODE_RENDERER = new Ean13BarcodeSvgRenderer();
     private final ProductRepository productRepository;
     private final ProductPriceAdjustmentRepository productPriceAdjustmentRepository;
     private final ProductPriceAdjustmentItemRepository productPriceAdjustmentItemRepository;
@@ -52,10 +54,12 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product update(Long id, Product data) {
+        data.setId(id);
         validate(data);
         ensureUniqueCode(data.getProvider().getId(), data.getProductCode(), id);
 
         Product product = findById(id);
+        PriceSnapshot before = PriceSnapshot.from(product);
         product.setProvider(data.getProvider());
         product.setProductCode(data.getProductCode());
         product.setBarcode(data.getBarcode());
@@ -70,6 +74,7 @@ public class ProductServiceImpl implements ProductService {
         product.setImagePath(data.getImagePath());
 
         recalcPrices(product);
+        saveManualAdjustmentIfNeeded(product, before);
         return product;
     }
 
@@ -115,7 +120,9 @@ public class ProductServiceImpl implements ProductService {
 
         BigDecimal factor = calculateFactor(percentage, adjustmentType);
 
+        Map<Long, PriceSnapshot> beforeSnapshots = new LinkedHashMap<>();
         for (Product product : products) {
+            beforeSnapshots.put(product.getId(), PriceSnapshot.from(product));
             applyFactor(product, factor, scope);
         }
 
@@ -135,6 +142,9 @@ public class ProductServiceImpl implements ProductService {
                     ProductPriceAdjustmentItem item = new ProductPriceAdjustmentItem();
                     item.setAdjustment(adjustment);
                     item.setProduct(product);
+                    PriceSnapshot before = beforeSnapshots.get(product.getId());
+                    PriceSnapshot after = PriceSnapshot.from(product);
+                    applySnapshots(item, before, after);
                     return item;
                 })
                 .toList();
@@ -200,17 +210,48 @@ public class ProductServiceImpl implements ProductService {
             throw new InvalidProductException("No hay productos para deshacer el ajuste");
         }
 
-        BigDecimal inverseFactor = BigDecimal.ONE.divide(adjustment.getFactorApplied(), 12, RoundingMode.HALF_UP);
+        List<ProductPriceAdjustmentItem> adjustmentItems = productPriceAdjustmentItemRepository.findByAdjustment_Id(adjustmentId);
         List<Product> products = productRepository.findAllById(productIds);
 
-        PriceAdjustmentScope scope = adjustment.getScope() == null ? PriceAdjustmentScope.ALL : adjustment.getScope();
+        boolean restoredFromSnapshots = false;
+        Map<Long, ProductPriceAdjustmentItem> itemByProductId = adjustmentItems.stream()
+                .collect(Collectors.toMap(item -> item.getProduct().getId(), item -> item, (left, right) -> left, LinkedHashMap::new));
+
         for (Product product : products) {
-            applyFactor(product, inverseFactor, scope);
+            ProductPriceAdjustmentItem item = itemByProductId.get(product.getId());
+            if (item != null && hasSnapshot(item)) {
+                restoreSnapshot(product, item);
+                restoredFromSnapshots = true;
+            }
+        }
+
+        if (!restoredFromSnapshots) {
+            BigDecimal inverseFactor = BigDecimal.ONE.divide(adjustment.getFactorApplied(), 12, RoundingMode.HALF_UP);
+            PriceAdjustmentScope scope = adjustment.getScope() == null ? PriceAdjustmentScope.ALL : adjustment.getScope();
+            for (Product product : products) {
+                applyFactor(product, inverseFactor, scope);
+            }
         }
 
         adjustment.setUndone(true);
         adjustment.setUndoneAt(LocalDateTime.now());
         adjustment.setUndoneBy(currentUsername());
+    }
+
+    @Override
+    public String generateSystemBarcode() {
+        for (int attempt = 0; attempt < 20; attempt++) {
+            String barcode = nextSystemBarcodeCandidate();
+            if (!productRepository.existsByBarcode(barcode)) {
+                return barcode;
+            }
+        }
+        throw new InvalidProductException("No se pudo generar un codigo de barras unico");
+    }
+
+    @Override
+    public String renderBarcodeLabelSvg(String barcode) {
+        return BARCODE_RENDERER.render(barcode);
     }
 
     private void ensureUniqueCode(Long providerId, String productCode, Long id) {
@@ -235,6 +276,7 @@ public class ProductServiceImpl implements ProductService {
         if (product.getDescription() == null || product.getDescription().isBlank()) {
             throw new InvalidProductException("La descripcion es obligatoria");
         }
+        validateBarcode(product.getBarcode(), product.getId());
         if (product.getCost() == null) {
             throw new InvalidProductException("El costo es obligatorio");
         }
@@ -268,6 +310,61 @@ public class ProductServiceImpl implements ProductService {
         product.setPriceRetail(
                 product.getPriceRetailNet().multiply(vatMultiplier).setScale(2, RoundingMode.HALF_UP)
         );
+    }
+
+    private void saveManualAdjustmentIfNeeded(Product product, PriceSnapshot before) {
+        PriceSnapshot after = PriceSnapshot.from(product);
+        if (before.equalsPrices(after)) {
+            return;
+        }
+
+        ProductPriceAdjustment adjustment = new ProductPriceAdjustment();
+        adjustment.setAdjustmentType(PriceAdjustmentType.MANUAL);
+        adjustment.setPercentage(null);
+        adjustment.setFactorApplied(null);
+        adjustment.setScope(PriceAdjustmentScope.ALL);
+        adjustment.setProvider(product.getProvider());
+        adjustment.setProductsAffected(1);
+        adjustment.setCreatedBy(currentUsername());
+        adjustment.setUndone(false);
+        productPriceAdjustmentRepository.save(adjustment);
+
+        ProductPriceAdjustmentItem item = new ProductPriceAdjustmentItem();
+        item.setAdjustment(adjustment);
+        item.setProduct(product);
+        applySnapshots(item, before, after);
+        productPriceAdjustmentItemRepository.save(item);
+    }
+
+    private void applySnapshots(ProductPriceAdjustmentItem item, PriceSnapshot before, PriceSnapshot after) {
+        if (before == null || after == null) {
+            return;
+        }
+        item.setPreviousCost(before.cost());
+        item.setNewCost(after.cost());
+        item.setPreviousPriceWholesaleNet(before.wholesaleNet());
+        item.setNewPriceWholesaleNet(after.wholesaleNet());
+        item.setPreviousPriceRetailNet(before.retailNet());
+        item.setNewPriceRetailNet(after.retailNet());
+    }
+
+    private boolean hasSnapshot(ProductPriceAdjustmentItem item) {
+        return item.getPreviousCost() != null
+                || item.getPreviousPriceWholesaleNet() != null
+                || item.getPreviousPriceRetailNet() != null;
+    }
+
+    private void restoreSnapshot(Product product, ProductPriceAdjustmentItem item) {
+        if (item.getPreviousCost() != null) {
+            product.setCost(item.getPreviousCost());
+        }
+        if (item.getPreviousPriceWholesaleNet() != null) {
+            product.setPriceWholesaleNet(item.getPreviousPriceWholesaleNet());
+        }
+        if (item.getPreviousPriceRetailNet() != null) {
+            product.setPriceRetailNet(item.getPreviousPriceRetailNet());
+        }
+        recalcPrices(product);
     }
 
     private BigDecimal calculateFactor(BigDecimal percentage, PriceAdjustmentType adjustmentType) {
@@ -309,5 +406,61 @@ public class ProductServiceImpl implements ProductService {
         return vatRate.compareTo(BigDecimal.ZERO) == 0
                 || vatRate.compareTo(new BigDecimal("10.50")) == 0
                 || vatRate.compareTo(new BigDecimal("21.00")) == 0;
+    }
+
+    private void validateBarcode(String barcode, Long productId) {
+        if (barcode == null || barcode.isBlank()) {
+            return;
+        }
+        String normalized = barcode.trim();
+        if (!normalized.matches("^\\d{8,14}$")) {
+            throw new InvalidProductException("El codigo de barras debe tener entre 8 y 14 digitos");
+        }
+        boolean exists = productId == null
+                ? productRepository.existsByBarcode(normalized)
+                : productRepository.existsByBarcodeAndIdNot(normalized, productId);
+        if (exists) {
+            throw new InvalidProductException("El codigo de barras ya pertenece a otro producto");
+        }
+    }
+
+    private String nextSystemBarcodeCandidate() {
+        long base = 200_000_000_000L + ThreadLocalRandom.current().nextLong(100_000_000_000L);
+        String firstTwelve = String.valueOf(base).substring(0, 12);
+        return firstTwelve + ean13CheckDigit(firstTwelve);
+    }
+
+    private int ean13CheckDigit(String firstTwelveDigits) {
+        int sum = 0;
+        for (int i = 0; i < firstTwelveDigits.length(); i++) {
+            int digit = Character.digit(firstTwelveDigits.charAt(i), 10);
+            sum += (i % 2 == 0) ? digit : digit * 3;
+        }
+        return (10 - (sum % 10)) % 10;
+    }
+
+    private record PriceSnapshot(BigDecimal cost, BigDecimal wholesaleNet, BigDecimal retailNet) {
+        private static PriceSnapshot from(Product product) {
+            return new PriceSnapshot(product.getCost(), product.getPriceWholesaleNet(), product.getPriceRetailNet());
+        }
+
+        private boolean equalsPrices(PriceSnapshot other) {
+            if (other == null) {
+                return false;
+            }
+            return equalsAmount(cost, other.cost)
+                    && equalsAmount(wholesaleNet, other.wholesaleNet)
+                    && equalsAmount(retailNet, other.retailNet);
+        }
+
+        private static boolean equalsAmount(BigDecimal left, BigDecimal right) {
+            if (left == null && right == null) {
+                return true;
+            }
+            if (left == null || right == null) {
+                return false;
+            }
+            return left.compareTo(right) == 0;
+        }
     }
 }
