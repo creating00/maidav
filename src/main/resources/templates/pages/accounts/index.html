@@ -24,39 +24,6 @@
         <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
     </form>
 
-    <div class="mb-6 rounded bg-white p-6 shadow">
-        <div class="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-            <div>
-                <h2 class="text-lg font-semibold">Carga rapida de pagos</h2>
-                <p class="text-sm text-gray-600">
-                    Pegá desde Excel la fila completa de la planilla o una lista simple con <strong>ID credito</strong> y <strong>Pago</strong>.
-                </p>
-            </div>
-            <div class="rounded bg-gray-100 px-3 py-2 text-xs text-gray-600">
-                Ejemplo: <span th:text="${bulkPaymentTemplate}"></span>
-            </div>
-        </div>
-        <form th:action="@{/accounts/bulk-pay}" method="post" class="mt-4 grid gap-3">
-            <textarea name="entries"
-                      rows="7"
-                      class="w-full rounded border px-4 py-3 font-mono text-sm"
-                      placeholder="35\t20000&#10;40\t5000"
-                      required></textarea>
-            <div class="flex flex-col gap-3 md:flex-row md:items-center">
-                <select name="paymentMethod" class="rounded border px-3 py-2">
-                    <option value="BANK">Debito/Transferencia</option>
-                    <option value="CASH">Efectivo</option>
-                </select>
-                <button class="w-full rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 md:w-auto">
-                    Impactar pagos
-                </button>
-            </div>
-            <p class="text-xs text-gray-600">
-                Se acepta pegar filas completas de la planilla de cobranza, o columnas separadas por tabulacion, coma o punto y coma. Cada linea impacta sobre el credito indicado.
-            </p>
-        </form>
-    </div>
-
     <div class="grid gap-4">
         <article th:each="group : ${clientGroups}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -111,6 +78,10 @@
                                 <p class="text-xs uppercase tracking-wide text-slate-500">Vencimientos</p>
                                 <p class="text-sm text-slate-700" th:text="${account.dueSchedule}"></p>
                             </div>
+                            <div th:if="${isAdmin}">
+                                <p class="text-xs uppercase tracking-wide text-slate-500">Creada por</p>
+                                <p class="text-sm text-slate-700" th:text="${account.sellerDisplay}"></p>
+                            </div>
                         </div>
 
                         <div class="flex flex-col items-start gap-3 lg:items-end">
@@ -122,6 +93,38 @@
                             </a>
                         </div>
                     </div>
+
+                    <details class="mt-4 rounded-lg border border-slate-200 bg-white/90">
+                        <summary class="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-700">
+                            <div class="flex items-center justify-between gap-3">
+                                <span>Productos de esta cuenta</span>
+                                <span class="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                                      th:text="${#lists.size(account.products)} + ' item(s)'"></span>
+                            </div>
+                        </summary>
+                        <div class="border-t border-slate-200 px-4 py-3">
+                            <div th:if="${#lists.isEmpty(account.products)}"
+                                 class="text-sm text-slate-500">
+                                Esta cuenta no tiene productos asociados.
+                            </div>
+                            <div th:unless="${#lists.isEmpty(account.products)}"
+                                 class="max-h-52 overflow-y-auto pr-2">
+                                <div th:each="product : ${account.products}"
+                                     class="grid grid-cols-1 gap-2 border-b border-slate-100 py-2 last:border-b-0 md:grid-cols-[1fr_auto_auto] md:items-center">
+                                    <div>
+                                        <p class="text-sm font-semibold text-slate-800"
+                                           th:text="${product.description != null ? product.description : '-'}"></p>
+                                        <p class="text-xs text-slate-500"
+                                           th:text="${product.productCode != null ? 'Codigo: ' + product.productCode : 'Sin codigo'}"></p>
+                                    </div>
+                                    <p class="text-sm text-slate-700"
+                                       th:text="${'x' + product.quantity}"></p>
+                                    <p class="text-sm font-semibold text-slate-900"
+                                       th:text="${product.lineTotal}"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
                 </div>
             </div>
         </article>

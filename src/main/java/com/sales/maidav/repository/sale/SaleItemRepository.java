@@ -7,6 +7,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 
 public interface SaleItemRepository extends JpaRepository<SaleItem, Long> {
-    @EntityGraph(attributePaths = {"product", "product.provider"})
+    @EntityGraph(attributePaths = {"sale", "product", "product.provider"})
     List<SaleItem> findBySale_IdOrderByIdAsc(Long saleId);
+
+    @EntityGraph(attributePaths = {"sale", "product", "product.provider"})
+    List<SaleItem> findBySale_IdInOrderBySale_IdAscIdAsc(List<Long> saleIds);
 }

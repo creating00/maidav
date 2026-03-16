@@ -2,11 +2,13 @@ package com.sales.maidav.web.controller.web;
 
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
+import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.model.sale.AccountStatus;
 import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.model.sale.CreditInstallment;
 import com.sales.maidav.model.sale.InstallmentStatus;
 import com.sales.maidav.model.sale.PaymentCollectionMethod;
+import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.sale.InvalidSaleException;
@@ -38,10 +40,11 @@ public class CreditAccountController {
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final CreditPaymentRepository creditPaymentRepository;
     private final CompanySettingsService companySettingsService;
+    private final SaleItemRepository saleItemRepository;
 
     @GetMapping
     @PreAuthorize("hasAuthority('ARREARS_READ')")
-    public String list(@RequestParam(required = false) String q, Model model) {
+    public String list(@RequestParam(required = false) String q, Authentication authentication, Model model) {
         List<CreditAccount> accounts = creditAccountService.findAll();
         if (q != null && !q.isBlank()) {
             String term = q.trim().toLowerCase(Locale.ROOT);
@@ -67,12 +70,13 @@ public class CreditAccountController {
             currentInstallments.put(account.getId(), currentAmount);
             dueSchedules.put(account.getId(), formatDueSchedule(account));
         }
+        Map<Long, List<AccountProductItemView>> productsByAccount = buildProductsByAccount(accounts);
         model.addAttribute("q", q);
         model.addAttribute("accounts", accounts);
         model.addAttribute("currentInstallments", currentInstallments);
         model.addAttribute("dueSchedules", dueSchedules);
-        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules));
-        model.addAttribute("bulkPaymentTemplate", "35\t20000\n40\t5000");
+        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount));
+        model.addAttribute("isAdmin", isAdmin(authentication));
         return "pages/accounts/index";
     }
 
@@ -92,9 +96,8 @@ public class CreditAccountController {
                     ? roundUpToFifty(remaining.divide(cashRecargo, 2, RoundingMode.HALF_UP))
                     : remaining;
             cashAmounts.put(installment.getId(), cashAmount);
-            if (installment.getStatus() != InstallmentStatus.PAID) {
+            if (currentInstallment == null && installment.getStatus() != InstallmentStatus.PAID) {
                 currentInstallment = remaining;
-                break;
             }
         }
         model.addAttribute("account", account);
@@ -300,7 +303,8 @@ public class CreditAccountController {
 
     private List<ClientGroupView> buildClientGroups(List<CreditAccount> accounts,
                                                     Map<Long, BigDecimal> currentInstallments,
-                                                    Map<Long, String> dueSchedules) {
+                                                    Map<Long, String> dueSchedules,
+                                                    Map<Long, List<AccountProductItemView>> productsByAccount) {
         Map<Long, MutableClientGroup> groups = new LinkedHashMap<>();
         List<CreditAccount> sortedAccounts = accounts.stream()
                 .sorted((a, b) -> {
@@ -335,7 +339,9 @@ public class CreditAccountController {
                     paymentFrequencyLabel(account),
                     dueSchedules.get(account.getId()),
                     badge.label,
-                    badge.cssClass
+                    badge.cssClass,
+                    resolveSellerDisplay(account),
+                    productsByAccount.getOrDefault(account.getId(), List.of())
             ));
         }
 
@@ -350,6 +356,43 @@ public class CreditAccountController {
                         group.accounts
                 ))
                 .toList();
+    }
+
+    private Map<Long, List<AccountProductItemView>> buildProductsByAccount(List<CreditAccount> accounts) {
+        if (accounts == null || accounts.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Long> saleIdToAccountId = new LinkedHashMap<>();
+        for (CreditAccount account : accounts) {
+            if (account.getSale() == null || account.getSale().getId() == null) {
+                continue;
+            }
+            saleIdToAccountId.put(account.getSale().getId(), account.getId());
+        }
+        if (saleIdToAccountId.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, List<AccountProductItemView>> productsByAccount = new LinkedHashMap<>();
+        List<SaleItem> saleItems = saleItemRepository.findBySale_IdInOrderBySale_IdAscIdAsc(new ArrayList<>(saleIdToAccountId.keySet()));
+        for (SaleItem saleItem : saleItems) {
+            if (saleItem.getSale() == null || saleItem.getSale().getId() == null) {
+                continue;
+            }
+            Long accountId = saleIdToAccountId.get(saleItem.getSale().getId());
+            if (accountId == null) {
+                continue;
+            }
+            productsByAccount.computeIfAbsent(accountId, ignored -> new ArrayList<>())
+                    .add(new AccountProductItemView(
+                            saleItem.getProduct() != null ? saleItem.getProduct().getProductCode() : null,
+                            saleItem.getProduct() != null ? saleItem.getProduct().getDescription() : null,
+                            saleItem.getQuantity(),
+                            saleItem.getLineTotal()
+                    ));
+        }
+        return productsByAccount;
     }
 
     private AccountBadge resolveAccountBadge(Long accountId) {
@@ -389,6 +432,28 @@ public class CreditAccountController {
             case BIWEEKLY -> "Quincenal";
             case MONTHLY -> "Mensual";
         };
+    }
+
+    private String resolveSellerDisplay(CreditAccount account) {
+        if (account == null || account.getSale() == null || account.getSale().getSeller() == null) {
+            return "-";
+        }
+        String firstName = account.getSale().getSeller().getFirstName();
+        String lastName = account.getSale().getSeller().getLastName();
+        String fullName = ((firstName == null ? "" : firstName) + " " + (lastName == null ? "" : lastName)).trim();
+        if (!fullName.isEmpty()) {
+            return fullName;
+        }
+        String email = account.getSale().getSeller().getEmail();
+        return email == null || email.isBlank() ? "-" : email;
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
     private BulkPaymentEntry parseBulkPaymentEntry(String line) {
@@ -526,7 +591,10 @@ public class CreditAccountController {
     private record AccountBadge(String label, String cssClass, int priority) {}
     private record ClientAccountItemView(Long id, String accountNumber, BigDecimal balance, BigDecimal currentInstallment,
                                          String paymentFrequency,
-                                         String dueSchedule, String badgeLabel, String badgeClass) {}
+                                         String dueSchedule, String badgeLabel, String badgeClass,
+                                         String sellerDisplay,
+                                         List<AccountProductItemView> products) {}
+    private record AccountProductItemView(String productCode, String description, Integer quantity, BigDecimal lineTotal) {}
     private record ClientGroupView(String clientName, String nationalId, BigDecimal totalBalance, int activeCredits,
                                    String badgeLabel, String badgeClass, List<ClientAccountItemView> accounts) {}
     private record BulkPaymentEntry(Long accountId, BigDecimal amount) {}

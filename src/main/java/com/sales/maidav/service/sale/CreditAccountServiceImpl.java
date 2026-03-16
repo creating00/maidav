@@ -4,9 +4,12 @@ import com.sales.maidav.model.sale.*;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
+import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -29,21 +32,36 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final CreditPaymentRepository creditPaymentRepository;
     private final CompanySettingsService companySettingsService;
+    private final UserRepository userRepository;
 
     @Override
     public List<CreditAccount> findAll() {
-        return creditAccountRepository.findAll();
+        if (isCurrentUserAdmin()) {
+            return creditAccountRepository.findAll();
+        }
+        Long sellerId = currentUserId();
+        return sellerId == null ? List.of() : creditAccountRepository.findBySale_Seller_Id(sellerId);
     }
 
     @Override
     public CreditAccount findById(Long id) {
-        return creditAccountRepository.findById(id)
+        if (isCurrentUserAdmin()) {
+            return creditAccountRepository.findById(id)
+                    .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
+        }
+        Long sellerId = currentUserId();
+        return creditAccountRepository.findByIdAndSale_Seller_Id(id, sellerId == null ? -1L : sellerId)
                 .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
     }
 
     @Override
     public CreditAccount findBySaleId(Long saleId) {
-        return creditAccountRepository.findBySale_Id(saleId)
+        if (isCurrentUserAdmin()) {
+            return creditAccountRepository.findBySale_Id(saleId)
+                    .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
+        }
+        Long sellerId = currentUserId();
+        return creditAccountRepository.findBySale_IdAndSale_Seller_Id(saleId, sellerId == null ? -1L : sellerId)
                 .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
     }
 
@@ -396,6 +414,25 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
         result.sort(Comparator.comparing(MorositySummary::getDaysOverdue).reversed());
         return result;
+    }
+
+    private boolean isCurrentUserAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+    }
+
+    private Long currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return null;
+        }
+        return userRepository.findByEmail(authentication.getName())
+                .map(user -> user.getId())
+                .orElse(null);
     }
 
     private MorosityLevel resolveLevel(long daysOverdue) {

@@ -292,19 +292,42 @@
                     </div>
                 </div>
 
-                <div id="monthlyOptions" class="hidden mt-3">
-                    <label class="block text-sm font-semibold mb-1">Dia fijo del mes</label>
-                    <input type="number" min="1" max="28" name="monthlyDay" placeholder="Dia"
-                           class="w-28 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <div id="monthlyOptions" class="hidden">
+                    <input type="hidden" name="monthlyDay"/>
                 </div>
             </div>
         </div>
 
         <div class="mt-8">
             <h2 class="text-lg font-semibold mb-3">Productos</h2>
-            <div class="mb-3">
+            <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-center">
                 <input type="text" id="productSearch" placeholder="Buscar por codigo de barra"
                        class="w-full md:w-1/2 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <button type="button" id="startBarcodeScannerBtn"
+                        class="rounded border border-blue-300 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">
+                    Usar camara
+                </button>
+                <button type="button" id="stopBarcodeScannerBtn"
+                        class="hidden rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                    Detener camara
+                </button>
+            </div>
+            <p class="mb-3 text-xs text-gray-600">
+                Escanee o escriba el codigo y presione Enter para agregar el producto automaticamente al carrito.
+            </p>
+            <div id="barcodeScannerPanel" class="hidden mb-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p class="text-sm font-semibold text-blue-900">Lector de codigo de barras</p>
+                        <p id="barcodeScannerStatus" class="text-xs text-blue-700">
+                            Preparando camara...
+                        </p>
+                    </div>
+                </div>
+                <video id="barcodeScannerVideo" class="mt-3 hidden w-full max-w-xl rounded-lg border border-blue-200 bg-black" autoplay playsinline muted></video>
+            </div>
+            <div id="productActionToast"
+                 class="pointer-events-none fixed right-4 top-4 z-50 hidden max-w-sm rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-opacity duration-200">
             </div>
             <table class="min-w-full text-sm" id="itemsTable">
                 <thead class="bg-gray-100 text-left">
@@ -327,6 +350,7 @@
                                     th:data-wholesale="${product.priceWholesale}"
                                     th:data-cost-vat="${product.cost * (100 + product.vatRate) / 100}"
                                     th:data-barcode="${product.barcode}"
+                                    th:data-product-code="${product.productCode}"
                                     th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
                             </option>
                         </select>
@@ -435,6 +459,12 @@
             const addRow = document.getElementById('addRow');
             const clientSearch = document.getElementById('clientSearch');
             const productSearch = document.getElementById('productSearch');
+            const startBarcodeScannerBtn = document.getElementById('startBarcodeScannerBtn');
+            const stopBarcodeScannerBtn = document.getElementById('stopBarcodeScannerBtn');
+            const barcodeScannerPanel = document.getElementById('barcodeScannerPanel');
+            const barcodeScannerVideo = document.getElementById('barcodeScannerVideo');
+            const barcodeScannerStatus = document.getElementById('barcodeScannerStatus');
+            const productActionToast = document.getElementById('productActionToast');
             const clientSelect = document.querySelector('select[name="clientId"]');
             const quickClientToggle = document.getElementById('quickClientToggle');
             const quickClientFields = document.getElementById('quickClientFields');
@@ -474,6 +504,13 @@
             const confirmItemsBody = document.getElementById('confirmItemsBody');
             const confirmBackBtn = document.getElementById('confirmBackBtn');
             const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+            let barcodeScannerStream = null;
+            let barcodeScanFrame = null;
+            let barcodeDetector = null;
+            let barcodeScanActive = false;
+            let lastScannedCode = '';
+            let lastScannedAt = 0;
+            let productActionToastTimer = null;
             let confirmedSubmit = false;
 
             function parseNumber(value) {
@@ -701,6 +738,293 @@
                 return ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'][date.getDay()];
             }
 
+            function setBarcodeStatus(message, isError) {
+                if (!barcodeScannerStatus) {
+                    return;
+                }
+                barcodeScannerStatus.textContent = message;
+                barcodeScannerStatus.classList.toggle('text-red-600', Boolean(isError));
+                barcodeScannerStatus.classList.toggle('text-blue-700', !isError);
+            }
+
+            function showProductToast(message, isError) {
+                if (!productActionToast) {
+                    return;
+                }
+                productActionToast.textContent = message;
+                productActionToast.classList.remove('hidden', 'border-green-200', 'bg-green-50', 'text-green-800', 'border-red-200', 'bg-red-50', 'text-red-800');
+                if (isError) {
+                    productActionToast.classList.add('border-red-200', 'bg-red-50', 'text-red-800');
+                } else {
+                    productActionToast.classList.add('border-green-200', 'bg-green-50', 'text-green-800');
+                }
+                if (productActionToastTimer) {
+                    clearTimeout(productActionToastTimer);
+                }
+                productActionToastTimer = setTimeout(() => {
+                    productActionToast.classList.add('hidden');
+                }, 2400);
+            }
+
+            function getProductTemplateSelect() {
+                if (firstRowTemplate) {
+                    const templateSelect = firstRowTemplate.querySelector('.product-select');
+                    if (templateSelect) {
+                        return templateSelect;
+                    }
+                }
+                return body.querySelector('tr .product-select');
+            }
+
+            function findProductOptionByCode(rawTerm) {
+                const term = (rawTerm || '').trim().toLowerCase();
+                if (!term) {
+                    return null;
+                }
+                const selectTemplate = getProductTemplateSelect();
+                if (!selectTemplate) {
+                    return null;
+                }
+                return Array.from(selectTemplate.options).find(option => {
+                    if (!option.value) {
+                        return false;
+                    }
+                    const barcode = (option.dataset.barcode || '').trim().toLowerCase();
+                    const productCode = (option.dataset.productCode || '').trim().toLowerCase();
+                    return barcode === term || productCode === term;
+                }) || null;
+            }
+
+            function ensureRowProductPrice(row) {
+                if (!row) {
+                    return;
+                }
+                const rowSelect = row.querySelector('.product-select');
+                const priceInput = row.querySelector('.unit-price');
+                const option = rowSelect ? rowSelect.options[rowSelect.selectedIndex] : null;
+                const selectedPrice = getPriceFromOption(option);
+                if (priceInput && selectedPrice) {
+                    priceInput.value = selectedPrice;
+                }
+            }
+
+            function findRowByProductId(productId) {
+                return Array.from(body.querySelectorAll('tr')).find(row => {
+                    const rowSelect = row.querySelector('.product-select');
+                    return rowSelect && rowSelect.value === productId;
+                }) || null;
+            }
+
+            function findEmptyRow() {
+                return Array.from(body.querySelectorAll('tr')).find(row => {
+                    const rowSelect = row.querySelector('.product-select');
+                    return rowSelect && !rowSelect.value;
+                }) || null;
+            }
+
+            function applyProductSearchFilter(term) {
+                const normalized = (term || '').toLowerCase().trim();
+                body.querySelectorAll('.product-select').forEach(select => {
+                    Array.from(select.options).forEach(option => {
+                        if (!option.value) {
+                            option.hidden = false;
+                            return;
+                        }
+                        const barcode = (option.dataset.barcode || '').toLowerCase();
+                        const productCode = (option.dataset.productCode || '').toLowerCase();
+                        option.hidden = normalized.length > 0 && !(barcode.includes(normalized) || productCode.includes(normalized));
+                    });
+                });
+            }
+
+            function clearRow(row) {
+                if (!row) {
+                    return;
+                }
+                const rowSelect = row.querySelector('.product-select');
+                const qtyInput = row.querySelector('input[name="quantities"]');
+                const priceInput = row.querySelector('.unit-price');
+                const lineTotal = row.querySelector('.line-total');
+                if (rowSelect) {
+                    rowSelect.selectedIndex = 0;
+                }
+                if (qtyInput) {
+                    qtyInput.value = '1';
+                }
+                if (priceInput) {
+                    priceInput.value = '';
+                }
+                if (lineTotal) {
+                    lineTotal.textContent = '0.00';
+                }
+            }
+
+            function addProductOptionToCart(matchedOption) {
+                if (!matchedOption || !matchedOption.value) {
+                    return false;
+                }
+
+                const existingRow = findRowByProductId(matchedOption.value);
+                if (existingRow) {
+                    const qtyInput = existingRow.querySelector('input[name="quantities"]');
+                    if (qtyInput) {
+                        qtyInput.value = String(Math.max(1, parseNumber(qtyInput.value)) + 1);
+                    }
+                    ensureRowProductPrice(existingRow);
+                    updateTotals();
+                    return true;
+                }
+
+                let row = findEmptyRow();
+                if (!row) {
+                    row = buildEmptyRow();
+                    if (!row) {
+                        return false;
+                    }
+                    body.appendChild(row);
+                }
+
+                const rowSelect = row.querySelector('.product-select');
+                if (!rowSelect) {
+                    return false;
+                }
+                rowSelect.value = matchedOption.value;
+                ensureRowProductPrice(row);
+                updateTotals();
+                return true;
+            }
+
+            function handleProductCodeSubmit(rawTerm) {
+                const matchedOption = findProductOptionByCode(rawTerm);
+                if (!matchedOption) {
+                    setBarcodeStatus('No se encontro un producto con ese codigo.', true);
+                    showProductToast('No se encontro un producto con ese codigo.', true);
+                    return false;
+                }
+                const added = addProductOptionToCart(matchedOption);
+                if (!added) {
+                    setBarcodeStatus('No se pudo agregar el producto al carrito.', true);
+                    showProductToast('No se pudo agregar el producto al carrito.', true);
+                    return false;
+                }
+                const productLabel = ((matchedOption.dataset.productCode || matchedOption.dataset.barcode || '').trim());
+                setBarcodeStatus('Producto agregado: ' + productLabel, false);
+                showProductToast('Producto agregado al carrito: ' + productLabel, false);
+                if (productSearch) {
+                    productSearch.value = '';
+                    applyProductSearchFilter('');
+                    productSearch.focus();
+                }
+                return true;
+            }
+
+            function stopBarcodeScanner() {
+                barcodeScanActive = false;
+                if (barcodeScanFrame) {
+                    cancelAnimationFrame(barcodeScanFrame);
+                    barcodeScanFrame = null;
+                }
+                if (barcodeScannerVideo) {
+                    barcodeScannerVideo.pause();
+                    barcodeScannerVideo.classList.add('hidden');
+                    barcodeScannerVideo.srcObject = null;
+                }
+                if (barcodeScannerStream) {
+                    barcodeScannerStream.getTracks().forEach(track => track.stop());
+                    barcodeScannerStream = null;
+                }
+                if (barcodeScannerPanel) {
+                    barcodeScannerPanel.classList.add('hidden');
+                }
+                if (startBarcodeScannerBtn) {
+                    startBarcodeScannerBtn.classList.remove('hidden');
+                }
+                if (stopBarcodeScannerBtn) {
+                    stopBarcodeScannerBtn.classList.add('hidden');
+                }
+            }
+
+            function scanBarcodeFrame() {
+                if (!barcodeScanActive || !barcodeDetector || !barcodeScannerVideo) {
+                    return;
+                }
+                barcodeDetector.detect(barcodeScannerVideo)
+                    .then(codes => {
+                        if (!barcodeScanActive || !Array.isArray(codes) || !codes.length) {
+                            return;
+                        }
+                        const rawValue = (codes[0].rawValue || '').trim();
+                        if (!rawValue) {
+                            return;
+                        }
+                        const now = Date.now();
+                        if (rawValue === lastScannedCode && (now - lastScannedAt) < 1500) {
+                            return;
+                        }
+                        lastScannedCode = rawValue;
+                        lastScannedAt = now;
+                        handleProductCodeSubmit(rawValue);
+                    })
+                    .catch(() => {
+                        setBarcodeStatus('No se pudo leer el codigo. Intente acercar mas la camara.', true);
+                    })
+                    .finally(() => {
+                        if (barcodeScanActive) {
+                            barcodeScanFrame = requestAnimationFrame(scanBarcodeFrame);
+                        }
+                    });
+            }
+
+            async function startBarcodeScanner() {
+                if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.BarcodeDetector) {
+                    if (barcodeScannerPanel) {
+                        barcodeScannerPanel.classList.remove('hidden');
+                    }
+                    setBarcodeStatus('La camara no esta disponible en este navegador o contexto.', true);
+                    return;
+                }
+
+                try {
+                    if (!barcodeDetector) {
+                        barcodeDetector = new window.BarcodeDetector({
+                            formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e']
+                        });
+                    }
+                    barcodeScannerStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: {ideal: 'environment'}
+                        },
+                        audio: false
+                    });
+                    if (barcodeScannerPanel) {
+                        barcodeScannerPanel.classList.remove('hidden');
+                    }
+                    if (barcodeScannerVideo) {
+                        barcodeScannerVideo.srcObject = barcodeScannerStream;
+                        barcodeScannerVideo.classList.remove('hidden');
+                        await barcodeScannerVideo.play();
+                    }
+                    barcodeScanActive = true;
+                    lastScannedCode = '';
+                    lastScannedAt = 0;
+                    if (startBarcodeScannerBtn) {
+                        startBarcodeScannerBtn.classList.add('hidden');
+                    }
+                    if (stopBarcodeScannerBtn) {
+                        stopBarcodeScannerBtn.classList.remove('hidden');
+                    }
+                    setBarcodeStatus('Apunte la camara al codigo de barras para agregarlo al carrito.', false);
+                    scanBarcodeFrame();
+                } catch (error) {
+                    stopBarcodeScanner();
+                    if (barcodeScannerPanel) {
+                        barcodeScannerPanel.classList.remove('hidden');
+                    }
+                    setBarcodeStatus('No se pudo abrir la camara. Revise permisos del navegador.', true);
+                    showProductToast('No se pudo abrir la camara. Revise permisos del navegador.', true);
+                }
+            }
+
             function applyPlanToCart(planKey) {
                 const base = getBaseCartTotal();
                 const data = calculatePlans(base);
@@ -775,6 +1099,8 @@
                     const price = getPriceFromOption(option);
                     if (price) {
                         priceInput.value = price;
+                    } else {
+                        priceInput.value = '';
                     }
                     updateTotals();
                 });
@@ -794,8 +1120,11 @@
                 removeBtn.addEventListener('click', function () {
                     if (body.children.length > 1) {
                         row.remove();
-                        updateTotals();
+                    } else {
+                        clearRow(row);
                     }
+                    applyProductSearchFilter(productSearch ? productSearch.value : '');
+                    updateTotals();
                 });
             }
 
@@ -888,7 +1217,9 @@
                 dailyOptions.classList.add('hidden');
                 weeklyOptions.classList.toggle('hidden', freq !== 'WEEKLY');
                 biweeklyOptions.classList.toggle('hidden', freq !== 'BIWEEKLY');
-                monthlyOptions.classList.toggle('hidden', freq !== 'MONTHLY');
+                if (monthlyOptions) {
+                    monthlyOptions.classList.add('hidden');
+                }
 
                 if (freq === 'BIWEEKLY') {
                     if (biMonthlyDay1Input && !biMonthlyDay1Input.value) {
@@ -923,7 +1254,11 @@
                     biMonthlyDay2Input.required = freq === 'BIWEEKLY';
                 }
                 if (monthlyDayInput) {
-                    monthlyDayInput.required = freq === 'MONTHLY';
+                    monthlyDayInput.required = false;
+                    if (freq === 'MONTHLY' && firstDueDateInput && firstDueDateInput.value) {
+                        const dueDate = toDateOnly(firstDueDateInput.value);
+                        monthlyDayInput.value = String(Math.min(28, dueDate.getDate()));
+                    }
                 }
             }
 
@@ -944,17 +1279,7 @@
 
             if (productSearch) {
                 productSearch.addEventListener('input', function () {
-                    const term = productSearch.value.toLowerCase().trim();
-                    body.querySelectorAll('.product-select').forEach(select => {
-                        Array.from(select.options).forEach(option => {
-                            if (!option.value) {
-                                option.hidden = false;
-                                return;
-                            }
-                            const barcode = (option.dataset.barcode || '').toLowerCase();
-                            option.hidden = term.length > 0 && !barcode.includes(term);
-                        });
-                    });
+                    applyProductSearchFilter(productSearch.value);
                 });
 
                 productSearch.addEventListener('keydown', function (event) {
@@ -966,39 +1291,7 @@
                     if (!term) {
                         return;
                     }
-
-                    let matchedOption = null;
-                    const selectTemplate = body.querySelector('tr .product-select');
-                    if (!selectTemplate) {
-                        return;
-                    }
-                    Array.from(selectTemplate.options).forEach(option => {
-                        if (!option.value || matchedOption) {
-                            return;
-                        }
-                        const barcode = (option.dataset.barcode || '').toLowerCase();
-                        if (barcode === term) {
-                            matchedOption = option;
-                        }
-                    });
-
-                    if (!matchedOption) {
-                        return;
-                    }
-
-                    const row = body.querySelector('tr').cloneNode(true);
-                    row.querySelectorAll('input').forEach(input => input.value = input.name === 'quantities' ? 1 : '');
-                    const rowSelect = row.querySelector('select');
-                    rowSelect.value = matchedOption.value;
-                    const priceInput = row.querySelector('.unit-price');
-                    const selectedPrice = getPriceFromOption(matchedOption);
-                    if (selectedPrice) {
-                        priceInput.value = selectedPrice;
-                    }
-                    bindRow(row);
-                    body.appendChild(row);
-                    updateTotals();
-                    productSearch.value = '';
+                    handleProductCodeSubmit(term);
                 });
             }
 
@@ -1024,6 +1317,13 @@
                 }
                 updateTotals();
             });
+            if (startBarcodeScannerBtn) {
+                startBarcodeScannerBtn.addEventListener('click', startBarcodeScanner);
+            }
+            if (stopBarcodeScannerBtn) {
+                stopBarcodeScannerBtn.addEventListener('click', stopBarcodeScanner);
+            }
+            window.addEventListener('beforeunload', stopBarcodeScanner);
 
             if (paymentType) {
                 paymentType.addEventListener('change', toggleCreditFields);
@@ -1140,7 +1440,14 @@
                         return 'Dias del mes invalidos (1-28)';
                     }
                 } else if (frequency === 'MONTHLY') {
-                    const monthlyDay = parseInt(getFieldValue('input[name="monthlyDay"]'), 10);
+                    let monthlyDay = parseInt(getFieldValue('input[name="monthlyDay"]'), 10);
+                    if (!Number.isFinite(monthlyDay)) {
+                        const firstDueDate = getFieldValue('input[name="firstDueDate"]');
+                        if (firstDueDate) {
+                            monthlyDay = Math.min(28, toDateOnly(firstDueDate).getDate());
+                            setFieldValue('input[name="monthlyDay"]', String(monthlyDay));
+                        }
+                    }
                     if (!Number.isFinite(monthlyDay) || monthlyDay < 1 || monthlyDay > 28) {
                         return 'Dia de vencimiento invalido (1-28)';
                     }
@@ -1217,7 +1524,13 @@
                     return [d1, d2].filter(Boolean).join(' y ') || '-';
                 }
                 if (frequency === 'MONTHLY') {
-                    const day = getFieldValue('input[name="monthlyDay"]');
+                    let day = getFieldValue('input[name="monthlyDay"]');
+                    if (!day) {
+                        const firstDueDate = getFieldValue('input[name="firstDueDate"]');
+                        if (firstDueDate) {
+                            day = String(Math.min(28, toDateOnly(firstDueDate).getDate()));
+                        }
+                    }
                     return day ? ('Dia ' + day) : '-';
                 }
                 return '-';
