@@ -1,39 +1,222 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
-      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
-      th:replace="layout/main :: layout(~{::content}, 'Dashboard')">
+      th:replace="layout/main :: layout(~{::content}, 'Dashboard de cartera')">
 
 <section th:fragment="content">
 
-    <h1 class="text-2xl font-bold mb-6">Dashboard</h1>
+    <div class="overflow-hidden rounded-[2rem] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.28),_transparent_38%),linear-gradient(135deg,_#0f172a,_#1d4ed8_55%,_#22c55e)] p-6 text-white shadow-xl md:p-8">
+        <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div class="max-w-3xl">
+                <div class="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.25em] text-blue-100">
+                    Dashboard
+                </div>
+                <h1 class="mt-4 text-3xl font-black tracking-tight md:text-4xl">Cartera de creditos del negocio</h1>
+                <p class="mt-3 max-w-2xl text-sm text-blue-50/90 md:text-base">
+                    Vista consolidada del dinero financiado, lo que ya deberia haber ingresado, lo efectivamente cobrado
+                    y la deuda vencida real de toda la cartera.
+                </p>
+            </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="grid gap-3 rounded-3xl border border-white/15 bg-white/10 p-4 backdrop-blur sm:grid-cols-2">
+                <div>
+                    <p class="text-[11px] uppercase tracking-[0.2em] text-blue-100/80">Fecha de corte</p>
+                    <p class="mt-1 text-lg font-bold" th:text="${#temporals.format(summary.cutoffDate, 'dd/MM/yyyy')}"></p>
+                </div>
+                <div>
+                    <p class="text-[11px] uppercase tracking-[0.2em] text-blue-100/80">Creditos considerados</p>
+                    <p class="mt-1 text-lg font-bold" th:text="${summary.creditsCount}">0</p>
+                </div>
+                <div class="sm:col-span-2">
+                    <p class="text-[11px] uppercase tracking-[0.2em] text-blue-100/80">Alcance</p>
+                    <p class="mt-1 text-sm font-semibold"
+                       th:text="${summary.globalPortfolio ? 'Cartera completa del negocio' : 'Cartera filtrada / segmentada'}">
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-gray-500 text-sm">Total clientes</h2>
-            <p class="text-3xl font-bold" th:text="${clientsCount}">0</p>
+    <div class="mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Filtros</p>
+                <h2 class="mt-1 text-xl font-bold text-slate-900">Segmentacion de cartera</h2>
+                <p class="mt-1 text-sm text-slate-500">
+                    Puede mirar toda la cartera o enfocarse por vendedor y zona sin perder consistencia en los calculos.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2 text-xs font-semibold">
+                <span class="rounded-full bg-slate-900 px-3 py-1.5 text-white" th:text="${summary.effectiveSellerLabel}"></span>
+                <span class="rounded-full bg-slate-100 px-3 py-1.5 text-slate-700" th:text="${summary.effectiveZoneLabel}"></span>
+            </div>
         </div>
 
-        <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-gray-500 text-sm">Total ventas</h2>
-            <p class="text-3xl font-bold" th:text="${salesCount}">0</p>
+        <form method="get" th:action="@{/dashboard}" class="mt-5 grid gap-4 xl:grid-cols-[1fr_1fr_auto]">
+            <div th:if="${isAdminView}">
+                <label for="sellerId" class="mb-2 block text-sm font-semibold text-slate-800">Vendedor</label>
+                <select id="sellerId" name="sellerId" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    <option value="">Todos los vendedores</option>
+                    <option th:each="seller : ${sellerOptions}"
+                            th:value="${seller.id}"
+                            th:text="${seller.label}"
+                            th:selected="${summary.effectiveSellerId != null and seller.id == summary.effectiveSellerId}">
+                    </option>
+                </select>
+            </div>
+
+            <div th:if="${!isAdminView}" class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">Vendedor</p>
+                <p class="mt-1 text-sm font-bold text-slate-900" th:text="${summary.effectiveSellerLabel}">Mi cartera</p>
+                <p class="mt-1 text-xs text-slate-500">La vista esta limitada automaticamente a los creditos creados por este usuario.</p>
+            </div>
+
+            <div>
+                <label for="zoneId" class="mb-2 block text-sm font-semibold text-slate-800">Zona</label>
+                <select id="zoneId" name="zoneId" class="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200">
+                    <option value="">Todas las zonas</option>
+                    <option th:each="zone : ${zoneOptions}"
+                            th:value="${zone.id}"
+                            th:text="${zone.label}"
+                            th:selected="${summary.effectiveZoneId != null and zone.id == summary.effectiveZoneId}">
+                    </option>
+                </select>
+            </div>
+
+            <div class="flex flex-wrap items-end gap-3">
+                <button type="submit" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800">
+                    Aplicar filtros
+                </button>
+                <a th:href="@{/dashboard}" class="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                    Limpiar
+                </a>
+            </div>
+        </form>
+    </div>
+
+    <div class="mt-6 grid gap-5 xl:grid-cols-[1.2fr_1.2fr_1fr]">
+        <div class="rounded-[1.75rem] border border-blue-200 bg-[linear-gradient(180deg,_#eff6ff,_#dbeafe)] p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-700">Dinero en la calle</p>
+                    <h3 class="mt-2 text-base font-bold text-slate-900">Total financiado</h3>
+                </div>
+                <div class="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-blue-700 shadow-sm">Capital total</div>
+            </div>
+            <p class="mt-6 text-3xl font-black tracking-tight text-slate-950"
+               th:text="${'$ ' + #numbers.formatDecimal(summary.totalFinanced, 1, 'POINT', 2, 'COMMA')}">$ 0,00</p>
+            <p class="mt-3 text-sm text-slate-600">
+                Suma de todas las ventas financiadas registradas en la cartera.
+            </p>
         </div>
 
-        <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-gray-500 text-sm">Clientes morosos</h2>
-            <p class="text-3xl font-bold" th:text="${overdueClientsCount}">0</p>
+        <div class="rounded-[1.75rem] border border-violet-200 bg-[linear-gradient(180deg,_#f5f3ff,_#ede9fe)] p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-violet-700">Exigible al dia</p>
+                    <h3 class="mt-2 text-base font-bold text-slate-900">Deberia haberse cobrado</h3>
+                </div>
+                <div class="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-violet-700 shadow-sm">Cuotas vencidas a hoy</div>
+            </div>
+            <p class="mt-6 text-3xl font-black tracking-tight text-slate-950"
+               th:text="${'$ ' + #numbers.formatDecimal(summary.expectedCollected, 1, 'POINT', 2, 'COMMA')}">$ 0,00</p>
+            <p class="mt-3 text-sm text-slate-600">
+                Suma de todas las cuotas cuyo vencimiento ya llego segun la fecha de corte.
+            </p>
         </div>
 
-        <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-gray-500 text-sm">Ventas del dia</h2>
-            <p class="text-3xl font-bold" th:text="${todaySalesCount}">0</p>
+        <div class="rounded-[1.75rem] border border-emerald-200 bg-[linear-gradient(180deg,_#ecfdf5,_#d1fae5)] p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">Cobranza real</p>
+                    <h3 class="mt-2 text-base font-bold text-slate-900">Cobrado realmente</h3>
+                </div>
+                <div class="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-emerald-700 shadow-sm">Pagos registrados</div>
+            </div>
+            <p class="mt-6 text-3xl font-black tracking-tight text-slate-950"
+               th:text="${'$ ' + #numbers.formatDecimal(summary.collectedAmount, 1, 'POINT', 2, 'COMMA')}">$ 0,00</p>
+            <p class="mt-3 text-sm text-slate-600">
+                Suma de todos los pagos efectivamente ingresados en el sistema.
+            </p>
+            <div class="mt-4">
+                <div class="mb-2 flex items-center justify-between text-xs font-semibold text-slate-600">
+                    <span>Progreso de cobranza sobre lo exigible</span>
+                    <span th:text="${#numbers.formatDecimal(summary.collectionProgressPercent, 1, 'POINT', 2, 'COMMA') + '%'}">0,00%</span>
+                </div>
+                <div class="h-3 overflow-hidden rounded-full bg-white/80">
+                    <div class="h-full rounded-full bg-emerald-500"
+                         th:style="'width:' + summary.collectionProgressPercent + '%'"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="mt-5 grid gap-5 lg:grid-cols-[0.95fr_1.05fr]">
+        <div class="rounded-[1.75rem] border border-rose-200 bg-[linear-gradient(180deg,_#fff1f2,_#ffe4e6)] p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-rose-700">Mora consolidada</p>
+                    <h3 class="mt-2 text-base font-bold text-slate-900">Deuda vencida total</h3>
+                </div>
+                <div class="rounded-2xl bg-white/80 px-3 py-2 text-xs font-semibold text-rose-700 shadow-sm">Saldo atrasado real</div>
+            </div>
+            <p class="mt-6 text-4xl font-black tracking-tight text-slate-950"
+               th:text="${'$ ' + #numbers.formatDecimal(summary.overdueDebt, 1, 'POINT', 2, 'COMMA')}">$ 0,00</p>
+            <p class="mt-3 text-sm text-slate-600">
+                Saldo pendiente de cuotas ya vencidas y todavia no canceladas por completo.
+            </p>
+            <a th:href="@{/arrears}" class="mt-5 inline-flex rounded-2xl bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700">
+                Ir a morosidad
+            </a>
         </div>
 
-        <div class="bg-white p-6 rounded shadow">
-            <h2 class="text-gray-500 text-sm">Productos</h2>
-            <p class="text-3xl font-bold" th:text="${productsCount}">0</p>
-        </div>
+        <div class="rounded-[2rem] border border-slate-900 bg-slate-950 p-6 text-white shadow-xl">
+            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">Pendiente total</p>
+                    <h3 class="mt-2 text-lg font-bold">Saldo total de la cartera</h3>
+                </div>
+                <div class="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-200">
+                    Vista financiera global
+                </div>
+            </div>
 
+            <p class="mt-8 text-5xl font-black tracking-tight text-white"
+               th:text="${'$ ' + #numbers.formatDecimal(summary.pendingBalance, 1, 'POINT', 2, 'COMMA')}">$ 0,00</p>
+
+            <div class="mt-6 grid gap-3 sm:grid-cols-2">
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p class="text-xs uppercase tracking-[0.18em] text-slate-400">Vendedor</p>
+                    <p class="mt-2 text-sm font-bold text-white" th:text="${summary.effectiveSellerLabel}"></p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p class="text-xs uppercase tracking-[0.18em] text-slate-400">Zona</p>
+                    <p class="mt-2 text-sm font-bold text-white" th:text="${summary.effectiveZoneLabel}"></p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 p-4 sm:col-span-2">
+                    <p class="text-xs uppercase tracking-[0.18em] text-slate-400">Lectura rapida</p>
+                    <p class="mt-2 text-sm text-slate-200">
+                        Este valor representa cuanto capital financiado falta recuperar de la cartera seleccionada.
+                    </p>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-3">
+                <a th:href="@{/accounts}" class="rounded-2xl bg-white px-4 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
+                    Ver cuentas
+                </a>
+                <a th:href="@{/collections}" class="rounded-2xl border border-white/20 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-white/10">
+                    Ir a cobranza
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div th:if="${summary.creditsCount == 0}" class="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-white px-6 py-8 text-center shadow-sm">
+        <p class="text-sm font-semibold uppercase tracking-[0.22em] text-slate-400">Sin resultados</p>
+        <h3 class="mt-3 text-xl font-bold text-slate-900">No hay creditos para los filtros seleccionados</h3>
+        <p class="mt-2 text-sm text-slate-500">
+            Revise la combinacion de vendedor y zona o quite los filtros para volver a la vista general.
+        </p>
     </div>
 
 </section>

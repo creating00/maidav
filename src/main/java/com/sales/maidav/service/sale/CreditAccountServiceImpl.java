@@ -229,7 +229,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                                     ? "Cuota #" + installment.getInstallmentNumber() + " total (efectivo sin descuento)"
                                     : "Cuota #" + installment.getInstallmentNumber() + " parcial (efectivo sin descuento)"
                     );
-                    remainingInput = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                    remainingInput = remainingInput.subtract(partialImpact).setScale(2, RoundingMode.HALF_UP);
                 }
             } else {
                 if (remainingInput.compareTo(financedRemaining) >= 0) {

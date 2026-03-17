@@ -1,40 +1,28 @@
 package com.sales.maidav.web.controller.web;
 
-import com.sales.maidav.service.client.ClientService;
-import com.sales.maidav.service.product.ProductService;
-import com.sales.maidav.service.sale.CreditAccountService;
-import com.sales.maidav.service.sale.SaleService;
+import com.sales.maidav.service.dashboard.DashboardPortfolioService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 public class DashboardController {
 
-    private final ClientService clientService;
-    private final SaleService saleService;
-    private final CreditAccountService creditAccountService;
-    private final ProductService productService;
+    private final DashboardPortfolioService dashboardPortfolioService;
 
-    public DashboardController(ClientService clientService,
-                               SaleService saleService,
-                               CreditAccountService creditAccountService,
-                               ProductService productService) {
-        this.clientService = clientService;
-        this.saleService = saleService;
-        this.creditAccountService = creditAccountService;
-        this.productService = productService;
+    public DashboardController(DashboardPortfolioService dashboardPortfolioService) {
+        this.dashboardPortfolioService = dashboardPortfolioService;
     }
 
     @GetMapping("/dashboard")
-    public String dashboard(Model model) {
-
-        model.addAttribute("clientsCount", clientService.count());
-        model.addAttribute("salesCount", saleService.countActive());
-        model.addAttribute("overdueClientsCount", creditAccountService.countMoroseClients());
-        model.addAttribute("todaySalesCount", saleService.countToday());
-        model.addAttribute("productsCount", productService.count());
-
+    public String dashboard(@RequestParam(required = false) Long sellerId,
+                            @RequestParam(required = false) Long zoneId,
+                            Model model) {
+        model.addAttribute("summary", dashboardPortfolioService.buildSnapshot(sellerId, zoneId));
+        model.addAttribute("sellerOptions", dashboardPortfolioService.getSellerOptions());
+        model.addAttribute("zoneOptions", dashboardPortfolioService.getZoneOptions());
+        model.addAttribute("isAdminView", dashboardPortfolioService.isCurrentUserAdminView());
         return "pages/dashboard/index";
     }
 }
