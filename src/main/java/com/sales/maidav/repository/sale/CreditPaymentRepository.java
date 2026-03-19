@@ -8,11 +8,13 @@ import org.springframework.data.repository.query.Param;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface CreditPaymentRepository extends JpaRepository<CreditPayment, Long> {
     List<CreditPayment> findByAccount_IdOrderByPaidAtDesc(Long accountId);
     List<CreditPayment> findByAccount_IdOrderByPaidAtDescIdDesc(Long accountId);
     List<CreditPayment> findByAccount_IdOrderByPaidAtAscIdAsc(Long accountId);
+    Optional<CreditPayment> findByAccount_IdAndOperationToken(Long accountId, String operationToken);
 
     @Query("""
             select coalesce(sum(payment.amount), 0)
@@ -25,3 +27,4 @@ public interface CreditPaymentRepository extends JpaRepository<CreditPayment, Lo
                                  @Param("sellerId") Long sellerId,
                                  @Param("zoneId") Long zoneId);
 }
+

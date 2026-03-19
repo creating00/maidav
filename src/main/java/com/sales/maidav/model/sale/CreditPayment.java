@@ -33,6 +33,9 @@ public class CreditPayment extends BaseEntity {
     @Column(name = "payment_method", length = 20)
     private PaymentCollectionMethod paymentMethod;
 
+    @Column(name = "operation_token", length = 120)
+    private String operationToken;
+
     public CreditPayment() {}
 
     public CreditAccount getAccount() { return account; }
@@ -55,4 +58,8 @@ public class CreditPayment extends BaseEntity {
 
     public PaymentCollectionMethod getPaymentMethod() { return paymentMethod; }
     public void setPaymentMethod(PaymentCollectionMethod paymentMethod) { this.paymentMethod = paymentMethod; }
+
+    public String getOperationToken() { return operationToken; }
+    public void setOperationToken(String operationToken) { this.operationToken = operationToken; }
 }
+

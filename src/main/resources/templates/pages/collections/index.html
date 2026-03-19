@@ -142,6 +142,13 @@
                 text-decoration: underline;
             }
 
+            .collections-page .processing {
+                margin-top: 10px;
+                font-size: 15px;
+                color: #1d4ed8;
+                font-weight: bold;
+            }
+
             @media (max-width: 640px) {
                 .collections-page .botones {
                     flex-direction: column;
@@ -217,6 +224,7 @@
 
             function resetMessages(card) {
                 card.querySelector('.cobrado').innerHTML = '';
+                card.querySelector('.processing').innerHTML = '';
                 card.querySelector('.error').innerHTML = '';
             }
 
@@ -225,6 +233,7 @@
                 card.dataset.cobrado = 'no';
                 card.dataset.cashAmount = '0';
                 card.dataset.financedAmount = '0';
+                card.dataset.operationToken = '';
                 card.dataset.detailUrl = '';
                 card.querySelector('.cliente').innerHTML = '';
                 card.querySelector('.producto').innerHTML = '';
@@ -272,6 +281,7 @@
                     </div>
 
                     <div class="cobrado"></div>
+                    <div class="processing"></div>
                     <div class="error"></div>
                     <div class="detalle"></div>
                 `;
@@ -325,6 +335,7 @@
                     card.dataset.cobrado = 'no';
                     card.dataset.cashAmount = data.cashAmount || 0;
                     card.dataset.financedAmount = data.financedAmount || 0;
+                    card.dataset.operationToken = '';
                     card.dataset.detailUrl = data.detailUrl || '';
 
                     card.querySelector('.cliente').textContent = `Cliente: ${data.clientName || '-'}`;
@@ -333,7 +344,13 @@
                     card.querySelector('.contado').textContent = `Cuota contado: $${money(data.cashAmount)}`;
                     card.querySelector('.financiada').textContent = `Cuota financiada: $${money(data.financedAmount)}`;
                     card.querySelector('.debe').textContent = `Debe: $${money(data.balance)}`;
-                    card.querySelector('.estado').innerHTML = `<span class="${data.statusCssClass || 'estadoD'}">${String(data.statusLabel || 'Al dia').toUpperCase()}</span>`;
+                    const overdueAmount = parseNumber(data.overdueAmount);
+                    if (String(data.statusLabel || '').toUpperCase() === 'ATRASADO' && overdueAmount > 0) {
+                        // MOSTRAR MONTO ATRASO
+                        card.querySelector('.estado').innerHTML = `<span class="${data.statusCssClass || 'estadoA'}">${String(data.statusLabel || 'Atrasado').toUpperCase()} - $${money(overdueAmount)}</span>`;
+                    } else {
+                        card.querySelector('.estado').innerHTML = `<span class="${data.statusCssClass || 'estadoD'}">${String(data.statusLabel || 'Al dia').toUpperCase()}</span>`;
+                    }
                     card.querySelector('.cobro').value = Number(data.financedAmount || 0).toFixed(2);
                     card.querySelector('.detalle').innerHTML = data.detailUrl
                         ? `<a class="detalle-link" href="${data.detailUrl}">Ver detalle de la cuenta</a>`
@@ -407,10 +424,25 @@
                 }
 
                 const paymentMethod = tipo === 'efectivo' ? 'CASH' : 'BANK';
+                const paymentLabel = tipo === 'efectivo' ? 'efectivo' : 'transferencia / debito';
+                // CONFIRMACION COBRANZA
+                const confirmed = window.confirm(`Esta por registrar un pago en ${paymentLabel} por $${money(monto)}. Desea continuar?`);
+                if (!confirmed) {
+                    return;
+                }
                 const body = new URLSearchParams();
+                const operationToken = `collection-${card.dataset.accountId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
                 body.set('accountId', card.dataset.accountId);
                 body.set('amount', monto.toFixed(2));
                 body.set('paymentMethod', paymentMethod);
+                body.set('operationToken', operationToken);
+                card.dataset.operationToken = operationToken;
+                const actionButtons = Array.from(card.querySelectorAll('button'));
+                // PREVENIR DOBLE PAGO
+                actionButtons.forEach(button => {
+                    button.disabled = true;
+                });
+                card.querySelector('.processing').textContent = 'Procesando cobro...';
 
                 try {
                     const response = await fetch(registerUrl, {
@@ -436,6 +468,7 @@
                         totalDebito += Number(data.amount || monto);
                     }
                     updateTotals();
+                    card.querySelector('.processing').textContent = '';
 
                     let message = `COBRADO $${money(data.amount || monto)}`;
                     if (data.paymentMethodLabel) {
@@ -447,6 +480,16 @@
                     card.querySelector('.cobrado').innerHTML = message;
                 } catch (error) {
                     card.querySelector('.error').textContent = 'No se pudo registrar el cobro';
+                } finally {
+                    if (card.dataset.cobrado !== 'si') {
+                        card.dataset.operationToken = '';
+                    }
+                    actionButtons.forEach(button => {
+                        button.disabled = card.dataset.cobrado === 'si';
+                    });
+                    if (card.dataset.cobrado !== 'si') {
+                        card.querySelector('.processing').textContent = '';
+                    }
                 }
             }
 
@@ -462,3 +505,4 @@
 
 </section>
 </html>
+

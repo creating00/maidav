@@ -50,13 +50,15 @@ public class MassPaymentController {
     public ResponseEntity<?> register(@RequestParam Long accountId,
                                       @RequestParam BigDecimal amount,
                                       @RequestParam PaymentCollectionMethod paymentMethod,
+                                      @RequestParam(required = false) String operationToken,
                                       Authentication authentication) {
         try {
             String registeredBy = authentication != null ? authentication.getName() : null;
-            return ResponseEntity.ok(collectionWorkbenchService.registerPayment(accountId, amount, paymentMethod, registeredBy));
+            return ResponseEntity.ok(collectionWorkbenchService.registerPayment(accountId, amount, paymentMethod, registeredBy, operationToken));
         } catch (RuntimeException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("message", ex.getMessage()));
         }
     }
 }
+

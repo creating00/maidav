@@ -2,6 +2,7 @@ package com.sales.maidav.service.sale;
 
 import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.model.sale.CreditInstallment;
+import com.sales.maidav.model.sale.CreditPayment;
 import com.sales.maidav.model.sale.InstallmentStatus;
 import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import com.sales.maidav.model.sale.SaleItem;
@@ -43,6 +44,8 @@ public class CollectionWorkbenchService {
         List<CreditInstallment> installments = creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(accountId);
         CreditInstallment currentInstallment = installments.stream()
                 .filter(installment -> installment.getStatus() != InstallmentStatus.PAID)
+                .filter(installment -> installment.getStatus() != InstallmentStatus.VOID)
+                .filter(installment -> !installment.isVoided())
                 .findFirst()
                 .orElse(null);
 
@@ -58,8 +61,18 @@ public class CollectionWorkbenchService {
 
         boolean overdue = installments.stream()
                 .anyMatch(installment -> installment.getStatus() != InstallmentStatus.PAID
+                        && installment.getStatus() != InstallmentStatus.VOID
+                        && !installment.isVoided()
                         && installment.getDueDate() != null
                         && installment.getDueDate().isBefore(LocalDate.now()));
+        // MOSTRAR MONTO ATRASO
+        BigDecimal overdueAmount = installments.stream()
+                .filter(installment -> installment.getStatus() != InstallmentStatus.PAID)
+                .filter(installment -> installment.getStatus() != InstallmentStatus.VOID)
+                .filter(installment -> !installment.isVoided())
+                .filter(installment -> installment.getDueDate() != null && installment.getDueDate().isBefore(LocalDate.now()))
+                .map(installment -> remainingAmount(installment.getAmount(), installment.getPaidAmount()))
+                .reduce(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP), BigDecimal::add);
 
         return new CollectionLookupView(
                 account.getId(),
@@ -70,6 +83,7 @@ public class CollectionWorkbenchService {
                 cashAmount,
                 financedAmount,
                 normalize(account.getBalance()),
+                normalize(overdueAmount),
                 overdue ? "Atrasado" : "Al dia",
                 overdue ? "estadoA" : "estadoD",
                 "/accounts/" + account.getId() + "#payments-section"
@@ -79,11 +93,19 @@ public class CollectionWorkbenchService {
     public PaymentSubmitResult registerPayment(Long accountId,
                                                BigDecimal amount,
                                                PaymentCollectionMethod paymentMethod,
-                                               String registeredBy) {
-        creditAccountService.registerPayment(accountId, amount, null, registeredBy, paymentMethod);
+                                               String registeredBy,
+                                               String operationToken) {
+        CreditPayment payment = creditAccountService.registerPayment(
+                accountId,
+                amount,
+                null,
+                registeredBy,
+                paymentMethod,
+                operationToken
+        );
         return new PaymentSubmitResult(
-                normalize(amount),
-                paymentMethod == PaymentCollectionMethod.CASH ? "Efectivo" : "Transferencia / Debito",
+                normalize(payment.getAmount()),
+                payment.getPaymentMethod() == PaymentCollectionMethod.CASH ? "Efectivo" : "Transferencia / Debito",
                 "/accounts/" + accountId + "#payments-section"
         );
     }
@@ -186,6 +208,7 @@ public class CollectionWorkbenchService {
                                        BigDecimal cashAmount,
                                        BigDecimal financedAmount,
                                        BigDecimal balance,
+                                       BigDecimal overdueAmount,
                                        String statusLabel,
                                        String statusCssClass,
                                        String detailUrl) {
@@ -194,3 +217,4 @@ public class CollectionWorkbenchService {
     public record PaymentSubmitResult(BigDecimal amount, String paymentMethodLabel, String detailUrl) {
     }
 }
+
