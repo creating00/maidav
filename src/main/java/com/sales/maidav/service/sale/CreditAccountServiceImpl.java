@@ -8,6 +8,7 @@ import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -67,17 +69,23 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     @Override
     public void registerPayment(Long accountId, BigDecimal amount) {
-        registerPayment(accountId, amount, null, null, PaymentCollectionMethod.BANK);
+        registerPayment(accountId, amount, null, null, PaymentCollectionMethod.BANK, null);
     }
 
     @Override
     public void registerPayment(Long accountId, BigDecimal amount, List<Long> installmentIds) {
-        registerPayment(accountId, amount, installmentIds, null, PaymentCollectionMethod.BANK);
+        registerPayment(accountId, amount, installmentIds, null, PaymentCollectionMethod.BANK, null);
     }
 
     @Override
     public void registerPayment(Long accountId, BigDecimal amount, List<Long> installmentIds, String registeredBy,
                                 PaymentCollectionMethod paymentMethod) {
+        registerPayment(accountId, amount, installmentIds, registeredBy, paymentMethod, null);
+    }
+
+    @Override
+    public CreditPayment registerPayment(Long accountId, BigDecimal amount, List<Long> installmentIds, String registeredBy,
+                                         PaymentCollectionMethod paymentMethod, String operationToken) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidSaleException("El pago debe ser mayor a cero");
         }
@@ -85,12 +93,22 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         if (account.getStatus() == AccountStatus.CLOSED) {
             throw new InvalidSaleException("La cuenta ya esta saldada");
         }
+        String normalizedOperationToken = trimToNull(operationToken);
+        if (normalizedOperationToken != null) {
+            CreditPayment existingPayment = creditPaymentRepository
+                    .findByAccount_IdAndOperationToken(accountId, normalizedOperationToken)
+                    .orElse(null);
+            if (existingPayment != null) {
+                return existingPayment;
+            }
+        }
 
         CreditPayment payment = new CreditPayment();
         payment.setAccount(account);
         payment.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
         payment.setPaidAt(LocalDate.now());
         payment.setRegisteredBy(trimToNull(registeredBy));
+        payment.setOperationToken(normalizedOperationToken);
         PaymentCollectionMethod resolvedMethod = paymentMethod == null ? PaymentCollectionMethod.BANK : paymentMethod;
         payment.setPaymentMethod(resolvedMethod);
 
@@ -118,11 +136,22 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
         payment.setImpactAmount(impactAmount.setScale(2, RoundingMode.HALF_UP));
         payment.setAllocationSummary(buildAllocationSummary(paymentReferences));
-        creditPaymentRepository.save(payment);
+        try {
+            creditPaymentRepository.save(payment);
+        } catch (DataIntegrityViolationException ex) {
+            if (normalizedOperationToken != null) {
+                return creditPaymentRepository.findByAccount_IdAndOperationToken(accountId, normalizedOperationToken)
+                        .orElseThrow(() -> ex);
+            }
+            throw ex;
+        }
         account.setBalance(newBalance.setScale(2, RoundingMode.HALF_UP));
         if (account.getBalance().compareTo(BigDecimal.ZERO) == 0) {
             account.setStatus(AccountStatus.CLOSED);
+        } else {
+            account.setStatus(AccountStatus.OPEN);
         }
+        return payment;
     }
 
     @Override
@@ -150,23 +179,38 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     }
 
     @Override
-    public void updateInstallmentDueDate(Long accountId, Long installmentId, LocalDate dueDate) {
-        if (dueDate == null) {
-            throw new InvalidSaleException("La fecha de vencimiento es obligatoria");
-        }
+    public void voidInstallment(Long accountId, Long installmentId, String voidedBy, String reason) {
         CreditInstallment installment = creditInstallmentRepository.findById(installmentId)
                 .orElseThrow(() -> new InvalidSaleException("Cuota no encontrada"));
         if (!installment.getAccount().getId().equals(accountId)) {
             throw new InvalidSaleException("La cuota no pertenece a la cuenta");
         }
-        installment.setDueDate(dueDate);
+        if (installment.isVoided() || installment.getStatus() == InstallmentStatus.VOID) {
+            throw new InvalidSaleException("La cuota ya fue anulada");
+        }
+
+        // ANULACION DE CUOTA
+        // AUDITORIA ANULACION
+        installment.setVoided(true);
+        installment.setStatus(InstallmentStatus.VOID);
+        installment.setVoidedAt(LocalDateTime.now());
+        installment.setVoidedBy(trimToNull(voidedBy));
+        installment.setVoidReason(trimToNull(reason));
+        installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        installment.setPaidAt(null);
+
+        recalculateAccountState(installment.getAccount());
     }
 
     private List<CreditInstallment> resolveInstallments(Long accountId, List<Long> installmentIds) {
         if (installmentIds == null || installmentIds.isEmpty()) {
-            return creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(accountId);
+            return creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(accountId).stream()
+                    .filter(installment -> !installment.isVoided() && installment.getStatus() != InstallmentStatus.VOID)
+                    .toList();
         }
-        return creditInstallmentRepository.findByAccount_IdAndIdInOrderByInstallmentNumber(accountId, installmentIds);
+        return creditInstallmentRepository.findByAccount_IdAndIdInOrderByInstallmentNumber(accountId, installmentIds).stream()
+                .filter(installment -> !installment.isVoided() && installment.getStatus() != InstallmentStatus.VOID)
+                .toList();
     }
 
     private BigDecimal applyPaymentToInstallments(List<CreditInstallment> installments,
@@ -183,7 +227,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             if (remainingInput.compareTo(BigDecimal.ZERO) <= 0) {
                 break;
             }
-            if (installment.getStatus() == InstallmentStatus.PAID) {
+            if (installment.getStatus() == InstallmentStatus.PAID || installment.getStatus() == InstallmentStatus.VOID || installment.isVoided()) {
                 continue;
             }
 
@@ -263,7 +307,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     private BigDecimal calculateMaxPayable(List<CreditInstallment> installments, PaymentCollectionMethod paymentMethod) {
         BigDecimal total = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         for (CreditInstallment installment : installments) {
-            if (installment.getStatus() == InstallmentStatus.PAID) {
+            if (installment.getStatus() == InstallmentStatus.PAID || installment.getStatus() == InstallmentStatus.VOID || installment.isVoided()) {
                 continue;
             }
             BigDecimal paidAmount = installment.getPaidAmount() == null
@@ -322,15 +366,25 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 .findByAccount_IdOrderByPaidAtAscIdAsc(account.getId());
 
         for (CreditInstallment installment : installments) {
+            if (installment.isVoided() || installment.getStatus() == InstallmentStatus.VOID) {
+                installment.setVoided(true);
+                installment.setStatus(InstallmentStatus.VOID);
+                installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                installment.setPaidAt(null);
+                continue;
+            }
             installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
             installment.setStatus(InstallmentStatus.PENDING);
             installment.setPaidAt(null);
         }
 
+        List<CreditInstallment> activeInstallments = installments.stream()
+                .filter(installment -> !installment.isVoided() && installment.getStatus() != InstallmentStatus.VOID)
+                .toList();
         for (CreditPayment payment : payments) {
             Map<Integer, String> paymentReferences = new LinkedHashMap<>();
             BigDecimal impactAmount = applyPaymentToInstallments(
-                    installments,
+                    activeInstallments,
                     payment.getAmount(),
                     payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod(),
                     payment.getPaidAt(),
@@ -340,14 +394,19 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             payment.setAllocationSummary(buildAllocationSummary(paymentReferences));
         }
 
+        BigDecimal recalculatedTotal = activeInstallments.stream()
+                .map(CreditInstallment::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalPaid = payments.stream()
                 .map(CreditPayment::getImpactAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 .setScale(2, RoundingMode.HALF_UP);
-        BigDecimal newBalance = account.getTotalAmount().subtract(totalPaid).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal newBalance = recalculatedTotal.subtract(totalPaid).setScale(2, RoundingMode.HALF_UP);
         if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-            throw new InvalidSaleException("La suma de pagos no puede superar el total de la cuenta");
+            throw new InvalidSaleException("No se puede anular la cuota porque los pagos ya superan el saldo recalculado");
         }
+        account.setTotalAmount(recalculatedTotal);
         account.setBalance(newBalance);
         account.setStatus(newBalance.compareTo(BigDecimal.ZERO) == 0 ? AccountStatus.CLOSED : AccountStatus.OPEN);
     }
@@ -470,3 +529,4 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 }
+

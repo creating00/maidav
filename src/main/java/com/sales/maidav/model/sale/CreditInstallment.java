@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "credit_installments")
@@ -33,6 +34,18 @@ public class CreditInstallment extends BaseEntity {
     @Column(name = "paid_at")
     private LocalDate paidAt;
 
+    @Column(nullable = false)
+    private boolean voided = false;
+
+    @Column(name = "voided_at")
+    private LocalDateTime voidedAt;
+
+    @Column(name = "voided_by", length = 150)
+    private String voidedBy;
+
+    @Column(name = "void_reason", length = 255)
+    private String voidReason;
+
     public CreditInstallment() {}
 
     public CreditAccount getAccount() { return account; }
@@ -55,4 +68,17 @@ public class CreditInstallment extends BaseEntity {
 
     public LocalDate getPaidAt() { return paidAt; }
     public void setPaidAt(LocalDate paidAt) { this.paidAt = paidAt; }
+
+    public boolean isVoided() { return voided; }
+    public void setVoided(boolean voided) { this.voided = voided; }
+
+    public LocalDateTime getVoidedAt() { return voidedAt; }
+    public void setVoidedAt(LocalDateTime voidedAt) { this.voidedAt = voidedAt; }
+
+    public String getVoidedBy() { return voidedBy; }
+    public void setVoidedBy(String voidedBy) { this.voidedBy = voidedBy; }
+
+    public String getVoidReason() { return voidReason; }
+    public void setVoidReason(String voidReason) { this.voidReason = voidReason; }
 }
+

@@ -1,6 +1,7 @@
 package com.sales.maidav.service.sale;
 
 import com.sales.maidav.model.sale.CreditAccount;
+import com.sales.maidav.model.sale.CreditPayment;
 import com.sales.maidav.model.sale.PaymentCollectionMethod;
 
 import java.math.BigDecimal;
@@ -15,9 +16,12 @@ public interface CreditAccountService {
     void registerPayment(Long accountId, BigDecimal amount, java.util.List<Long> installmentIds);
     void registerPayment(Long accountId, BigDecimal amount, java.util.List<Long> installmentIds, String registeredBy,
                          PaymentCollectionMethod paymentMethod);
+    CreditPayment registerPayment(Long accountId, BigDecimal amount, java.util.List<Long> installmentIds, String registeredBy,
+                                  PaymentCollectionMethod paymentMethod, String operationToken);
     void updatePayment(Long accountId, Long paymentId, BigDecimal amount, LocalDate paidAt,
                        PaymentCollectionMethod paymentMethod);
-    void updateInstallmentDueDate(Long accountId, Long installmentId, LocalDate dueDate);
+    void voidInstallment(Long accountId, Long installmentId, String voidedBy, String reason);
     long countMoroseClients();
     java.util.List<MorositySummary> getMorosity(MorosityLevel levelFilter);
 }
+

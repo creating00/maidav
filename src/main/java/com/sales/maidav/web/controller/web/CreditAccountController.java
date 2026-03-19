@@ -60,11 +60,11 @@ public class CreditAccountController {
         Map<Long, BigDecimal> currentInstallments = new HashMap<>();
         Map<Long, String> dueSchedules = new HashMap<>();
         for (CreditAccount account : accounts) {
-            BigDecimal currentAmount = creditInstallmentRepository
-                    .findFirstByAccount_IdAndStatusNotOrderByInstallmentNumberAsc(
-                            account.getId(),
-                            InstallmentStatus.PAID
-                    )
+            BigDecimal currentAmount = creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId()).stream()
+                    .filter(installment -> installment.getStatus() != InstallmentStatus.PAID)
+                    .filter(installment -> installment.getStatus() != InstallmentStatus.VOID)
+                    .filter(installment -> !installment.isVoided())
+                    .findFirst()
                     .map(installment -> remainingAmount(installment.getAmount(), installment.getPaidAmount()))
                     .orElse(null);
             currentInstallments.put(account.getId(), currentAmount);
@@ -96,7 +96,10 @@ public class CreditAccountController {
                     ? roundUpToFifty(remaining.divide(cashRecargo, 2, RoundingMode.HALF_UP))
                     : remaining;
             cashAmounts.put(installment.getId(), cashAmount);
-            if (currentInstallment == null && installment.getStatus() != InstallmentStatus.PAID) {
+            if (currentInstallment == null
+                    && installment.getStatus() != InstallmentStatus.PAID
+                    && installment.getStatus() != InstallmentStatus.VOID
+                    && !installment.isVoided()) {
                 currentInstallment = remaining;
             }
         }
@@ -207,15 +210,19 @@ public class CreditAccountController {
         return "redirect:/accounts/" + id;
     }
 
-    @PostMapping("/{id}/installments/{installmentId}/due-date")
-    @PreAuthorize("hasAuthority('ARREARS_UPDATE_DUE_DATE')")
-    public String updateDueDate(@PathVariable Long id,
-                                @PathVariable Long installmentId,
-                                @RequestParam LocalDate dueDate,
-                                RedirectAttributes redirectAttributes) {
+    @PostMapping("/{id}/installments/{installmentId}/void")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String voidInstallment(@PathVariable Long id,
+                                  @PathVariable Long installmentId,
+                                  @RequestParam(required = false) String reason,
+                                  Authentication authentication,
+                                  RedirectAttributes redirectAttributes) {
         try {
-            creditAccountService.updateInstallmentDueDate(id, installmentId, dueDate);
-            redirectAttributes.addFlashAttribute("successMessage", "Vencimiento actualizado correctamente");
+            String voidedBy = authentication != null ? authentication.getName() : null;
+            // ANULACION DE CUOTA
+            // AUDITORIA ANULACION
+            creditAccountService.voidInstallment(id, installmentId, voidedBy, reason);
+            redirectAttributes.addFlashAttribute("successMessage", "Cuota anulada correctamente");
         } catch (InvalidSaleException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
         }
@@ -402,7 +409,7 @@ public class CreditAccountController {
         long dueSoonDays = Long.MAX_VALUE;
 
         for (CreditInstallment installment : installments) {
-            if (installment.getStatus() == InstallmentStatus.PAID || installment.getDueDate() == null) {
+            if (installment.getStatus() == InstallmentStatus.PAID || installment.getStatus() == InstallmentStatus.VOID || installment.isVoided() || installment.getDueDate() == null) {
                 continue;
             }
             if (installment.getDueDate().isBefore(today)) {
@@ -599,3 +606,4 @@ public class CreditAccountController {
                                    String badgeLabel, String badgeClass, List<ClientAccountItemView> accounts) {}
     private record BulkPaymentEntry(Long accountId, BigDecimal amount) {}
 }
+
