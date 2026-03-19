@@ -1,5 +1,6 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:replace="layout/main :: layout(~{::content}, 'Producto')">
 
 <section th:fragment="content">
@@ -91,11 +92,13 @@
                             Generar codigo del sistema
                         </button>
                         <button type="button"
+                                sec:authorize="hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')"
                                 id="printBarcodeBtn"
                                 class="rounded border border-indigo-300 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50">
                             Ver etiqueta
                         </button>
                         <button type="button"
+                                sec:authorize="hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')"
                                 id="printBarcodeSheetBtn"
                                 class="rounded border border-fuchsia-300 px-3 py-2 text-sm text-fuchsia-700 hover:bg-fuchsia-50">
                             Hoja de etiquetas
@@ -537,3 +540,4 @@
 
 </section>
 </html>
+

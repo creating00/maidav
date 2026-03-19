@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:replace="layout/main :: layout(~{::content}, 'Productos')">
@@ -76,7 +76,7 @@
             <div>
                 <h2 class="text-base font-semibold text-sky-950">Escanear producto</h2>
                 <p class="text-sm text-sky-800">
-                    Desde el celular podés escanear el codigo de barras para ubicar el producto y ver stock, precio y financiacion.
+                    Desde el celular pod�s escanear el codigo de barras para ubicar el producto y ver stock, precio y financiacion.
                 </p>
             </div>
             <button type="button"
@@ -298,14 +298,16 @@
                                 th:attr="data-target='financing-' + ${product.id}">
                             Financiacion
                         </button>
-                        <a th:if="${product.barcode != null and #strings.length(product.barcode) == 13}"
+                        <a sec:authorize="hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')"
+                           th:if="${product.barcode != null and #strings.length(product.barcode) == 13}"
                            th:href="@{/products/barcode/label(barcode=${product.barcode},description=${product.description},productCode=${product.productCode})}"
                            target="_blank"
                            rel="noopener"
                            class="text-indigo-700 hover:underline">
                             Etiqueta
                         </a>
-                        <a th:if="${product.barcode != null and #strings.length(product.barcode) == 13}"
+                        <a sec:authorize="hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')"
+                           th:if="${product.barcode != null and #strings.length(product.barcode) == 13}"
                            th:href="@{/products/barcode/sheet(barcode=${product.barcode},description=${product.description},productCode=${product.productCode},copies=12)}"
                            target="_blank"
                            rel="noopener"
@@ -545,23 +547,23 @@
                 return [
                     (code ? code + ' - ' : '') + description,
                     '',
-                    '💰 OPCIONES DE PAGO',
+                    '?? OPCIONES DE PAGO',
                     '',
-                    '📅 Diaria ' + data.plans.DAILY.count + ' dias:',
+                    '?? Diaria ' + data.plans.DAILY.count + ' dias:',
                     money(data.plans.DAILY.fee) + ' financiado',
-                    '👉 Pagando la cuota en efectivo: ' + money(data.plans.DAILY.cashFee),
+                    '?? Pagando la cuota en efectivo: ' + money(data.plans.DAILY.cashFee),
                     '',
-                    '📆 Semanal ' + data.plans.WEEKLY.count + ' semanas:',
+                    '?? Semanal ' + data.plans.WEEKLY.count + ' semanas:',
                     money(data.plans.WEEKLY.fee) + ' financiado',
-                    '👉 Pagando la cuota en efectivo: ' + money(data.plans.WEEKLY.cashFee),
+                    '?? Pagando la cuota en efectivo: ' + money(data.plans.WEEKLY.cashFee),
                     '',
-                    '🗓 Mensual ' + data.plans.MONTHLY_SHORT.count + ' meses:',
+                    '?? Mensual ' + data.plans.MONTHLY_SHORT.count + ' meses:',
                     money(data.plans.MONTHLY_SHORT.fee) + ' financiado',
-                    '👉 Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_SHORT.cashFee),
+                    '?? Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_SHORT.cashFee),
                     '',
-                    '🗓 Mensual ' + data.plans.MONTHLY_LONG.count + ' meses:',
+                    '?? Mensual ' + data.plans.MONTHLY_LONG.count + ' meses:',
                     money(data.plans.MONTHLY_LONG.fee) + ' financiado',
-                    '👉 Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_LONG.cashFee)
+                    '?? Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_LONG.cashFee)
                 ].join('\n');
             }
 
@@ -667,7 +669,7 @@
 
             async function openProductScanner() {
                 if (!window.BarcodeDetector) {
-                    showLookupResult('Este navegador no soporta escaneo nativo. Probá con Chrome en Android.', true);
+                    showLookupResult('Este navegador no soporta escaneo nativo. Prob� con Chrome en Android.', true);
                     return;
                 }
                 try {
@@ -701,7 +703,7 @@
                         const row = resolveProductByBarcode(code);
                         closeProductScanner();
                         if (!row) {
-                            showLookupResult('No se encontró un producto con el codigo ' + code + '.', true);
+                            showLookupResult('No se encontr� un producto con el codigo ' + code + '.', true);
                             return;
                         }
                         showLookupResult('Producto encontrado: ' + (row.dataset.description || code), false);
@@ -914,10 +916,4 @@
 
 </section>
 </html>
-
-
-
-
-
-
 

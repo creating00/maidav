@@ -15,12 +15,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.web.bind.WebDataBinder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
 
 import java.io.IOException;
+import java.beans.PropertyEditorSupport;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +39,39 @@ import java.util.UUID;
 @RequestMapping("/products")
 @RequiredArgsConstructor
 public class ProductController {
+
+    @InitBinder
+    public void initBinder(WebDataBinder binder) {
+        // FIX COSTO PRODUCTO
+        binder.registerCustomEditor(BigDecimal.class, new PropertyEditorSupport() {
+            @Override
+            public void setAsText(String text) {
+                if (text == null) {
+                    setValue(null);
+                    return;
+                }
+                String normalized = text.trim().replace(" ", "");
+                if (normalized.isEmpty()) {
+                    setValue(null);
+                    return;
+                }
+                if (normalized.contains(",") && normalized.contains(".")) {
+                    if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+                        normalized = normalized.replace(".", "").replace(",", ".");
+                    } else {
+                        normalized = normalized.replace(",", "");
+                    }
+                } else if (normalized.contains(",")) {
+                    normalized = normalized.replace(",", ".");
+                }
+                try {
+                    setValue(new BigDecimal(normalized));
+                } catch (NumberFormatException ex) {
+                    setValue(null);
+                }
+            }
+        });
+    }
 
     private final ProductService productService;
     private final ProviderService providerService;
@@ -256,8 +292,9 @@ public class ProductController {
         return Map.of("barcode", productService.generateSystemBarcode());
     }
 
+    // RESTRICCION POR ROL
     @GetMapping(value = "/barcode/label", produces = MediaType.TEXT_HTML_VALUE)
-    @PreAuthorize("hasAuthority('PRODUCT_READ')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')")
     public String barcodeLabel(@RequestParam String barcode,
                                @RequestParam(required = false) String description,
                                @RequestParam(required = false) String productCode,
@@ -270,7 +307,7 @@ public class ProductController {
     }
 
     @GetMapping(value = "/barcode/sheet", produces = MediaType.TEXT_HTML_VALUE)
-    @PreAuthorize("hasAuthority('PRODUCT_READ')")
+    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')")
     public String barcodeSheet(@RequestParam String barcode,
                                @RequestParam(required = false) String description,
                                @RequestParam(required = false) String productCode,
@@ -303,3 +340,4 @@ public class ProductController {
         }
     }
 }
+
