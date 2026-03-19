@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="layout/main :: layout(~{::content}, 'Producto')">
 
@@ -9,7 +9,7 @@
             th:text="${product.id == null ? 'Nuevo Producto' : 'Editar Producto'}">
         </h1>
         <p class="text-gray-500 text-sm">
-            Precios sin IVA, el sistema recalcula automaticamente
+            Precios sin IVA, el sistema recalcula automaticamente y el codigo del producto se genera desde el sistema.
         </p>
     </div>
 
@@ -22,6 +22,30 @@
              class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700"
              th:text="${formError}">
         </div>
+
+        <div class="mb-6 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                <div>
+                    <p class="font-semibold text-slate-900">Codigo del producto</p>
+                    <p th:if="${product.id == null}">Se genera automaticamente al guardar el producto.</p>
+                    <p th:if="${product.id != null}">El codigo queda bloqueado para evitar cambios manuales y duplicados.</p>
+                </div>
+                <div class="grid gap-1 text-right text-xs text-slate-600">
+                    <span>
+                        Codigo actual:
+                        <strong class="text-sm text-slate-900" th:text="${product.productCode != null ? product.productCode : 'Se asignara automaticamente'}"></strong>
+                    </span>
+                    <span th:if="${product.id != null}">
+                        Creado: <strong th:text="${product.createdAt != null ? #temporals.format(product.createdAt, 'dd/MM/yyyy HH:mm') : '-'}"></strong>
+                    </span>
+                    <span th:if="${product.id != null}">
+                        Ultima actualizacion: <strong th:text="${product.updatedAt != null ? #temporals.format(product.updatedAt, 'dd/MM/yyyy HH:mm') : (product.createdAt != null ? #temporals.format(product.createdAt, 'dd/MM/yyyy HH:mm') : '-')}"></strong>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <input type="hidden" name="productCode" th:value="${product.productCode}"/>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -42,10 +66,9 @@
             <div>
                 <label class="block text-sm font-semibold mb-1">Codigo de producto</label>
                 <input type="text"
-                       name="productCode"
-                       th:value="${product.productCode}"
-                       required
-                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                       th:value="${product.productCode != null ? product.productCode : 'Se genera automaticamente al guardar'}"
+                       readonly
+                       class="w-full cursor-not-allowed rounded border border-slate-200 bg-slate-50 px-4 py-2 text-slate-600"/>
             </div>
 
             <div>
@@ -244,7 +267,7 @@
             <div class="flex items-center justify-between gap-3">
                 <div>
                     <h2 class="text-lg font-semibold text-slate-900">Escanear codigo de barras</h2>
-                    <p class="text-sm text-slate-500">Apuntá la camara al codigo del producto.</p>
+                    <p class="text-sm text-slate-500">Apunta la camara al codigo del producto.</p>
                 </div>
                 <button type="button" id="closeBarcodeScannerBtn" class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
                     Cerrar
@@ -384,7 +407,7 @@
             async function openScanner() {
                 if (!window.BarcodeDetector) {
                     if (barcodeScannerStatus) {
-                        barcodeScannerStatus.textContent = 'Este navegador no soporta escaneo nativo. Probá con Chrome en Android.';
+                        barcodeScannerStatus.textContent = 'Este navegador no soporta escaneo nativo. Proba con Chrome en Android.';
                     }
                     if (barcodeScannerModal) {
                         barcodeScannerModal.classList.remove('hidden');
@@ -461,10 +484,10 @@
                     return;
                 }
                 const description = encodeURIComponent(document.querySelector('input[name="description"]')?.value || '');
-                const productCode = encodeURIComponent(document.querySelector('input[name="productCode"]')?.value || '');
+                const productCodeValue = encodeURIComponent(document.querySelector('input[name="productCode"]')?.value || '');
                 let url = '/products/barcode/' + type + '?barcode=' + encodeURIComponent(barcode)
                     + '&description=' + description
-                    + '&productCode=' + productCode;
+                    + '&productCode=' + productCodeValue;
                 if (type === 'sheet') {
                     const copies = window.prompt('Cantidad de etiquetas a imprimir', '12');
                     if (copies === null) {

@@ -41,13 +41,7 @@ public class RoleController {
     @PreAuthorize("hasAuthority('ROLE_CREATE')")
     public String create(Role role,
                          @RequestParam(required = false) List<Long> permissionIds) {
-
-        if (permissionIds != null) {
-            role.setPermissions(
-                    new HashSet<>(permissionRepository.findAllById(permissionIds))
-            );
-        }
-
+        role.setPermissions(resolvePermissions(permissionIds));
         roleRepository.save(role);
         return "redirect:/roles";
     }
@@ -55,10 +49,8 @@ public class RoleController {
     @GetMapping("/{id}/edit")
     @PreAuthorize("hasAuthority('ROLE_UPDATE')")
     public String editForm(@PathVariable Long id, Model model) {
-
         model.addAttribute("role", roleRepository.findWithPermissionsById(id).orElseThrow());
         model.addAttribute("permissions", permissionRepository.findAll());
-
         return "pages/roles/form";
     }
 
@@ -67,31 +59,28 @@ public class RoleController {
     public String update(@PathVariable Long id,
                          Role data,
                          @RequestParam(required = false) List<Long> permissionIds) {
-
         Role role = roleRepository.findWithPermissionsById(id)
                 .orElseThrow(() -> new RuntimeException("Rol no encontrado"));
 
         role.setName(data.getName());
-
-        if (permissionIds != null) {
-            Set<Permission> actuales = role.getPermissions();
-            Set<Permission> nuevos = new HashSet<>(
-                    permissionRepository.findAllById(permissionIds)
-            );
-
-            actuales.addAll(nuevos); // 🔥 MERGE, no replace
-        }
+        role.getPermissions().clear();
+        role.getPermissions().addAll(resolvePermissions(permissionIds));
 
         roleRepository.save(role);
         return "redirect:/roles";
     }
-
-
 
     @PostMapping("/{id}/delete")
     @PreAuthorize("hasAuthority('ROLE_DELETE')")
     public String delete(@PathVariable Long id) {
         roleRepository.deleteById(id);
         return "redirect:/roles";
+    }
+
+    private Set<Permission> resolvePermissions(List<Long> permissionIds) {
+        if (permissionIds == null || permissionIds.isEmpty()) {
+            return new HashSet<>();
+        }
+        return new HashSet<>(permissionRepository.findAllById(permissionIds));
     }
 }

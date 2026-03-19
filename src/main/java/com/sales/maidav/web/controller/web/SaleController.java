@@ -101,7 +101,6 @@ public class SaleController {
                          @RequestParam(required = false) String weeklyDay,
                          @RequestParam(required = false) Integer biMonthlyDay1,
                          @RequestParam(required = false) Integer biMonthlyDay2,
-                         @RequestParam(required = false) Integer monthlyDay,
                          @RequestParam(required = false) BigDecimal discountAmount,
                          @RequestParam(required = false) Integer weeksCount,
                          @RequestParam(name = "productIds") List<Long> productIds,
@@ -122,7 +121,7 @@ public class SaleController {
             Client client = resolveClient(clientId, seller, quickClientNationalId, quickClientFirstName,
                     quickClientLastName, quickClientPhone, quickClientAddress);
             List<SaleItemInput> items = buildItems(productIds, quantities, unitPrices);
-            List<String> dueDays = resolveDueDays(paymentFrequency, dailyDays, weeklyDay, biMonthlyDay1, biMonthlyDay2, monthlyDay, firstDueDate);
+            List<String> dueDays = resolveDueDays(paymentFrequency, dailyDays, weeklyDay, biMonthlyDay1, biMonthlyDay2, firstDueDate);
 
             Sale sale = saleService.createSale(client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
                     discountAmount, weeksCount, items);
@@ -228,7 +227,6 @@ public class SaleController {
                                         String weeklyDay,
                                         Integer biMonthlyDay1,
                                         Integer biMonthlyDay2,
-                                        Integer monthlyDay,
                                         LocalDate firstDueDate) {
         List<String> dueDays = new ArrayList<>();
         if (paymentFrequency == null) {
@@ -263,9 +261,7 @@ public class SaleController {
                 }
             }
             case MONTHLY -> {
-                if (monthlyDay != null) {
-                    dueDays.add(String.valueOf(monthlyDay));
-                } else if (firstDueDate != null) {
+                if (firstDueDate != null) {
                     dueDays.add(String.valueOf(normalizeDayOfMonth(firstDueDate.getDayOfMonth())));
                 }
             }

@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -46,6 +47,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product create(Product product) {
+        if (product.getProductCode() == null || product.getProductCode().isBlank()) {
+            product.setProductCode(generateUniqueProductCode());
+        }
         validate(product);
         ensureUniqueCode(product.getProvider().getId(), product.getProductCode(), null);
         recalcPrices(product);
@@ -54,11 +58,14 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public Product update(Long id, Product data) {
+        Product product = findById(id);
+        String preservedProductCode = (product.getProductCode() == null || product.getProductCode().isBlank())
+                ? generateUniqueProductCode()
+                : product.getProductCode();
         data.setId(id);
+        data.setProductCode(preservedProductCode);
         validate(data);
         ensureUniqueCode(data.getProvider().getId(), data.getProductCode(), id);
-
-        Product product = findById(id);
         PriceSnapshot before = PriceSnapshot.from(product);
         product.setProvider(data.getProvider());
         product.setProductCode(data.getProductCode());
@@ -264,6 +271,23 @@ public class ProductServiceImpl implements ProductService {
         if (exists) {
             throw new DuplicateProductCodeException("Codigo ya existente para ese proveedor");
         }
+    }
+
+    private String generateUniqueProductCode() {
+        for (int attempt = 0; attempt < 40; attempt++) {
+            String timePart = Long.toString(System.currentTimeMillis(), 36).toUpperCase(Locale.ROOT);
+            if (timePart.length() > 6) {
+                timePart = timePart.substring(timePart.length() - 6);
+            }
+            String randomPart = Integer.toString(ThreadLocalRandom.current().nextInt(36 * 36 * 36), 36)
+                    .toUpperCase(Locale.ROOT);
+            randomPart = String.format(Locale.ROOT, "%3s", randomPart).replace(' ', '0');
+            String candidate = "PRD-" + timePart + randomPart;
+            if (!productRepository.existsByProductCode(candidate)) {
+                return candidate;
+            }
+        }
+        throw new InvalidProductException("No se pudo generar un codigo de producto unico");
     }
 
     private void validate(Product product) {

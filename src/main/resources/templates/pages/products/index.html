@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
       th:replace="layout/main :: layout(~{::content}, 'Productos')">
@@ -38,19 +38,37 @@
         <a th:href="@{/products}" class="text-sm text-amber-900 hover:underline">Ver todos</a>
     </div>
 
-    <form method="get" th:action="@{/products}" class="mb-4 flex flex-wrap gap-2 items-end">
-        <input type="text" name="q" th:value="${q}" placeholder="Buscar por codigo, barra, descripcion o proveedor"
-               class="w-full md:w-96 border rounded px-4 py-2"/>
-        <select name="providerId"
-                class="border rounded px-4 py-2">
-            <option value="">Todos los proveedores</option>
-            <option th:each="provider : ${providers}"
-                    th:value="${provider.id}"
-                    th:selected="${providerId != null and provider.id == providerId}"
-                    th:text="${provider.name}">
-            </option>
-        </select>
-        <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
+    <form method="get" th:action="@{/products}" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div class="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(180px,1fr)_minmax(220px,1fr)_auto_auto] lg:items-end">
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Buscar</label>
+                <input type="text" name="q" th:value="${q}" placeholder="Codigo, barra, descripcion o proveedor"
+                       class="w-full rounded border px-4 py-2"/>
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Proveedor</label>
+                <select name="providerId" class="w-full rounded border px-4 py-2">
+                    <option value="">Todos los proveedores</option>
+                    <option th:each="provider : ${providers}"
+                            th:value="${provider.id}"
+                            th:selected="${providerId != null and provider.id == providerId}"
+                            th:text="${provider.name}">
+                    </option>
+                </select>
+            </div>
+            <div>
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Ultima actualizacion</label>
+                <select name="updateAgeFilter" class="w-full rounded border px-4 py-2">
+                    <option value="" th:selected="${updateAgeFilter == null or updateAgeFilter == ''}">Todas</option>
+                    <option value="RECENT_15" th:selected="${updateAgeFilter == 'RECENT_15'}">Actualizados en 15 dias</option>
+                    <option value="RECENT_30" th:selected="${updateAgeFilter == 'RECENT_30'}">Actualizados en 30 dias</option>
+                    <option value="STALE_30" th:selected="${updateAgeFilter == 'STALE_30'}">No actualizados en 30 dias</option>
+                    <option value="STALE_60" th:selected="${updateAgeFilter == 'STALE_60'}">No actualizados en 60 dias</option>
+                </select>
+            </div>
+            <button class="rounded border border-gray-300 px-4 py-2 hover:bg-gray-100">Buscar</button>
+            <a th:href="@{/products}" class="rounded border border-slate-200 px-4 py-2 text-center text-slate-600 hover:bg-slate-50">Limpiar</a>
+        </div>
     </form>
 
     <div class="mb-4 rounded-xl border border-sky-200 bg-sky-50 p-4">
@@ -223,10 +241,11 @@
             <thead class="bg-gray-100 text-left">
             <tr>
                 <th class="px-4 py-3">Imagen</th>
+                <th class="px-4 py-3">Descripcion</th>
                 <th class="px-4 py-3">Proveedor</th>
                 <th class="px-4 py-3">Codigo</th>
                 <th class="px-4 py-3">Codigo barra</th>
-                <th class="px-4 py-3">Descripcion</th>
+                <th class="px-4 py-3">Ultima actualizacion</th>
                 <th class="px-4 py-3">Stock</th>
                 <th class="px-4 py-3">Mayorista</th>
                 <th class="px-4 py-3">Minorista</th>
@@ -237,20 +256,31 @@
             <tbody>
             <th:block th:each="product : ${products}">
                 <tr class="border-t hover:bg-gray-50 product-row"
-                    th:attr="data-product-id=${product.id},data-barcode=${product.barcode},data-description=${product.description}"
+                    th:attr="data-product-id=${product.id},data-barcode=${product.barcode},data-description=${product.description},data-image=${product.imagePath}"
                     th:classappend="${focusProductId != null and product.id == focusProductId} ? ' bg-amber-50' : ''">
-                    <td class="px-4 py-3">
-                        <img th:if="${product.imagePath}"
-                             th:src="${product.imagePath}"
-                             alt="Imagen"
-                             class="h-10 w-10 rounded object-cover border"/>
-                        <span th:if="${product.imagePath == null}" class="text-xs text-gray-500">-</span>
+                    <td class="px-4 py-3 align-top">
+                        <button type="button"
+                                th:if="${product.imagePath}"
+                                class="product-image-trigger overflow-hidden rounded-xl border border-slate-200"
+                                th:attr="data-image=${product.imagePath},data-description=${product.description}">
+                            <img th:src="${product.imagePath}"
+                                 alt="Imagen"
+                                 class="h-16 w-16 object-cover"/>
+                        </button>
+                        <span th:if="${product.imagePath == null}" class="text-xs text-gray-500">Sin imagen</span>
                     </td>
-                    <td class="px-4 py-3" th:text="${product.provider.name}"></td>
-                    <td class="px-4 py-3" th:text="${product.productCode}"></td>
-                    <td class="px-4 py-3" th:text="${product.barcode}"></td>
-                    <td class="px-4 py-3" th:text="${product.description}"></td>
-                    <td class="px-4 py-3">
+                    <td class="px-4 py-3 align-top">
+                        <div class="max-w-sm">
+                            <p class="font-semibold text-slate-900" th:text="${product.description}"></p>
+                            <p class="mt-1 text-xs text-slate-500">La imagen se muestra primero para ubicar mejor el producto en celular.</p>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3 align-top" th:text="${product.provider != null ? product.provider.name : '-'}"></td>
+                    <td class="px-4 py-3 align-top" th:text="${product.productCode}"></td>
+                    <td class="px-4 py-3 align-top" th:text="${product.barcode != null and !product.barcode.isBlank() ? product.barcode : '-'}"></td>
+                    <td class="px-4 py-3 align-top text-xs text-slate-700"
+                        th:text="${product.updatedAt != null ? #temporals.format(product.updatedAt, 'dd/MM/yyyy HH:mm') : (product.createdAt != null ? #temporals.format(product.createdAt, 'dd/MM/yyyy HH:mm') : '-')}"></td>
+                    <td class="px-4 py-3 align-top">
                         <div class="flex flex-col">
                             <span th:text="${product.stockAvailable}"></span>
                             <span th:if="${product.stockAvailable <= product.stockMin}"
@@ -259,10 +289,10 @@
                             </span>
                         </div>
                     </td>
-                    <td class="px-4 py-3" th:text="${product.priceWholesale}"></td>
-                    <td class="px-4 py-3" th:text="${product.priceRetail}"></td>
-                    <td class="px-4 py-3" th:text="${#numbers.formatDecimal(product.vatRate,1,2) + '%'}"></td>
-                    <td class="px-4 py-3 text-right space-x-2">
+                    <td class="px-4 py-3 align-top" th:text="${product.priceWholesale}"></td>
+                    <td class="px-4 py-3 align-top" th:text="${product.priceRetail}"></td>
+                    <td class="px-4 py-3 align-top" th:text="${#numbers.formatDecimal(product.vatRate,1,2) + '%'}"></td>
+                    <td class="px-4 py-3 align-top text-right space-x-2">
                         <button type="button"
                                 class="toggle-financing-btn text-emerald-700 hover:underline"
                                 th:attr="data-target='financing-' + ${product.id}">
@@ -298,7 +328,7 @@
                 </tr>
                 <tr class="hidden financing-row border-t bg-slate-50"
                     th:id="${'financing-' + product.id}">
-                    <td colspan="10" class="px-4 py-4">
+                    <td colspan="11" class="px-4 py-4">
                         <div class="rounded-lg border border-slate-200 bg-white p-4 financing-panel"
                              th:attr="data-base=${product.cost * (100 + product.vatRate) / 100},
                                       data-code=${product.productCode},
@@ -374,12 +404,29 @@
             </th:block>
 
             <tr th:if="${#lists.isEmpty(products)}">
-                <td colspan="10" class="px-4 py-6 text-center text-gray-500">
+                <td colspan="11" class="px-4 py-6 text-center text-gray-500">
                     No hay productos registrados
                 </td>
             </tr>
             </tbody>
         </table>
+    </div>
+
+    <div id="productImageModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 px-4">
+        <div class="w-full max-w-3xl rounded-2xl bg-white p-4 shadow-2xl">
+            <div class="mb-3 flex items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-900">Imagen del producto</h2>
+                    <p id="productImageCaption" class="text-sm text-slate-500">Detalle ampliado</p>
+                </div>
+                <button type="button" id="closeProductImageModal" class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                    Cerrar
+                </button>
+            </div>
+            <div class="overflow-hidden rounded-2xl bg-slate-100">
+                <img id="productImageModalContent" src="" alt="Imagen ampliada" class="max-h-[75vh] w-full object-contain"/>
+            </div>
+        </div>
     </div>
 
     <div id="productScanModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/80 px-4">
@@ -410,6 +457,10 @@
             const productScanStatus = document.getElementById('productScanStatus');
             const scanLookupResult = document.getElementById('scanLookupResult');
             const productRows = Array.from(document.querySelectorAll('.product-row'));
+            const productImageModal = document.getElementById('productImageModal');
+            const closeProductImageModal = document.getElementById('closeProductImageModal');
+            const productImageModalContent = document.getElementById('productImageModalContent');
+            const productImageCaption = document.getElementById('productImageCaption');
             let productScanStream = null;
             let productScanInterval = null;
 
@@ -553,6 +604,32 @@
                 panel.dataset.whatsappText = buildWhatsAppText(panel, data);
             }
 
+            function openImageModal(image, description) {
+                if (!productImageModal || !productImageModalContent) {
+                    return;
+                }
+                productImageModalContent.src = image || '';
+                productImageModalContent.alt = description || 'Imagen del producto';
+                if (productImageCaption) {
+                    productImageCaption.textContent = description || 'Imagen ampliada';
+                }
+                productImageModal.classList.remove('hidden');
+                productImageModal.classList.add('flex');
+                document.body.classList.add('overflow-hidden');
+            }
+
+            function closeImageModal() {
+                if (!productImageModal) {
+                    return;
+                }
+                productImageModal.classList.add('hidden');
+                productImageModal.classList.remove('flex');
+                document.body.classList.remove('overflow-hidden');
+                if (productImageModalContent) {
+                    productImageModalContent.src = '';
+                }
+            }
+
             function openFinancingRowByProductId(productId) {
                 const row = document.querySelector('.product-row[data-product-id="' + productId + '"]');
                 if (!row) {
@@ -675,6 +752,12 @@
                 });
             });
 
+            document.querySelectorAll('.product-image-trigger').forEach(button => {
+                button.addEventListener('click', function () {
+                    openImageModal(button.dataset.image || '', button.dataset.description || 'Imagen del producto');
+                });
+            });
+
             document.querySelectorAll('.copy-financing-btn').forEach(button => {
                 button.addEventListener('click', async function () {
                     const panel = button.closest('.financing-panel');
@@ -708,6 +791,16 @@
                 productScanModal.addEventListener('click', function (event) {
                     if (event.target === productScanModal) {
                         closeProductScanner();
+                    }
+                });
+            }
+            if (closeProductImageModal) {
+                closeProductImageModal.addEventListener('click', closeImageModal);
+            }
+            if (productImageModal) {
+                productImageModal.addEventListener('click', function (event) {
+                    if (event.target === productImageModal) {
+                        closeImageModal();
                     }
                 });
             }
@@ -812,6 +905,7 @@
             document.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape') {
                     closeHistoryPanel();
+                    closeImageModal();
                 }
             });
             renderHistoryRows();
@@ -820,3 +914,10 @@
 
 </section>
 </html>
+
+
+
+
+
+
+

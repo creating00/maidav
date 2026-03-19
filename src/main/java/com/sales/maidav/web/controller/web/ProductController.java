@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -47,6 +48,7 @@ public class ProductController {
     public String list(@RequestParam(required = false) Boolean lowStock,
                        @RequestParam(required = false) String q,
                        @RequestParam(required = false) Long providerId,
+                       @RequestParam(required = false) String updateAgeFilter,
                        @RequestParam(required = false) Long productId,
                        Model model) {
         List<Product> products;
@@ -70,8 +72,10 @@ public class ProductController {
                             || (p.getProvider() != null && contains(p.getProvider().getName(), term)))
                     .toList();
         }
+        products = filterByUpdateAge(products, updateAgeFilter);
         model.addAttribute("q", q);
         model.addAttribute("providerId", providerId);
+        model.addAttribute("updateAgeFilter", updateAgeFilter);
         model.addAttribute("products", products);
         model.addAttribute("providers", providerService.findAll());
         model.addAttribute("adjustmentTypes", PriceAdjustmentType.values());
@@ -83,6 +87,35 @@ public class ProductController {
         model.addAttribute("focusProductId", productId);
         model.addAttribute("calculatorConfig", buildCalculatorConfig());
         return "pages/products/index";
+    }
+
+    private List<Product> filterByUpdateAge(List<Product> products, String updateAgeFilter) {
+        if (products == null || products.isEmpty() || updateAgeFilter == null || updateAgeFilter.isBlank()) {
+            return products;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        return switch (updateAgeFilter.trim().toUpperCase(Locale.ROOT)) {
+            case "RECENT_15" -> products.stream()
+                    .filter(product -> lastUpdatedAt(product).isAfter(now.minusDays(15)))
+                    .toList();
+            case "RECENT_30" -> products.stream()
+                    .filter(product -> lastUpdatedAt(product).isAfter(now.minusDays(30)))
+                    .toList();
+            case "STALE_30" -> products.stream()
+                    .filter(product -> !lastUpdatedAt(product).isAfter(now.minusDays(30)))
+                    .toList();
+            case "STALE_60" -> products.stream()
+                    .filter(product -> !lastUpdatedAt(product).isAfter(now.minusDays(60)))
+                    .toList();
+            default -> products;
+        };
+    }
+
+    private LocalDateTime lastUpdatedAt(Product product) {
+        if (product == null) {
+            return LocalDateTime.MIN;
+        }
+        return product.getUpdatedAt() != null ? product.getUpdatedAt() : product.getCreatedAt();
     }
 
     private boolean contains(String value, String term) {

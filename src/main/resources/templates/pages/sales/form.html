@@ -147,7 +147,7 @@
 
             <div class="credit-field md:col-span-3">
                 <div class="mb-6 rounded-xl border border-blue-100 bg-blue-50/60 p-5">
-                    <h3 class="text-base font-semibold text-blue-900 mb-4">Opciones automáticas de cobro</h3>
+                    <h3 class="text-base font-semibold text-blue-900 mb-4">Opciones automÃƒÂ¡ticas de cobro</h3>
                     <p class="text-sm text-gray-600 mb-4">
                         Valores configurados por administracion. Seleccione la opcion y el sistema completa la financiacion automaticamente.
                     </p>
@@ -292,9 +292,7 @@
                     </div>
                 </div>
 
-                <div id="monthlyOptions" class="hidden">
-                    <input type="hidden" name="monthlyDay"/>
-                </div>
+
             </div>
         </div>
 
@@ -313,7 +311,7 @@
                 </button>
             </div>
             <p class="mb-3 text-xs text-gray-600">
-                Escanee o escriba el codigo y presione Enter para agregar el producto automaticamente al carrito.
+                Escanee o escriba el codigo y presione Enter para previsualizar el producto antes de agregarlo al carrito.
             </p>
             <div id="barcodeScannerPanel" class="hidden mb-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
                 <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -328,6 +326,64 @@
             </div>
             <div id="productActionToast"
                  class="pointer-events-none fixed right-4 top-4 z-50 hidden max-w-sm rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-opacity duration-200">
+            </div>
+            <div id="productPreviewModal"
+                 class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-900/75 px-4 pb-4 pt-8 md:items-center">
+                <div class="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl">
+                    <div class="border-b border-slate-200 px-5 py-4">
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" id="productPreviewSource">Previsualizacion</p>
+                        <h3 class="mt-1 text-xl font-semibold text-slate-900" id="productPreviewTitle">Producto detectado</h3>
+                        <p class="mt-1 text-sm text-slate-600" id="productPreviewMessage">Revise el producto antes de agregarlo.</p>
+                    </div>
+                    <div class="space-y-4 px-5 py-5">
+                        <div class="overflow-hidden rounded-2xl bg-slate-100">
+                            <img id="productPreviewImage"
+                                 src=""
+                                 alt="Vista previa del producto"
+                                 class="hidden h-72 w-full object-cover"/>
+                            <div id="productPreviewImagePlaceholder"
+                                 class="flex h-48 items-center justify-center text-sm text-slate-500">
+                                Sin imagen
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-lg font-semibold text-slate-900" id="productPreviewDescription">-</p>
+                            <div class="mt-2 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-3">
+                                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                    <span class="block text-xs uppercase tracking-wide text-slate-500">Codigo</span>
+                                    <strong id="productPreviewCode" class="text-slate-900">-</strong>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                    <span class="block text-xs uppercase tracking-wide text-slate-500">Precio</span>
+                                    <strong id="productPreviewPrice" class="text-slate-900">$0.00</strong>
+                                </div>
+                                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                                    <span class="block text-xs uppercase tracking-wide text-slate-500">Stock</span>
+                                    <strong id="productPreviewStock" class="text-slate-900">-</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col gap-3 border-t border-slate-200 px-5 py-4">
+                        <button type="button"
+                                id="confirmAddProductBtn"
+                                class="rounded-2xl bg-blue-600 px-4 py-3 text-base font-semibold text-white hover:bg-blue-700">
+                            Agregar producto
+                        </button>
+                        <div id="productPreviewAfterActions" class="hidden grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <button type="button"
+                                    id="continueAfterAddBtn"
+                                    class="rounded-2xl border border-emerald-300 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
+                                Seguir escaneando
+                            </button>
+                            <button type="button"
+                                    id="closeProductPreviewBtn"
+                                    class="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                                Volver a la venta
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
             <table class="min-w-full text-sm" id="itemsTable">
                 <thead class="bg-gray-100 text-left">
@@ -351,6 +407,9 @@
                                     th:data-cost-vat="${product.cost * (100 + product.vatRate) / 100}"
                                     th:data-barcode="${product.barcode}"
                                     th:data-product-code="${product.productCode}"
+                                    th:data-description="${product.description}"
+                                    th:data-image="${product.imagePath}"
+                                    th:data-stock="${product.stockAvailable}"
                                     th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
                             </option>
                         </select>
@@ -478,7 +537,6 @@
             const dailyOptions = document.getElementById('dailyOptions');
             const weeklyOptions = document.getElementById('weeklyOptions');
             const biweeklyOptions = document.getElementById('biweeklyOptions');
-            const monthlyOptions = document.getElementById('monthlyOptions');
             const saleNumberBadge = document.getElementById('saleNumberBadge');
             const saleNumberHelp = document.getElementById('saleNumberHelp');
             const saleForm = document.getElementById('saleForm');
@@ -499,11 +557,24 @@
             const weeklyDaySelect = document.querySelector('select[name="weeklyDay"]');
             const biMonthlyDay1Input = document.querySelector('input[name="biMonthlyDay1"]');
             const biMonthlyDay2Input = document.querySelector('input[name="biMonthlyDay2"]');
-            const monthlyDayInput = document.querySelector('input[name="monthlyDay"]');
             const saleConfirmModal = document.getElementById('saleConfirmModal');
             const confirmItemsBody = document.getElementById('confirmItemsBody');
             const confirmBackBtn = document.getElementById('confirmBackBtn');
             const confirmSaveBtn = document.getElementById('confirmSaveBtn');
+            const productPreviewModal = document.getElementById('productPreviewModal');
+            const productPreviewSource = document.getElementById('productPreviewSource');
+            const productPreviewTitle = document.getElementById('productPreviewTitle');
+            const productPreviewMessage = document.getElementById('productPreviewMessage');
+            const productPreviewImage = document.getElementById('productPreviewImage');
+            const productPreviewImagePlaceholder = document.getElementById('productPreviewImagePlaceholder');
+            const productPreviewDescription = document.getElementById('productPreviewDescription');
+            const productPreviewCode = document.getElementById('productPreviewCode');
+            const productPreviewPrice = document.getElementById('productPreviewPrice');
+            const productPreviewStock = document.getElementById('productPreviewStock');
+            const confirmAddProductBtn = document.getElementById('confirmAddProductBtn');
+            const continueAfterAddBtn = document.getElementById('continueAfterAddBtn');
+            const closeProductPreviewBtn = document.getElementById('closeProductPreviewBtn');
+            const productPreviewAfterActions = document.getElementById('productPreviewAfterActions');
             let barcodeScannerStream = null;
             let barcodeScanFrame = null;
             let barcodeDetector = null;
@@ -512,6 +583,9 @@
             let lastScannedAt = 0;
             let productActionToastTimer = null;
             let confirmedSubmit = false;
+            let pendingProductOption = null;
+            let pendingProductSource = 'manual';
+            let productPreviewAudioContext = null;
 
             function parseNumber(value) {
                 const num = parseFloat(value);
@@ -766,6 +840,139 @@
                 }, 2400);
             }
 
+            function playProductPreviewSound() {
+                try {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioCtx) {
+                        return;
+                    }
+                    if (!productPreviewAudioContext) {
+                        productPreviewAudioContext = new AudioCtx();
+                    }
+                    const now = productPreviewAudioContext.currentTime;
+                    const oscillator = productPreviewAudioContext.createOscillator();
+                    const gain = productPreviewAudioContext.createGain();
+                    oscillator.type = 'triangle';
+                    oscillator.frequency.setValueAtTime(880, now);
+                    oscillator.frequency.exponentialRampToValueAtTime(1320, now + 0.08);
+                    gain.gain.setValueAtTime(0.0001, now);
+                    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.16);
+                    oscillator.connect(gain);
+                    gain.connect(productPreviewAudioContext.destination);
+                    oscillator.start(now);
+                    oscillator.stop(now + 0.18);
+                } catch (error) {
+                    // Si el navegador bloquea audio, continuamos sin interrumpir el flujo.
+                }
+            }
+
+            function getProductDetails(option) {
+                if (!option) {
+                    return {
+                        code: '',
+                        description: '',
+                        image: '',
+                        stock: '-',
+                        price: ''
+                    };
+                }
+                return {
+                    code: (option.dataset.productCode || option.dataset.barcode || '').trim(),
+                    description: (option.dataset.description || option.textContent || '').trim(),
+                    image: (option.dataset.image || '').trim(),
+                    stock: option.dataset.stock || '-',
+                    price: getPriceFromOption(option)
+                };
+            }
+
+            function resetProductPreviewState() {
+                if (productPreviewTitle) {
+                    productPreviewTitle.textContent = 'Producto detectado';
+                }
+                if (productPreviewMessage) {
+                    productPreviewMessage.textContent = 'Revise el producto antes de agregarlo.';
+                }
+                if (confirmAddProductBtn) {
+                    confirmAddProductBtn.classList.remove('hidden');
+                    confirmAddProductBtn.disabled = false;
+                }
+                if (productPreviewAfterActions) {
+                    productPreviewAfterActions.classList.add('hidden');
+                }
+            }
+
+            function openProductPreview(option, source) {
+                if (!productPreviewModal || !option) {
+                    return false;
+                }
+                pendingProductOption = option;
+                pendingProductSource = source || 'manual';
+                const details = getProductDetails(option);
+
+                if (productPreviewSource) {
+                    productPreviewSource.textContent = pendingProductSource === 'scanner' ? 'Lectura por camara' : 'Carga manual';
+                }
+                if (productPreviewDescription) {
+                    productPreviewDescription.textContent = details.description || '-';
+                }
+                if (productPreviewCode) {
+                    productPreviewCode.textContent = details.code || '-';
+                }
+                if (productPreviewPrice) {
+                    productPreviewPrice.textContent = money(details.price || 0);
+                }
+                if (productPreviewStock) {
+                    productPreviewStock.textContent = details.stock || '-';
+                }
+                if (productPreviewImage && details.image) {
+                    productPreviewImage.src = details.image;
+                    productPreviewImage.classList.remove('hidden');
+                    if (productPreviewImagePlaceholder) {
+                        productPreviewImagePlaceholder.classList.add('hidden');
+                    }
+                } else {
+                    if (productPreviewImage) {
+                        productPreviewImage.src = '';
+                        productPreviewImage.classList.add('hidden');
+                    }
+                    if (productPreviewImagePlaceholder) {
+                        productPreviewImagePlaceholder.classList.remove('hidden');
+                    }
+                }
+
+                if (productSearch) {
+                    productSearch.blur();
+                }
+                resetProductPreviewState();
+                productPreviewModal.classList.remove('hidden');
+                productPreviewModal.classList.add('flex');
+                playProductPreviewSound();
+                return true;
+            }
+
+            function closeProductPreview() {
+                pendingProductOption = null;
+                if (!productPreviewModal) {
+                    return;
+                }
+                productPreviewModal.classList.remove('flex');
+                productPreviewModal.classList.add('hidden');
+            }
+
+            function continueAfterProductAdd() {
+                closeProductPreview();
+                if (pendingProductSource === 'scanner') {
+                    startBarcodeScanner();
+                    return;
+                }
+                if (productSearch) {
+                    productSearch.value = '';
+                    applyProductSearchFilter('');
+                    productSearch.focus();
+                }
+            }
+
             function getProductTemplateSelect() {
                 if (firstRowTemplate) {
                     const templateSelect = firstRowTemplate.querySelector('.product-select');
@@ -894,11 +1101,30 @@
                 return true;
             }
 
-            function handleProductCodeSubmit(rawTerm) {
+            function handleProductCodeSubmit(rawTerm, source) {
                 const matchedOption = findProductOptionByCode(rawTerm);
                 if (!matchedOption) {
                     setBarcodeStatus('No se encontro un producto con ese codigo.', true);
                     showProductToast('No se encontro un producto con ese codigo.', true);
+                    return false;
+                }
+                if (source === 'scanner') {
+                    stopBarcodeScanner();
+                }
+                const previewOpened = openProductPreview(matchedOption, source || 'manual');
+                if (!previewOpened) {
+                    setBarcodeStatus('No se pudo preparar la vista previa del producto.', true);
+                    showProductToast('No se pudo preparar la vista previa del producto.', true);
+                    return false;
+                }
+                const productLabel = ((matchedOption.dataset.productCode || matchedOption.dataset.barcode || '').trim());
+                setBarcodeStatus('Producto listo para agregar: ' + productLabel, false);
+                return true;
+            }
+
+            function confirmPendingProductAdd() {
+                const matchedOption = pendingProductOption;
+                if (!matchedOption) {
                     return false;
                 }
                 const added = addProductOptionToCart(matchedOption);
@@ -913,7 +1139,24 @@
                 if (productSearch) {
                     productSearch.value = '';
                     applyProductSearchFilter('');
-                    productSearch.focus();
+                }
+                if (productPreviewTitle) {
+                    productPreviewTitle.textContent = 'Producto agregado';
+                }
+                if (productPreviewMessage) {
+                    productPreviewMessage.textContent = 'Ahora puede seguir escaneando o volver a la venta.';
+                }
+                if (confirmAddProductBtn) {
+                    confirmAddProductBtn.classList.add('hidden');
+                }
+                if (productPreviewAfterActions) {
+                    productPreviewAfterActions.classList.remove('hidden');
+                }
+                if (continueAfterAddBtn) {
+                    continueAfterAddBtn.textContent = pendingProductSource === 'scanner' ? 'Seguir escaneando' : 'Seguir cargando';
+                }
+                if (closeProductPreviewBtn) {
+                    closeProductPreviewBtn.textContent = 'Volver a la venta';
                 }
                 return true;
             }
@@ -958,12 +1201,12 @@
                             return;
                         }
                         const now = Date.now();
-                        if (rawValue === lastScannedCode && (now - lastScannedAt) < 1500) {
+                        if (rawValue === lastScannedCode && (now - lastScannedAt) < 2500) {
                             return;
                         }
                         lastScannedCode = rawValue;
                         lastScannedAt = now;
-                        handleProductCodeSubmit(rawValue);
+                        handleProductCodeSubmit(rawValue, 'scanner');
                     })
                     .catch(() => {
                         setBarcodeStatus('No se pudo leer el codigo. Intente acercar mas la camara.', true);
@@ -1066,10 +1309,6 @@
                 } else if (planKey === 'WEEKLY') {
                     if (weeklyDaySelect) {
                         weeklyDaySelect.value = dayName(dueDate);
-                    }
-                } else {
-                    if (monthlyDayInput) {
-                        monthlyDayInput.value = String(Math.min(28, dueDate.getDate()));
                     }
                 }
 
@@ -1217,9 +1456,6 @@
                 dailyOptions.classList.add('hidden');
                 weeklyOptions.classList.toggle('hidden', freq !== 'WEEKLY');
                 biweeklyOptions.classList.toggle('hidden', freq !== 'BIWEEKLY');
-                if (monthlyOptions) {
-                    monthlyOptions.classList.add('hidden');
-                }
 
                 if (freq === 'BIWEEKLY') {
                     if (biMonthlyDay1Input && !biMonthlyDay1Input.value) {
@@ -1253,13 +1489,6 @@
                 if (biMonthlyDay2Input) {
                     biMonthlyDay2Input.required = freq === 'BIWEEKLY';
                 }
-                if (monthlyDayInput) {
-                    monthlyDayInput.required = false;
-                    if (freq === 'MONTHLY' && firstDueDateInput && firstDueDateInput.value) {
-                        const dueDate = toDateOnly(firstDueDateInput.value);
-                        monthlyDayInput.value = String(Math.min(28, dueDate.getDate()));
-                    }
-                }
             }
 
             if (clientSearch && clientSelect) {
@@ -1291,7 +1520,7 @@
                     if (!term) {
                         return;
                     }
-                    handleProductCodeSubmit(term);
+                    handleProductCodeSubmit(term, 'manual');
                 });
             }
 
@@ -1322,6 +1551,27 @@
             }
             if (stopBarcodeScannerBtn) {
                 stopBarcodeScannerBtn.addEventListener('click', stopBarcodeScanner);
+            }
+            if (confirmAddProductBtn) {
+                confirmAddProductBtn.addEventListener('click', confirmPendingProductAdd);
+            }
+            if (continueAfterAddBtn) {
+                continueAfterAddBtn.addEventListener('click', continueAfterProductAdd);
+            }
+            if (closeProductPreviewBtn) {
+                closeProductPreviewBtn.addEventListener('click', function () {
+                    closeProductPreview();
+                    if (productSearch) {
+                        productSearch.focus();
+                    }
+                });
+            }
+            if (productPreviewModal) {
+                productPreviewModal.addEventListener('click', function (event) {
+                    if (event.target === productPreviewModal) {
+                        closeProductPreview();
+                    }
+                });
             }
             window.addEventListener('beforeunload', stopBarcodeScanner);
 
@@ -1439,18 +1689,6 @@
                     if (d1 < 1 || d1 > 28 || d2 < 1 || d2 > 28) {
                         return 'Dias del mes invalidos (1-28)';
                     }
-                } else if (frequency === 'MONTHLY') {
-                    let monthlyDay = parseInt(getFieldValue('input[name="monthlyDay"]'), 10);
-                    if (!Number.isFinite(monthlyDay)) {
-                        const firstDueDate = getFieldValue('input[name="firstDueDate"]');
-                        if (firstDueDate) {
-                            monthlyDay = Math.min(28, toDateOnly(firstDueDate).getDate());
-                            setFieldValue('input[name="monthlyDay"]', String(monthlyDay));
-                        }
-                    }
-                    if (!Number.isFinite(monthlyDay) || monthlyDay < 1 || monthlyDay > 28) {
-                        return 'Dia de vencimiento invalido (1-28)';
-                    }
                 }
 
                 return '';
@@ -1524,14 +1762,11 @@
                     return [d1, d2].filter(Boolean).join(' y ') || '-';
                 }
                 if (frequency === 'MONTHLY') {
-                    let day = getFieldValue('input[name="monthlyDay"]');
-                    if (!day) {
-                        const firstDueDate = getFieldValue('input[name="firstDueDate"]');
-                        if (firstDueDate) {
-                            day = String(Math.min(28, toDateOnly(firstDueDate).getDate()));
-                        }
+                    const firstDueDate = getFieldValue('input[name="firstDueDate"]');
+                    if (!firstDueDate) {
+                        return '-';
                     }
-                    return day ? ('Dia ' + day) : '-';
+                    return 'Dia ' + Math.min(28, toDateOnly(firstDueDate).getDate());
                 }
                 return '-';
             }
@@ -1638,7 +1873,6 @@
                     weeklyDay: getFieldValue('select[name="weeklyDay"]'),
                     biMonthlyDay1: getFieldValue('input[name="biMonthlyDay1"]'),
                     biMonthlyDay2: getFieldValue('input[name="biMonthlyDay2"]'),
-                    monthlyDay: getFieldValue('input[name="monthlyDay"]'),
                     rows
                 };
 
@@ -1683,7 +1917,6 @@
                 setFieldValue('select[name="weeklyDay"]', draft.weeklyDay);
                 setFieldValue('input[name="biMonthlyDay1"]', draft.biMonthlyDay1);
                 setFieldValue('input[name="biMonthlyDay2"]', draft.biMonthlyDay2);
-                setFieldValue('input[name="monthlyDay"]', draft.monthlyDay);
 
                 document.querySelectorAll('input[name="dailyDays"]').forEach(checkbox => {
                     checkbox.checked = Array.isArray(draft.dailyDays) && draft.dailyDays.includes(checkbox.value);
@@ -1775,6 +2008,10 @@
             document.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape' && saleConfirmModal && !saleConfirmModal.classList.contains('hidden')) {
                     closeConfirmModal();
+                    return;
+                }
+                if (event.key === 'Escape' && productPreviewModal && !productPreviewModal.classList.contains('hidden')) {
+                    closeProductPreview();
                 }
             });
             if (quickClientToggle) {

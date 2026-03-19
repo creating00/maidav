@@ -16,6 +16,9 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     @EntityGraph(attributePaths = {"client", "seller"})
     List<Sale> findAll();
 
+    @EntityGraph(attributePaths = {"client", "seller"})
+    List<Sale> findAllByOrderBySaleDateDescIdDesc();
+
     @Override
     @EntityGraph(attributePaths = {"client", "seller"})
     java.util.Optional<Sale> findById(Long id);
