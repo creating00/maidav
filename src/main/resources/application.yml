@@ -19,7 +19,8 @@ spring:
     cache: ${SPRING_THYMELEAF_CACHE:false}
 
 server:
-  port: ${PORT:8080}
+  address: 0.0.0.0
+  port: ${PORT:10000}
 
 logging:
   level:

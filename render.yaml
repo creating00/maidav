@@ -20,6 +20,8 @@ services:
           property: password
       - key: APP_UPLOAD_DIR
         value: /var/data/uploads
+      - key: PORT
+        value: "10000"
       - key: SPRING_JPA_SHOW_SQL
         value: "false"
       - key: SPRING_THYMELEAF_CACHE
