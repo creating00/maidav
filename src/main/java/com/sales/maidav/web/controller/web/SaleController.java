@@ -1,31 +1,36 @@
 package com.sales.maidav.web.controller.web;
 
 import com.sales.maidav.model.client.Client;
+import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.model.sale.PaymentFrequency;
 import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.model.user.User;
+import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
+import com.sales.maidav.repository.sale.SaleRepository;
 import com.sales.maidav.service.client.ClientService;
 import com.sales.maidav.service.client.DuplicateNationalIdException;
 import com.sales.maidav.service.client.InvalidNationalIdException;
 import com.sales.maidav.service.product.ProductService;
+import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.sale.InvalidSaleException;
 import com.sales.maidav.service.sale.SaleItemInput;
 import com.sales.maidav.service.sale.SaleService;
-import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import com.sales.maidav.service.user.UserService;
-import com.sales.maidav.repository.sale.SaleRepository;
-import com.sales.maidav.repository.sale.CreditAccountRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.math.BigDecimal;
@@ -74,11 +79,8 @@ public class SaleController {
 
     @GetMapping("/new")
     @PreAuthorize("hasAuthority('SALES_CREATE')")
-    public String createForm(Model model) {
-        model.addAttribute("clients", clientService.findAll());
-        model.addAttribute("products", productService.findAll());
-        model.addAttribute("calculatorConfig", buildCalculatorConfig());
-        addNumberPreviews(model);
+    public String createForm(Authentication authentication, Model model) {
+        addCreateFormAttributes(model, authentication);
         return "pages/sales/form";
     }
 
@@ -97,12 +99,9 @@ public class SaleController {
                          @RequestParam(required = false) LocalDate saleDate,
                          @RequestParam(required = false) LocalDate firstDueDate,
                          @RequestParam(required = false) PaymentFrequency paymentFrequency,
-                         @RequestParam(required = false, name = "dailyDays") List<String> dailyDays,
-                         @RequestParam(required = false) String weeklyDay,
-                         @RequestParam(required = false) Integer biMonthlyDay1,
-                         @RequestParam(required = false) Integer biMonthlyDay2,
                          @RequestParam(required = false) BigDecimal discountAmount,
                          @RequestParam(required = false) Integer weeksCount,
+                         @RequestParam(required = false) Long sellerId,
                          @RequestParam(name = "productIds") List<Long> productIds,
                          @RequestParam(name = "quantities") List<Integer> quantities,
                          @RequestParam(name = "unitPrices") List<BigDecimal> unitPrices,
@@ -117,30 +116,40 @@ public class SaleController {
                          RedirectAttributes redirectAttributes) {
 
         try {
-            User seller = userService.findByEmail(authentication.getName());
+            User loggedUser = userService.findByEmail(authentication.getName());
+            boolean admin = isAdmin(authentication);
+            // SOLO ADMIN ASIGNAR VENDEDOR
+            User seller = resolveSeller(loggedUser, sellerId, admin);
             Client client = resolveClient(clientId, seller, quickClientNationalId, quickClientFirstName,
                     quickClientLastName, quickClientPhone, quickClientAddress);
             List<SaleItemInput> items = buildItems(productIds, quantities, unitPrices);
-            List<String> dueDays = resolveDueDays(paymentFrequency, dailyDays, weeklyDay, biMonthlyDay1, biMonthlyDay2, firstDueDate);
+            // FIX FECHA VENCIMIENTO
+            // REMOVER CONFLICTO FRECUENCIA
+            List<String> dueDays = resolveDueDays(paymentFrequency, firstDueDate);
+            // SOLO ADMIN DESCUENTO
+            BigDecimal effectiveDiscount = admin ? discountAmount : BigDecimal.ZERO;
 
             Sale sale = saleService.createSale(client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
-                    discountAmount, weeksCount, items);
+                    effectiveDiscount, weeksCount, items);
             redirectAttributes.addFlashAttribute("saleNumber", sale.getSaleNumber());
             if (paymentType == PaymentType.CREDIT) {
+                CreditAccount account = creditAccountService.findBySaleId(sale.getId());
+                redirectAttributes.addFlashAttribute("creditAccountId", account.getId());
+                redirectAttributes.addFlashAttribute("accountNumber", account.getAccountNumber());
+                // MOSTRAR ID CREDITO
                 redirectAttributes.addFlashAttribute(
-                        "accountNumber",
-                        creditAccountService.findBySaleId(sale.getId()).getAccountNumber()
+                        "successMessage",
+                        "Venta registrada correctamente. ID de credito: " + account.getId() +
+                                (account.getAccountNumber() != null ? " | Numero de cuenta: " + account.getAccountNumber() : "")
                 );
+            } else {
+                redirectAttributes.addFlashAttribute("successMessage", "Venta registrada correctamente");
             }
-            redirectAttributes.addFlashAttribute("successMessage", "Venta guardada correctamente");
             return "redirect:/sales/new";
         } catch (InvalidSaleException | DuplicateNationalIdException | InvalidNationalIdException ex) {
             model.addAttribute("formError", ex.getMessage());
             model.addAttribute("draftState", draftState);
-            model.addAttribute("clients", clientService.findAll());
-            model.addAttribute("products", productService.findAll());
-            model.addAttribute("calculatorConfig", buildCalculatorConfig());
-            addNumberPreviews(model);
+            addCreateFormAttributes(model, authentication);
             return "pages/sales/form";
         }
     }
@@ -151,6 +160,23 @@ public class SaleController {
         saleService.voidSale(id);
         redirectAttributes.addFlashAttribute("successMessage", "Venta anulada correctamente");
         return "redirect:/sales";
+    }
+
+    private void addCreateFormAttributes(Model model, Authentication authentication) {
+        model.addAttribute("clients", clientService.findAll());
+        model.addAttribute("products", productService.findAll());
+        model.addAttribute("calculatorConfig", buildCalculatorConfig());
+        boolean admin = isAdmin(authentication);
+        model.addAttribute("isAdmin", admin);
+        model.addAttribute("sellers", userService.findAll());
+        addNumberPreviews(model);
+    }
+
+    private User resolveSeller(User loggedUser, Long sellerId, boolean admin) {
+        if (!admin || sellerId == null) {
+            return loggedUser;
+        }
+        return userService.findById(sellerId);
     }
 
     private Client resolveClient(Long clientId,
@@ -223,48 +249,14 @@ public class SaleController {
     }
 
     private List<String> resolveDueDays(PaymentFrequency paymentFrequency,
-                                        List<String> dailyDays,
-                                        String weeklyDay,
-                                        Integer biMonthlyDay1,
-                                        Integer biMonthlyDay2,
                                         LocalDate firstDueDate) {
         List<String> dueDays = new ArrayList<>();
-        if (paymentFrequency == null) {
+        if (paymentFrequency == null || firstDueDate == null) {
             return dueDays;
         }
         switch (paymentFrequency) {
-            case DAILY -> {
-                if (dailyDays != null && !dailyDays.isEmpty()) {
-                    dueDays.addAll(dailyDays);
-                } else if (firstDueDate != null) {
-                    dueDays.add(firstDueDate.getDayOfWeek().name());
-                }
-            }
-            case WEEKLY -> {
-                if (weeklyDay != null && !weeklyDay.isBlank()) {
-                    dueDays.add(weeklyDay);
-                } else if (firstDueDate != null) {
-                    dueDays.add(firstDueDate.getDayOfWeek().name());
-                }
-            }
-            case BIWEEKLY -> {
-                if (biMonthlyDay1 != null) {
-                    dueDays.add(String.valueOf(biMonthlyDay1));
-                }
-                if (biMonthlyDay2 != null) {
-                    dueDays.add(String.valueOf(biMonthlyDay2));
-                }
-                if (dueDays.size() < 2) {
-                    dueDays.clear();
-                    dueDays.add("10");
-                    dueDays.add("25");
-                }
-            }
-            case MONTHLY -> {
-                if (firstDueDate != null) {
-                    dueDays.add(String.valueOf(normalizeDayOfMonth(firstDueDate.getDayOfMonth())));
-                }
-            }
+            case DAILY, WEEKLY -> dueDays.add(firstDueDate.getDayOfWeek().name());
+            case BIWEEKLY, MONTHLY -> dueDays.add(String.valueOf(normalizeDayOfMonth(firstDueDate.getDayOfMonth())));
         }
         return dueDays;
     }
@@ -274,6 +266,14 @@ public class SaleController {
             return 1;
         }
         return Math.min(day, 28);
+    }
+
+    private boolean isAdmin(Authentication authentication) {
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
     private Map<String, Object> buildCalculatorConfig() {
@@ -305,3 +305,4 @@ public class SaleController {
         return value != null && value.toLowerCase(Locale.ROOT).contains(term);
     }
 }
+

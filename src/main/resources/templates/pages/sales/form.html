@@ -17,11 +17,11 @@
              class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700"
              th:text="${formError}">
         </div>
-        <div th:if="${saleNumber}"
+        <div th:if="${successMessage}"
              id="saleSuccessMessage"
              class="mb-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-blue-700">
-            <span th:text="${'Numero de venta: ' + saleNumber}"></span>
-            <span th:if="${accountNumber}" th:text="${' | Numero de cuenta: ' + accountNumber}"></span>
+            <span th:text="${successMessage}"></span>
+            <span th:if="${saleNumber}" th:text="${' | Numero de venta: ' + saleNumber}"></span>
         </div>
         <input type="hidden" name="draftState" id="draftStateInput" th:value="${draftState}"/>
         <div id="calcConfig"
@@ -99,6 +99,19 @@
                 </select>
             </div>
 
+            <div th:if="${isAdmin}">
+                <!-- SOLO ADMIN ASIGNAR VENDEDOR -->
+                <label class="block text-sm font-semibold mb-1">Asignar vendedor</label>
+                <select name="sellerId"
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">Mi usuario</option>
+                    <option th:each="seller : ${sellers}"
+                            th:value="${seller.id}"
+                            th:text="${seller.firstName != null && !seller.firstName.isBlank() ? seller.firstName + ' ' + seller.lastName + ' - ' + seller.email : seller.email}">
+                    </option>
+                </select>
+            </div>
+
             <div>
                 <div class="flex items-center justify-between">
                     <label class="block text-sm font-semibold mb-1">Fecha de venta</label>
@@ -121,28 +134,23 @@
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
 
-            <div class="credit-field">
-                <label class="block text-sm font-semibold mb-1">Frecuencia de pago</label>
-                <select name="paymentFrequency" id="paymentFrequency"
-                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">Seleccionar frecuencia</option>
-                    <option value="DAILY">Diario</option>
-                    <option value="WEEKLY">Semanal</option>
-                    <option value="BIWEEKLY">Quincenal</option>
-                    <option value="MONTHLY">Mensual</option>
-                </select>
-            </div>
+            <input type="hidden" name="paymentFrequency" id="paymentFrequency"/>
+            <input type="hidden" name="weeksCount" value="4"/>
 
-            <div>
+            <div th:if="${isAdmin}">
+                <!-- SOLO ADMIN DESCUENTO -->
                 <label class="block text-sm font-semibold mb-1">Descuento (monto)</label>
                 <input type="number" step="0.01" name="discountAmount" value="0"
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
+            <input th:unless="${isAdmin}" type="hidden" name="discountAmount" value="0"/>
 
             <div class="credit-field">
-                <label class="block text-sm font-semibold mb-1">Cantidad de cuotas</label>
-                <input type="number" min="1" max="365" name="weeksCount" value="4"
-                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <!-- REMOVER CONFLICTO FRECUENCIA -->
+                <label class="block text-sm font-semibold mb-1">Plan de cobro automatico</label>
+                <div class="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                    <p id="planSelectionHelp">Seleccione un plan desde las opciones automaticas. La frecuencia y las cuotas se completan solas.</p>
+                </div>
             </div>
 
             <div class="credit-field md:col-span-3">
@@ -234,64 +242,11 @@
                     </div>
                     <p class="mt-2 text-xs text-gray-600" id="calcAppliedPlan"></p>
                 </div>
-
-                <label class="block text-sm font-semibold mb-2">Dias de vencimiento</label>
-                <div id="dailyOptions" class="flex flex-wrap gap-3">
-                    <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="dailyDays" value="MONDAY" class="rounded"/>
-                        Lunes
-                    </label>
-                    <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="dailyDays" value="TUESDAY" class="rounded"/>
-                        Martes
-                    </label>
-                    <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="dailyDays" value="WEDNESDAY" class="rounded"/>
-                        Miercoles
-                    </label>
-                    <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="dailyDays" value="THURSDAY" class="rounded"/>
-                        Jueves
-                    </label>
-                    <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="dailyDays" value="FRIDAY" class="rounded"/>
-                        Viernes
-                    </label>
-                    <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="dailyDays" value="SATURDAY" class="rounded"/>
-                        Sabado
-                    </label>
-                    <label class="inline-flex items-center gap-2">
-                        <input type="checkbox" name="dailyDays" value="SUNDAY" class="rounded"/>
-                        Domingo
-                    </label>
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <!-- FIX FECHA VENCIMIENTO -->
+                    <!-- REMOVER CONFLICTO FRECUENCIA -->
+                    La fecha del primer vencimiento que cargue manualmente sera la referencia principal del cronograma. Los planes automaticos no la sobrescriben si usted ya la definio.
                 </div>
-
-                <div id="weeklyOptions" class="hidden mt-3">
-                    <label class="block text-sm font-semibold mb-1">Dia de la semana</label>
-                    <select name="weeklyDay"
-                            class="w-full md:w-1/3 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">Seleccionar dia</option>
-                        <option value="MONDAY">Lunes</option>
-                        <option value="TUESDAY">Martes</option>
-                        <option value="WEDNESDAY">Miercoles</option>
-                        <option value="THURSDAY">Jueves</option>
-                        <option value="FRIDAY">Viernes</option>
-                        <option value="SATURDAY">Sabado</option>
-                        <option value="SUNDAY">Domingo</option>
-                    </select>
-                </div>
-
-                <div id="biweeklyOptions" class="hidden mt-3">
-                    <label class="block text-sm font-semibold mb-1">Dias del mes</label>
-                    <div class="flex flex-wrap gap-3">
-                        <input type="number" min="1" max="28" name="biMonthlyDay1" placeholder="Dia 1"
-                               class="w-28 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-                        <input type="number" min="1" max="28" name="biMonthlyDay2" placeholder="Dia 2"
-                               class="w-28 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-                    </div>
-                </div>
-
 
             </div>
         </div>
@@ -534,9 +489,7 @@
             const paymentType = document.getElementById('paymentType');
             const paymentFrequency = document.getElementById('paymentFrequency');
             const creditFields = document.querySelectorAll('.credit-field');
-            const dailyOptions = document.getElementById('dailyOptions');
-            const weeklyOptions = document.getElementById('weeklyOptions');
-            const biweeklyOptions = document.getElementById('biweeklyOptions');
+            const planSelectionHelp = document.getElementById('planSelectionHelp');
             const saleNumberBadge = document.getElementById('saleNumberBadge');
             const saleNumberHelp = document.getElementById('saleNumberHelp');
             const saleForm = document.getElementById('saleForm');
@@ -554,9 +507,6 @@
             const calcAppliedPlan = document.getElementById('calcAppliedPlan');
             const saleDateInput = document.querySelector('input[name="saleDate"]');
             const firstDueDateInput = document.querySelector('input[name="firstDueDate"]');
-            const weeklyDaySelect = document.querySelector('select[name="weeklyDay"]');
-            const biMonthlyDay1Input = document.querySelector('input[name="biMonthlyDay1"]');
-            const biMonthlyDay2Input = document.querySelector('input[name="biMonthlyDay2"]');
             const saleConfirmModal = document.getElementById('saleConfirmModal');
             const confirmItemsBody = document.getElementById('confirmItemsBody');
             const confirmBackBtn = document.getElementById('confirmBackBtn');
@@ -586,6 +536,7 @@
             let pendingProductOption = null;
             let pendingProductSource = 'manual';
             let productPreviewAudioContext = null;
+            let firstDueDateManuallyEdited = false;
 
             function parseNumber(value) {
                 const num = parseFloat(value);
@@ -1299,17 +1250,9 @@
                 } else {
                     dueDate.setMonth(dueDate.getMonth() + 1);
                 }
-                if (firstDueDateInput) {
+                if (firstDueDateInput && !firstDueDateManuallyEdited) {
+                    // FIX FECHA VENCIMIENTO
                     firstDueDateInput.value = toIsoDate(dueDate);
-                }
-                if (planKey === 'DAILY') {
-                    document.querySelectorAll('input[name="dailyDays"]').forEach(checkbox => {
-                        checkbox.checked = checkbox.value === dayName(dueDate);
-                    });
-                } else if (planKey === 'WEEKLY') {
-                    if (weeklyDaySelect) {
-                        weeklyDaySelect.value = dayName(dueDate);
-                    }
                 }
 
                 toggleCreditFields();
@@ -1449,46 +1392,22 @@
             }
 
             function toggleFrequencyOptions() {
-                if (!paymentFrequency) {
+                if (!paymentFrequency || !planSelectionHelp) {
                     return;
                 }
-                const freq = paymentFrequency.value;
-                dailyOptions.classList.add('hidden');
-                weeklyOptions.classList.toggle('hidden', freq !== 'WEEKLY');
-                biweeklyOptions.classList.toggle('hidden', freq !== 'BIWEEKLY');
-
-                if (freq === 'BIWEEKLY') {
-                    if (biMonthlyDay1Input && !biMonthlyDay1Input.value) {
-                        biMonthlyDay1Input.value = '10';
-                    }
-                    if (biMonthlyDay2Input && !biMonthlyDay2Input.value) {
-                        biMonthlyDay2Input.value = '25';
-                    }
-                    if (firstDueDateInput && !firstDueDateInput.value) {
-                        const baseDate = toDateOnly(saleDateInput ? saleDateInput.value : '');
-                        const month = baseDate.getMonth();
-                        const year = baseDate.getFullYear();
-                        const tenth = new Date(year, month, 10);
-                        const twentyFifth = new Date(year, month, 25);
-                        let first = tenth;
-                        if (baseDate > tenth && baseDate <= twentyFifth) {
-                            first = twentyFifth;
-                        } else if (baseDate > twentyFifth) {
-                            first = new Date(year, month + 1, 10);
-                        }
-                        firstDueDateInput.value = toIsoDate(first);
-                    }
+                const frequencyMap = {
+                    DAILY: 'Diario',
+                    WEEKLY: 'Semanal',
+                    BIWEEKLY: 'Quincenal',
+                    MONTHLY: 'Mensual'
+                };
+                const frequency = paymentFrequency.value;
+                const installments = weeksCountInput ? weeksCountInput.value : '';
+                if (!frequency || !installments) {
+                    planSelectionHelp.textContent = 'Seleccione un plan desde las opciones automaticas. La frecuencia y las cuotas se completan solas.';
+                    return;
                 }
-
-                if (weeklyDaySelect) {
-                    weeklyDaySelect.required = freq === 'WEEKLY';
-                }
-                if (biMonthlyDay1Input) {
-                    biMonthlyDay1Input.required = freq === 'BIWEEKLY';
-                }
-                if (biMonthlyDay2Input) {
-                    biMonthlyDay2Input.required = freq === 'BIWEEKLY';
-                }
+                planSelectionHelp.textContent = 'Plan activo: ' + (frequencyMap[frequency] || frequency) + ' | ' + installments + ' cuota(s).';
             }
 
             if (clientSearch && clientSelect) {
@@ -1578,8 +1497,12 @@
             if (paymentType) {
                 paymentType.addEventListener('change', toggleCreditFields);
             }
-            if (paymentFrequency) {
-                paymentFrequency.addEventListener('change', toggleFrequencyOptions);
+            if (firstDueDateInput) {
+                const markFirstDueDateManual = () => {
+                    firstDueDateManuallyEdited = Boolean(firstDueDateInput.value);
+                };
+                firstDueDateInput.addEventListener('input', markFirstDueDateManual);
+                firstDueDateInput.addEventListener('change', markFirstDueDateManual);
             }
             function updateSaleNumberBadge() {
                 if (!saleNumberBadge || !paymentType) {
@@ -1660,35 +1583,14 @@
                     return 'Debe seleccionar la fecha de primer vencimiento';
                 }
 
-                const frequency = getFieldValue('select[name="paymentFrequency"]');
+                const frequency = getFieldValue('input[name="paymentFrequency"]');
                 if (!frequency) {
-                    return 'Debe seleccionar la frecuencia de pago';
+                    return 'Debe aplicar una opcion automatica de cobro para ventas a credito';
                 }
 
                 const installments = parseInt(getFieldValue('input[name="weeksCount"]'), 10);
                 if (!Number.isFinite(installments) || installments < 1 || installments > 365) {
                     return 'Cantidad de cuotas invalida (1-365)';
-                }
-
-                if (frequency === 'DAILY') {
-                    const dailyChecked = document.querySelectorAll('input[name="dailyDays"]:checked').length;
-                    if (!dailyChecked) {
-                        return 'Debe seleccionar al menos un dia de vencimiento';
-                    }
-                } else if (frequency === 'WEEKLY') {
-                    const weeklyDay = getFieldValue('select[name="weeklyDay"]');
-                    if (!weeklyDay) {
-                        return 'Debe seleccionar el dia de la semana';
-                    }
-                } else if (frequency === 'BIWEEKLY') {
-                    const d1 = parseInt(getFieldValue('input[name="biMonthlyDay1"]'), 10);
-                    const d2 = parseInt(getFieldValue('input[name="biMonthlyDay2"]'), 10);
-                    if (!Number.isFinite(d1) || !Number.isFinite(d2)) {
-                        return 'Debe seleccionar dos dias del mes';
-                    }
-                    if (d1 < 1 || d1 > 28 || d2 < 1 || d2 > 28) {
-                        return 'Dias del mes invalidos (1-28)';
-                    }
                 }
 
                 return '';
@@ -1740,35 +1642,23 @@
 
             function getDueDaysLabel(frequency) {
                 const dayMap = {
-                    MONDAY: 'Lunes',
-                    TUESDAY: 'Martes',
-                    WEDNESDAY: 'Miercoles',
-                    THURSDAY: 'Jueves',
-                    FRIDAY: 'Viernes',
-                    SATURDAY: 'Sabado',
-                    SUNDAY: 'Domingo'
+                    0: 'Domingo',
+                    1: 'Lunes',
+                    2: 'Martes',
+                    3: 'Miercoles',
+                    4: 'Jueves',
+                    5: 'Viernes',
+                    6: 'Sabado'
                 };
-                if (frequency === 'DAILY') {
-                    const days = Array.from(document.querySelectorAll('input[name="dailyDays"]:checked'))
-                        .map(input => toLabel(input.value, dayMap));
-                    return days.length ? days.join(', ') : '-';
+                const firstDueDate = getFieldValue('input[name="firstDueDate"]');
+                if (!firstDueDate) {
+                    return '-';
                 }
-                if (frequency === 'WEEKLY') {
-                    return toLabel(getFieldValue('select[name="weeklyDay"]'), dayMap);
+                const date = toDateOnly(firstDueDate);
+                if (frequency === 'MONTHLY' || frequency === 'BIWEEKLY') {
+                    return 'Dia ' + Math.min(28, date.getDate());
                 }
-                if (frequency === 'BIWEEKLY') {
-                    const d1 = getFieldValue('input[name="biMonthlyDay1"]');
-                    const d2 = getFieldValue('input[name="biMonthlyDay2"]');
-                    return [d1, d2].filter(Boolean).join(' y ') || '-';
-                }
-                if (frequency === 'MONTHLY') {
-                    const firstDueDate = getFieldValue('input[name="firstDueDate"]');
-                    if (!firstDueDate) {
-                        return '-';
-                    }
-                    return 'Dia ' + Math.min(28, toDateOnly(firstDueDate).getDate());
-                }
-                return '-';
+                return dayMap[date.getDay()] || '-';
             }
 
             function fillConfirmModal() {
@@ -1794,7 +1684,7 @@
                 setConfirmField('confirmPaymentType', toLabel(getFieldValue('select[name="paymentType"]'), paymentMap));
                 setConfirmField('confirmSaleDate', formatDate(getFieldValue('input[name="saleDate"]')));
                 setConfirmField('confirmFirstDueDate', formatDate(getFieldValue('input[name="firstDueDate"]')));
-                const frequencyValue = getFieldValue('select[name="paymentFrequency"]');
+                const frequencyValue = getFieldValue('input[name="paymentFrequency"]');
                 setConfirmField('confirmFrequency', toLabel(frequencyValue, frequencyMap));
                 setConfirmField('confirmInstallments', getFieldValue('input[name="weeksCount"]') || '-');
                 setConfirmField('confirmDueDays', getDueDaysLabel(frequencyValue));
@@ -1866,13 +1756,9 @@
                     priceMode: getFieldValue('#priceMode'),
                     saleDate: getFieldValue('input[name="saleDate"]'),
                     firstDueDate: getFieldValue('input[name="firstDueDate"]'),
-                    paymentFrequency: getFieldValue('select[name="paymentFrequency"]'),
+                    paymentFrequency: getFieldValue('input[name="paymentFrequency"]'),
                     discountAmount: getFieldValue('input[name="discountAmount"]'),
                     weeksCount: getFieldValue('input[name="weeksCount"]'),
-                    dailyDays: Array.from(document.querySelectorAll('input[name="dailyDays"]:checked')).map(el => el.value),
-                    weeklyDay: getFieldValue('select[name="weeklyDay"]'),
-                    biMonthlyDay1: getFieldValue('input[name="biMonthlyDay1"]'),
-                    biMonthlyDay2: getFieldValue('input[name="biMonthlyDay2"]'),
                     rows
                 };
 
@@ -1911,16 +1797,10 @@
                 setFieldValue('#priceMode', draft.priceMode);
                 setFieldValue('input[name="saleDate"]', draft.saleDate);
                 setFieldValue('input[name="firstDueDate"]', draft.firstDueDate);
-                setFieldValue('select[name="paymentFrequency"]', draft.paymentFrequency);
+                setFieldValue('input[name="paymentFrequency"]', draft.paymentFrequency);
                 setFieldValue('input[name="discountAmount"]', draft.discountAmount);
                 setFieldValue('input[name="weeksCount"]', draft.weeksCount);
-                setFieldValue('select[name="weeklyDay"]', draft.weeklyDay);
-                setFieldValue('input[name="biMonthlyDay1"]', draft.biMonthlyDay1);
-                setFieldValue('input[name="biMonthlyDay2"]', draft.biMonthlyDay2);
-
-                document.querySelectorAll('input[name="dailyDays"]').forEach(checkbox => {
-                    checkbox.checked = Array.isArray(draft.dailyDays) && draft.dailyDays.includes(checkbox.value);
-                });
+                firstDueDateManuallyEdited = Boolean(draft.firstDueDate);
                 if (quickClientToggle) {
                     quickClientToggle.checked = Boolean(draft.quickClientEnabled);
                 }
@@ -2029,3 +1909,4 @@
 
 </section>
 </html>
+
