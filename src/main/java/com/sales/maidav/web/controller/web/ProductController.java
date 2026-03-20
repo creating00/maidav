@@ -55,15 +55,8 @@ public class ProductController {
                     setValue(null);
                     return;
                 }
-                if (normalized.contains(",") && normalized.contains(".")) {
-                    if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
-                        normalized = normalized.replace(".", "").replace(",", ".");
-                    } else {
-                        normalized = normalized.replace(",", "");
-                    }
-                } else if (normalized.contains(",")) {
-                    normalized = normalized.replace(",", ".");
-                }
+                normalized = normalized.replace("$", "");
+                normalized = normalizeDecimalValue(normalized);
                 try {
                     setValue(new BigDecimal(normalized));
                 } catch (NumberFormatException ex) {
@@ -71,6 +64,38 @@ public class ProductController {
                 }
             }
         });
+    }
+
+    private String normalizeDecimalValue(String rawValue) {
+        String normalized = rawValue;
+        boolean hasComma = normalized.contains(",");
+        boolean hasDot = normalized.contains(".");
+
+        if (hasComma && hasDot) {
+            if (normalized.lastIndexOf(',') > normalized.lastIndexOf('.')) {
+                return normalized.replace(".", "").replace(",", ".");
+            }
+            return normalized.replace(",", "");
+        }
+
+        if (hasComma) {
+            int commaIndex = normalized.lastIndexOf(',');
+            int decimalDigits = normalized.length() - commaIndex - 1;
+            if (decimalDigits == 3 && normalized.indexOf(',') == commaIndex) {
+                return normalized.replace(",", "");
+            }
+            return normalized.replace(".", "").replace(",", ".");
+        }
+
+        if (hasDot) {
+            int dotIndex = normalized.lastIndexOf('.');
+            int decimalDigits = normalized.length() - dotIndex - 1;
+            if (decimalDigits == 3 && normalized.indexOf('.') == dotIndex) {
+                return normalized.replace(".", "");
+            }
+        }
+
+        return normalized;
     }
 
     private final ProductService productService;

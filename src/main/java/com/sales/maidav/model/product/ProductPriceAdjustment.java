@@ -14,10 +14,10 @@ public class ProductPriceAdjustment extends BaseEntity {
     @Column(name = "adjustment_type", nullable = false, length = 20)
     private PriceAdjustmentType adjustmentType;
 
-    @Column(name = "percentage", nullable = false, precision = 8, scale = 4)
+    @Column(name = "percentage", precision = 8, scale = 4)
     private BigDecimal percentage;
 
-    @Column(name = "factor_applied", nullable = false, precision = 16, scale = 8)
+    @Column(name = "factor_applied", precision = 16, scale = 8)
     private BigDecimal factorApplied;
 
     @Enumerated(EnumType.STRING)

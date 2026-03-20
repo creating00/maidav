@@ -6,8 +6,11 @@ import com.sales.maidav.model.sale.*;
 import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.product.ProductRepository;
 import com.sales.maidav.repository.sale.*;
+import com.sales.maidav.repository.user.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -32,14 +35,24 @@ public class SaleServiceImpl implements SaleService {
     private final ProductRepository productRepository;
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
+    private final UserRepository userRepository;
 
     @Override
     public List<Sale> findAll() {
+        if (!isCurrentUserAdmin()) {
+            Long sellerId = currentUserId();
+            return sellerId == null ? List.of() : saleRepository.findBySeller_IdOrderBySaleDateDescIdDesc(sellerId);
+        }
         return saleRepository.findAllByOrderBySaleDateDescIdDesc();
     }
 
     @Override
     public Sale findById(Long id) {
+        if (!isCurrentUserAdmin()) {
+            Long sellerId = currentUserId();
+            return saleRepository.findByIdAndSeller_Id(id, sellerId == null ? -1L : sellerId)
+                    .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
+        }
         return saleRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
     }
@@ -365,5 +378,24 @@ public class SaleServiceImpl implements SaleService {
             return null;
         }
         return prefix + String.format("%06d", id);
+    }
+
+    private boolean isCurrentUserAdmin() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null) {
+            return false;
+        }
+        return authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+    }
+
+    private Long currentUserId() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return null;
+        }
+        return userRepository.findByEmail(authentication.getName())
+                .map(User::getId)
+                .orElse(null);
     }
 }

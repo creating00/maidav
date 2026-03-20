@@ -621,7 +621,11 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     @Override
     public List<MorositySummary> getMorosity(MorosityLevel levelFilter) {
         LocalDate today = LocalDate.now();
-        List<CreditAccount> accounts = creditAccountRepository.findAll();
+        boolean admin = isCurrentUserAdmin();
+        Long sellerId = admin ? null : currentUserId();
+        List<CreditAccount> accounts = admin
+                ? creditAccountRepository.findAll()
+                : sellerId == null ? List.of() : creditAccountRepository.findBySale_Seller_Id(sellerId);
 
         Map<Long, ClientAggregate> aggregates = new HashMap<>();
         for (CreditAccount account : accounts) {
@@ -635,6 +639,15 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                         today
                 )
                 .forEach(installment -> {
+                    if (!admin) {
+                        Long installmentSellerId = installment.getAccount().getSale() == null
+                                || installment.getAccount().getSale().getSeller() == null
+                                ? null
+                                : installment.getAccount().getSale().getSeller().getId();
+                        if (sellerId == null || !sellerId.equals(installmentSellerId)) {
+                            return;
+                        }
+                    }
                     Long clientId = installment.getAccount().getClient().getId();
                     ClientAggregate agg = aggregates.computeIfAbsent(
                             clientId, id -> new ClientAggregate(installment.getAccount().getClient())
