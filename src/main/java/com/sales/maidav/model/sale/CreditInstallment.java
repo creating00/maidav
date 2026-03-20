@@ -46,6 +46,9 @@ public class CreditInstallment extends BaseEntity {
     @Column(name = "void_reason", length = 255)
     private String voidReason;
 
+    @Column(name = "restored_from_installment_id")
+    private Long restoredFromInstallmentId;
+
     public CreditInstallment() {}
 
     public CreditAccount getAccount() { return account; }
@@ -80,5 +83,8 @@ public class CreditInstallment extends BaseEntity {
 
     public String getVoidReason() { return voidReason; }
     public void setVoidReason(String voidReason) { this.voidReason = voidReason; }
+
+    public Long getRestoredFromInstallmentId() { return restoredFromInstallmentId; }
+    public void setRestoredFromInstallmentId(Long restoredFromInstallmentId) { this.restoredFromInstallmentId = restoredFromInstallmentId; }
 }
 

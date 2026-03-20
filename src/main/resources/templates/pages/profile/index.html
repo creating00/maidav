@@ -5,8 +5,14 @@
 <section th:fragment="content">
 
     <div class="mb-6">
-        <h1 class="text-2xl font-bold">Mi perfil</h1>
-        <p class="text-gray-500 text-sm">Actualiza tus datos personales</p>
+        <h1 class="text-2xl font-bold" th:if="${viewingAnotherUser}">Datos personales del usuario</h1>
+        <h1 class="text-2xl font-bold" th:unless="${viewingAnotherUser}">Mi perfil</h1>
+        <p class="text-gray-500 text-sm" th:if="${viewingAnotherUser}">
+            Consulta y gestion de datos personales del usuario
+        </p>
+        <p class="text-gray-500 text-sm" th:unless="${viewingAnotherUser}">
+            Actualiza tus datos personales
+        </p>
     </div>
 
     <div th:if="${successMessage}"
@@ -18,8 +24,8 @@
         <span th:text="${errorMessage}"></span>
     </div>
 
-    <form th:action="@{/profile}" method="post" enctype="multipart/form-data"
-          class="bg-white p-8 rounded-lg shadow max-w-3xl">
+    <form th:if="${ownProfile}" th:action="@{/profile}" method="post" enctype="multipart/form-data"
+          class="bg-white p-8 rounded-lg shadow max-w-4xl">
 
         <div class="flex items-center gap-6 mb-6">
             <div class="h-24 w-24 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
@@ -35,6 +41,17 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-semibold mb-1">Email</label>
+                <input type="text" th:value="${user.email}" readonly
+                       class="w-full border rounded px-4 py-2 bg-slate-50 text-slate-600"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">DNI</label>
+                <input type="text" name="nationalId" th:value="${user.nationalId}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
 
             <div>
                 <label class="block text-sm font-semibold mb-1">Nombre</label>
@@ -53,30 +70,164 @@
                 <input type="date" name="birthDate" th:value="${user.birthDate}"
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 <p class="text-xs text-gray-500 mt-1" th:if="${age != null}">
-                    Edad: <span th:text="${age}"></span> años
+                    Edad: <span th:text="${age}"></span> anos
                 </p>
             </div>
 
             <div>
-                <label class="block text-sm font-semibold mb-1">Teléfono</label>
+                <label class="block text-sm font-semibold mb-1">Telefono</label>
                 <input type="text" name="phone" th:value="${user.phone}"
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
 
             <div class="md:col-span-2">
-                <label class="block text-sm font-semibold mb-1">Dirección</label>
+                <label class="block text-sm font-semibold mb-1">Direccion</label>
                 <input type="text" name="address" th:value="${user.address}"
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
-
         </div>
 
         <div class="flex justify-between items-center mt-8 pt-6 border-t">
-            <a th:href="@{/dashboard}" class="text-gray-600 hover:text-gray-900">
-                Volver al dashboard
+            <a th:href="${backUrl}" class="text-gray-600 hover:text-gray-900" th:text="${backLabel}">
+                Volver
             </a>
             <button class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
                 Guardar
+            </button>
+        </div>
+    </form>
+
+    <form th:if="${viewingAnotherUser}" th:action="@{/profile/{id}(id=${user.id})}" method="post" enctype="multipart/form-data"
+          class="bg-white p-8 rounded-lg shadow max-w-4xl">
+
+        <div class="flex items-center gap-6 mb-6">
+            <div class="h-24 w-24 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center">
+                <img th:if="${user.photoPath}" th:src="${user.photoPath}" alt="Foto"
+                     class="h-full w-full object-cover"/>
+                <span th:if="${user.photoPath == null}" class="text-gray-400 text-sm">Sin foto</span>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold mb-1">Foto de perfil</label>
+                <input type="file" name="photo" accept="image/*"
+                       class="block text-sm text-gray-700"/>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="block text-sm font-semibold mb-1">Email</label>
+                <input type="text" th:value="${user.email}" readonly
+                       class="w-full border rounded px-4 py-2 bg-slate-50 text-slate-600"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">DNI</label>
+                <input type="text" name="nationalId" th:value="${user.nationalId}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Nombre</label>
+                <input type="text" name="firstName" th:value="${user.firstName}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Apellido</label>
+                <input type="text" name="lastName" th:value="${user.lastName}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Fecha nacimiento</label>
+                <input type="date" name="birthDate" th:value="${user.birthDate}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                <p class="text-xs text-gray-500 mt-1" th:if="${age != null}">
+                    Edad: <span th:text="${age}"></span> anos
+                </p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Telefono</label>
+                <input type="text" name="phone" th:value="${user.phone}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-sm font-semibold mb-1">Direccion</label>
+                <input type="text" name="address" th:value="${user.address}"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+            </div>
+        </div>
+
+        <div class="flex justify-between items-center mt-8 pt-6 border-t">
+            <a th:href="${backUrl}" class="text-gray-600 hover:text-gray-900" th:text="${backLabel}">
+                Volver
+            </a>
+            <button class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
+                Guardar
+            </button>
+        </div>
+    </form>
+
+    <div th:if="${viewingAnotherUser}" class="bg-white p-8 rounded-lg shadow max-w-4xl mt-6">
+        <h2 class="text-lg font-bold text-gray-900">Token de recuperacion</h2>
+        <p class="mt-1 text-sm text-gray-500">
+            Genere un token temporal para que el usuario pueda restablecer su contrasena.
+        </p>
+
+        <form th:action="@{/profile/{id}/recovery-token(id=${user.id})}" method="post" class="mt-4">
+            <button class="rounded bg-emerald-700 px-5 py-2 text-white font-semibold hover:bg-emerald-800">
+                Generar token temporal
+            </button>
+        </form>
+
+        <div th:if="${generatedRecoveryToken}" class="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-900">
+            <p class="text-sm font-semibold">
+                Token generado para <span th:text="${generatedRecoveryTokenUserLabel != null ? generatedRecoveryTokenUserLabel : user.email}"></span>
+            </p>
+            <p class="mt-3 text-3xl font-black tracking-[0.35em]" th:text="${generatedRecoveryToken}"></p>
+            <p class="mt-2 text-sm">
+                Vence el <span th:text="${generatedRecoveryTokenExpiresAt != null ? #temporals.format(generatedRecoveryTokenExpiresAt, 'yyyy-MM-dd HH:mm') : '-'}"></span>
+            </p>
+        </div>
+    </div>
+
+    <form th:if="${ownProfile}" th:action="@{/profile/password}" method="post"
+          class="bg-white p-8 rounded-lg shadow max-w-4xl mt-6">
+        <h2 class="text-lg font-bold text-gray-900">Cambiar contrasena</h2>
+        <p class="mt-1 text-sm text-gray-500">
+            Ingrese su contrasena actual y defina una nueva contrasena segura.
+        </p>
+
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+                <label class="block text-sm font-semibold mb-1">Contrasena actual</label>
+                <input type="password" name="currentPassword"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       required/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Nueva contrasena</label>
+                <input type="password" name="newPassword"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       minlength="6"
+                       required/>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-1">Confirmar nueva contrasena</label>
+                <input type="password" name="confirmPassword"
+                       class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                       minlength="6"
+                       required/>
+            </div>
+        </div>
+
+        <div class="flex justify-end mt-8 pt-6 border-t">
+            <button class="bg-slate-800 text-white px-6 py-2 rounded hover:bg-slate-900 shadow">
+                Actualizar contrasena
             </button>
         </div>
     </form>

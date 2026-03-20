@@ -298,7 +298,7 @@
                                 th:attr="data-target='financing-' + ${product.id}">
                             Financiacion
                         </button>
-                        <a sec:authorize="hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')"
+                        <a sec:authorize="hasAuthority('PRODUCT_BARCODE_LABEL')"
                            th:if="${product.barcode != null and #strings.length(product.barcode) == 13}"
                            th:href="@{/products/barcode/label(barcode=${product.barcode},description=${product.description},productCode=${product.productCode})}"
                            target="_blank"
@@ -306,7 +306,7 @@
                            class="text-indigo-700 hover:underline">
                             Etiqueta
                         </a>
-                        <a sec:authorize="hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')"
+                        <a sec:authorize="hasAuthority('PRODUCT_BARCODE_SHEET')"
                            th:if="${product.barcode != null and #strings.length(product.barcode) == 13}"
                            th:href="@{/products/barcode/sheet(barcode=${product.barcode},description=${product.description},productCode=${product.productCode},copies=12)}"
                            target="_blank"
@@ -341,7 +341,7 @@
                                        th:text="${product.productCode + ' - ' + product.description}"></p>
                                     <p class="text-xs text-slate-600">Simulacion de financiacion para compartir por WhatsApp</p>
                                 </div>
-                                <span class="text-sm text-slate-600">Base: <strong class="js-base">$0.00</strong></span>
+                                <span sec:authorize="hasRole('ADMIN')" class="text-sm text-slate-600">Base: <strong class="js-base">$0.00</strong></span>
                             </div>
 
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -916,4 +916,6 @@
 
 </section>
 </html>
+
+
 

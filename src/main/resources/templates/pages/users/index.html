@@ -50,7 +50,8 @@
 
                 <!-- Email -->
                 <td class="px-6 py-4 text-sm font-medium text-gray-800">
-                    <span th:text="${user.email}">email</span>
+                    <div class="font-semibold" th:text="${user.email}">email</div>
+                    <div class="text-xs text-gray-500" th:text="${user.nationalId != null && !user.nationalId.isBlank() ? 'DNI: ' + user.nationalId : 'Sin DNI'}"></div>
                 </td>
 
                 <!-- Roles -->
@@ -83,6 +84,12 @@
                        sec:authorize="hasAuthority('USER_UPDATE')"
                        class="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-yellow-100 text-yellow-700 hover:bg-yellow-200">
                         Editar
+                    </a>
+
+                    <a th:href="@{/profile/{id}(id=${user.id})}"
+                       sec:authorize="hasAuthority('USER_READ')"
+                       class="inline-flex items-center px-3 py-1 rounded-lg text-sm bg-sky-100 text-sky-700 hover:bg-sky-200">
+                        Ver datos personales
                     </a>
 
                     <form th:action="@{/users/{id}/delete(id=${user.id})}"

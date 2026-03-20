@@ -117,14 +117,15 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         if (amount.compareTo(maxPayable) > 0) {
             throw new InvalidSaleException("El pago supera el saldo de las cuotas seleccionadas");
         }
-        Map<Integer, String> paymentReferences = new LinkedHashMap<>();
-        BigDecimal impactAmount = applyPaymentToInstallments(
+        PaymentApplicationResult applicationResult = applyPaymentToInstallments(
                 installments,
                 amount.setScale(2, RoundingMode.HALF_UP),
                 resolvedMethod,
                 LocalDate.now(),
-                paymentReferences
+                payment.getId(),
+                new ArrayList<>()
         );
+        BigDecimal impactAmount = applicationResult.impactAmount();
 
         if (impactAmount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new InvalidSaleException("El pago no pudo aplicarse a cuotas pendientes");
@@ -135,7 +136,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         }
 
         payment.setImpactAmount(impactAmount.setScale(2, RoundingMode.HALF_UP));
-        payment.setAllocationSummary(buildAllocationSummary(paymentReferences));
+        payment.setAllocationSummary(buildAllocationSummary(applicationResult.paymentReferences()));
         try {
             creditPaymentRepository.save(payment);
         } catch (DataIntegrityViolationException ex) {
@@ -170,6 +171,9 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         if (!payment.getAccount().getId().equals(accountId)) {
             throw new InvalidSaleException("El pago no pertenece a la cuenta");
         }
+        if (payment.isReversal()) {
+            throw new InvalidSaleException("Las reversiones de anulacion no pueden editarse manualmente");
+        }
 
         payment.setAmount(amount.setScale(2, RoundingMode.HALF_UP));
         payment.setPaidAt(paidAt);
@@ -189,16 +193,28 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             throw new InvalidSaleException("La cuota ya fue anulada");
         }
 
-        // ANULACION DE CUOTA
+        List<PaymentAllocation> impactedAllocations = collectCurrentAllocations(installment.getAccount()).stream()
+                .filter(allocation -> installmentId.equals(allocation.installmentId()))
+                .toList();
+
+        // FIX ANULACION CUOTA
         // AUDITORIA ANULACION
         installment.setVoided(true);
         installment.setStatus(InstallmentStatus.VOID);
         installment.setVoidedAt(LocalDateTime.now());
         installment.setVoidedBy(trimToNull(voidedBy));
         installment.setVoidReason(trimToNull(reason));
-        installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-        installment.setPaidAt(null);
+        creditInstallmentRepository.save(installment);
 
+        // RESTAURAR CUOTA REIMPACTABLE
+        CreditInstallment restoredInstallment = restoreInstallmentForReimpact(installment);
+        creditInstallmentRepository.save(restoredInstallment);
+
+        // REVERSION IMPACTO ECONOMICO
+        buildReversalPayments(installment, restoredInstallment, impactedAllocations, voidedBy, reason)
+                .forEach(creditPaymentRepository::save);
+
+        // RECALCULO DE TOTALES
         recalculateAccountState(installment.getAccount());
     }
 
@@ -213,14 +229,16 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 .toList();
     }
 
-    private BigDecimal applyPaymentToInstallments(List<CreditInstallment> installments,
-                                                  BigDecimal inputAmount,
-                                                  PaymentCollectionMethod paymentMethod,
-                                                  LocalDate paidAt,
-                                                  Map<Integer, String> paymentReferences) {
+    private PaymentApplicationResult applyPaymentToInstallments(List<CreditInstallment> installments,
+                                                                BigDecimal inputAmount,
+                                                                PaymentCollectionMethod paymentMethod,
+                                                                LocalDate paidAt,
+                                                                Long paymentId,
+                                                                List<PaymentAllocation> allocations) {
         BigDecimal remainingInput = inputAmount == null ? BigDecimal.ZERO : inputAmount.setScale(2, RoundingMode.HALF_UP);
         BigDecimal impactAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal cashRecargo = resolveCashRecargo();
+        Map<Integer, String> paymentReferences = new LinkedHashMap<>();
 
         for (int index = 0; index < installments.size(); index++) {
             CreditInstallment installment = installments.get(index);
@@ -248,15 +266,25 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                         && (remainingInput.compareTo(cashRemaining) == 0
                         || hasPendingInstallmentAfter(installments, index));
                 if (closesWithCashDiscount) {
+                    BigDecimal allocationImpact = financedRemaining.setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal allocationCollected = cashRemaining.setScale(2, RoundingMode.HALF_UP);
                     installment.setPaidAmount(installment.getAmount().setScale(2, RoundingMode.HALF_UP));
                     installment.setStatus(InstallmentStatus.PAID);
                     installment.setPaidAt(paidAt);
-                    remainingInput = remainingInput.subtract(cashRemaining).setScale(2, RoundingMode.HALF_UP);
-                    impactAmount = impactAmount.add(financedRemaining).setScale(2, RoundingMode.HALF_UP);
+                    remainingInput = remainingInput.subtract(allocationCollected).setScale(2, RoundingMode.HALF_UP);
+                    impactAmount = impactAmount.add(allocationImpact).setScale(2, RoundingMode.HALF_UP);
                     paymentReferences.put(
                             installment.getInstallmentNumber(),
                             "Cuota #" + installment.getInstallmentNumber() + " total (efectivo con descuento)"
                     );
+                    allocations.add(new PaymentAllocation(
+                            paymentId,
+                            installment.getId(),
+                            installment.getInstallmentNumber(),
+                            paymentMethod,
+                            allocationCollected,
+                            allocationImpact
+                    ));
                 } else {
                     BigDecimal partialImpact = remainingInput.min(financedRemaining).setScale(2, RoundingMode.HALF_UP);
                     installment.setPaidAmount(paidAmount.add(partialImpact).setScale(2, RoundingMode.HALF_UP));
@@ -274,18 +302,35 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                                     : "Cuota #" + installment.getInstallmentNumber() + " parcial (efectivo sin descuento)"
                     );
                     remainingInput = remainingInput.subtract(partialImpact).setScale(2, RoundingMode.HALF_UP);
+                    allocations.add(new PaymentAllocation(
+                            paymentId,
+                            installment.getId(),
+                            installment.getInstallmentNumber(),
+                            paymentMethod,
+                            partialImpact,
+                            partialImpact
+                    ));
                 }
             } else {
                 if (remainingInput.compareTo(financedRemaining) >= 0) {
+                    BigDecimal allocationImpact = financedRemaining.setScale(2, RoundingMode.HALF_UP);
                     installment.setPaidAmount(installment.getAmount().setScale(2, RoundingMode.HALF_UP));
                     installment.setStatus(InstallmentStatus.PAID);
                     installment.setPaidAt(paidAt);
-                    remainingInput = remainingInput.subtract(financedRemaining).setScale(2, RoundingMode.HALF_UP);
-                    impactAmount = impactAmount.add(financedRemaining).setScale(2, RoundingMode.HALF_UP);
+                    remainingInput = remainingInput.subtract(allocationImpact).setScale(2, RoundingMode.HALF_UP);
+                    impactAmount = impactAmount.add(allocationImpact).setScale(2, RoundingMode.HALF_UP);
                     paymentReferences.put(
                             installment.getInstallmentNumber(),
                             "Cuota #" + installment.getInstallmentNumber() + " total"
                     );
+                    allocations.add(new PaymentAllocation(
+                            paymentId,
+                            installment.getId(),
+                            installment.getInstallmentNumber(),
+                            paymentMethod,
+                            allocationImpact,
+                            allocationImpact
+                    ));
                 } else {
                     BigDecimal partialImpact = remainingInput.min(financedRemaining).setScale(2, RoundingMode.HALF_UP);
                     installment.setPaidAmount(paidAmount.add(partialImpact).setScale(2, RoundingMode.HALF_UP));
@@ -297,11 +342,23 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                             "Cuota #" + installment.getInstallmentNumber() + " parcial"
                     );
                     remainingInput = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+                    allocations.add(new PaymentAllocation(
+                            paymentId,
+                            installment.getId(),
+                            installment.getInstallmentNumber(),
+                            paymentMethod,
+                            partialImpact,
+                            partialImpact
+                    ));
                 }
             }
         }
 
-        return impactAmount;
+        return new PaymentApplicationResult(
+                impactAmount.setScale(2, RoundingMode.HALF_UP),
+                paymentReferences,
+                allocations
+        );
     }
 
     private BigDecimal calculateMaxPayable(List<CreditInstallment> installments, PaymentCollectionMethod paymentMethod) {
@@ -369,8 +426,6 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             if (installment.isVoided() || installment.getStatus() == InstallmentStatus.VOID) {
                 installment.setVoided(true);
                 installment.setStatus(InstallmentStatus.VOID);
-                installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
-                installment.setPaidAt(null);
                 continue;
             }
             installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
@@ -382,16 +437,26 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 .filter(installment -> !installment.isVoided() && installment.getStatus() != InstallmentStatus.VOID)
                 .toList();
         for (CreditPayment payment : payments) {
-            Map<Integer, String> paymentReferences = new LinkedHashMap<>();
-            BigDecimal impactAmount = applyPaymentToInstallments(
+            if (payment.isReversal()) {
+                // FIX ANULACION CUOTA
+                // REVERSION IMPACTO ECONOMICO
+                applyReversalToInstallments(activeInstallments, payment);
+                if (payment.getAllocationSummary() == null || payment.getAllocationSummary().isBlank()) {
+                    payment.setAllocationSummary("Reversion de anulacion");
+                }
+                continue;
+            }
+
+            PaymentApplicationResult result = applyPaymentToInstallments(
                     activeInstallments,
                     payment.getAmount(),
                     payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod(),
                     payment.getPaidAt(),
-                    paymentReferences
+                    payment.getId(),
+                    new ArrayList<>()
             );
-            payment.setImpactAmount(impactAmount.setScale(2, RoundingMode.HALF_UP));
-            payment.setAllocationSummary(buildAllocationSummary(paymentReferences));
+            payment.setImpactAmount(result.impactAmount().setScale(2, RoundingMode.HALF_UP));
+            payment.setAllocationSummary(buildAllocationSummary(result.paymentReferences()));
         }
 
         BigDecimal recalculatedTotal = activeInstallments.stream()
@@ -409,6 +474,135 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         account.setTotalAmount(recalculatedTotal);
         account.setBalance(newBalance);
         account.setStatus(newBalance.compareTo(BigDecimal.ZERO) == 0 ? AccountStatus.CLOSED : AccountStatus.OPEN);
+    }
+
+    private CreditInstallment restoreInstallmentForReimpact(CreditInstallment originalInstallment) {
+        CreditInstallment restoredInstallment = new CreditInstallment();
+        restoredInstallment.setAccount(originalInstallment.getAccount());
+        restoredInstallment.setInstallmentNumber(originalInstallment.getInstallmentNumber());
+        restoredInstallment.setDueDate(originalInstallment.getDueDate());
+        restoredInstallment.setAmount(originalInstallment.getAmount().setScale(2, RoundingMode.HALF_UP));
+        restoredInstallment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        restoredInstallment.setStatus(InstallmentStatus.PENDING);
+        restoredInstallment.setPaidAt(null);
+        restoredInstallment.setRestoredFromInstallmentId(originalInstallment.getId());
+        return restoredInstallment;
+    }
+
+    private List<PaymentAllocation> collectCurrentAllocations(CreditAccount account) {
+        List<CreditInstallment> replayInstallments = creditInstallmentRepository
+                .findByAccount_IdOrderByInstallmentNumber(account.getId())
+                .stream()
+                .filter(installment -> !installment.isVoided() && installment.getStatus() != InstallmentStatus.VOID)
+                .map(this::copyInstallmentForReplay)
+                .toList();
+        List<CreditPayment> payments = creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(account.getId());
+        List<PaymentAllocation> allocations = new ArrayList<>();
+
+        for (CreditInstallment installment : replayInstallments) {
+            installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+            installment.setStatus(InstallmentStatus.PENDING);
+            installment.setPaidAt(null);
+        }
+
+        for (CreditPayment payment : payments) {
+            if (payment.isReversal()) {
+                applyReversalToInstallments(replayInstallments, payment);
+                continue;
+            }
+            applyPaymentToInstallments(
+                    replayInstallments,
+                    payment.getAmount(),
+                    payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod(),
+                    payment.getPaidAt(),
+                    payment.getId(),
+                    allocations
+            );
+        }
+        return allocations;
+    }
+
+    private List<CreditPayment> buildReversalPayments(CreditInstallment originalInstallment,
+                                                      CreditInstallment restoredInstallment,
+                                                      List<PaymentAllocation> impactedAllocations,
+                                                      String voidedBy,
+                                                      String reason) {
+        List<CreditPayment> reversalPayments = new ArrayList<>();
+        for (PaymentAllocation allocation : impactedAllocations) {
+            if (allocation.impactAmount().compareTo(BigDecimal.ZERO) <= 0
+                    && allocation.collectedAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+            CreditPayment reversalPayment = new CreditPayment();
+            reversalPayment.setAccount(originalInstallment.getAccount());
+            reversalPayment.setAmount(allocation.collectedAmount().negate().setScale(2, RoundingMode.HALF_UP));
+            reversalPayment.setImpactAmount(allocation.impactAmount().negate().setScale(2, RoundingMode.HALF_UP));
+            reversalPayment.setPaidAt(LocalDate.now());
+            reversalPayment.setRegisteredBy(trimToNull(voidedBy));
+            reversalPayment.setPaymentMethod(allocation.paymentMethod());
+            reversalPayment.setReversal(true);
+            reversalPayment.setReversalOfPaymentId(allocation.paymentId());
+            reversalPayment.setTargetInstallmentId(restoredInstallment.getId());
+            reversalPayment.setReversalReason(trimToNull(reason));
+            reversalPayment.setAllocationSummary(
+                    "Anulacion cuota #" + originalInstallment.getInstallmentNumber()
+                            + " -> restaura cuota reimpactable #"
+                            + restoredInstallment.getInstallmentNumber()
+            );
+            reversalPayments.add(reversalPayment);
+        }
+        return reversalPayments;
+    }
+
+    private void applyReversalToInstallments(List<CreditInstallment> installments, CreditPayment payment) {
+        Long targetInstallmentId = payment.getTargetInstallmentId();
+        if (targetInstallmentId == null) {
+            throw new InvalidSaleException("La reversa no tiene cuota de destino");
+        }
+        CreditInstallment targetInstallment = installments.stream()
+                .filter(installment -> targetInstallmentId.equals(installment.getId()))
+                .findFirst()
+                .orElseThrow(() -> new InvalidSaleException("No se encontro la cuota restaurada para recalcular la anulacion"));
+
+        BigDecimal currentPaid = targetInstallment.getPaidAmount() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : targetInstallment.getPaidAmount().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal reversalImpact = payment.getImpactAmount() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : payment.getImpactAmount().abs().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal recalculatedPaid = currentPaid.subtract(reversalImpact).setScale(2, RoundingMode.HALF_UP);
+        if (recalculatedPaid.compareTo(BigDecimal.ZERO) < 0) {
+            recalculatedPaid = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+
+        targetInstallment.setPaidAmount(recalculatedPaid);
+        if (recalculatedPaid.compareTo(BigDecimal.ZERO) == 0) {
+            targetInstallment.setStatus(InstallmentStatus.PENDING);
+            targetInstallment.setPaidAt(null);
+        } else if (recalculatedPaid.compareTo(targetInstallment.getAmount().setScale(2, RoundingMode.HALF_UP)) >= 0) {
+            targetInstallment.setStatus(InstallmentStatus.PAID);
+        } else {
+            targetInstallment.setStatus(InstallmentStatus.PARTIAL);
+            targetInstallment.setPaidAt(null);
+        }
+    }
+
+    private CreditInstallment copyInstallmentForReplay(CreditInstallment source) {
+        CreditInstallment copy = new CreditInstallment();
+        copy.setId(source.getId());
+        copy.setAccount(source.getAccount());
+        copy.setInstallmentNumber(source.getInstallmentNumber());
+        copy.setDueDate(source.getDueDate());
+        copy.setAmount(source.getAmount().setScale(2, RoundingMode.HALF_UP));
+        copy.setPaidAmount(
+                source.getPaidAmount() == null
+                        ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                        : source.getPaidAmount().setScale(2, RoundingMode.HALF_UP)
+        );
+        copy.setStatus(source.getStatus());
+        copy.setPaidAt(source.getPaidAt());
+        copy.setRestoredFromInstallmentId(source.getRestoredFromInstallmentId());
+        return copy;
     }
 
     @Override
@@ -512,6 +706,19 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         private ClientAggregate(com.sales.maidav.model.client.Client client) {
             this.client = client;
         }
+    }
+
+    private record PaymentApplicationResult(BigDecimal impactAmount,
+                                            Map<Integer, String> paymentReferences,
+                                            List<PaymentAllocation> allocations) {
+    }
+
+    private record PaymentAllocation(Long paymentId,
+                                     Long installmentId,
+                                     Integer installmentNumber,
+                                     PaymentCollectionMethod paymentMethod,
+                                     BigDecimal collectedAmount,
+                                     BigDecimal impactAmount) {
     }
 
     private String buildAllocationSummary(Map<Integer, String> paymentReferences) {

@@ -54,6 +54,7 @@ public class UserServiceImpl implements UserService{
         user.setLastName(data.getLastName());
         user.setPhone(data.getPhone());
         user.setAddress(data.getAddress());
+        user.setNationalId(data.getNationalId());
         user.setBirthDate(data.getBirthDate());
         user.setPhotoPath(data.getPhotoPath());
 
@@ -74,6 +75,7 @@ public class UserServiceImpl implements UserService{
         user.setLastName(data.getLastName());
         user.setPhone(data.getPhone());
         user.setAddress(data.getAddress());
+        user.setNationalId(data.getNationalId());
         user.setBirthDate(data.getBirthDate());
         user.setPhotoPath(data.getPhotoPath());
         return user;
@@ -104,5 +106,28 @@ public class UserServiceImpl implements UserService{
     public CurrentUserView findCurrentUserViewByEmail(String email) {
         String photoPath = userRepository.findPhotoPathByEmail(email).orElse(null);
         return new CurrentUserView(email, photoPath);
+    }
+
+    @Override
+    public void changePassword(String email, String currentPassword, String newPassword, String confirmPassword) {
+        User user = findByEmail(email);
+
+        if (currentPassword == null || currentPassword.isBlank()) {
+            throw new IllegalArgumentException("La contraseña actual es obligatoria");
+        }
+        if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
+            throw new IllegalArgumentException("La contraseña actual es incorrecta");
+        }
+        if (newPassword == null || newPassword.isBlank()) {
+            throw new IllegalArgumentException("La nueva contraseña es obligatoria");
+        }
+        if (newPassword.length() < 6) {
+            throw new IllegalArgumentException("La nueva contraseña debe tener al menos 6 caracteres");
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            throw new IllegalArgumentException("La confirmacion de la nueva contraseña no coincide");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
     }
 }

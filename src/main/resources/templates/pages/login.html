@@ -10,7 +10,12 @@
 
 <div class="bg-white p-8 rounded shadow w-full max-w-md">
 
-    <h2 class="text-2xl font-bold mb-6 text-center">Iniciar sesión</h2>
+    <h2 class="text-2xl font-bold mb-6 text-center">Iniciar sesion</h2>
+
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
 
     <form th:action="@{/login}" method="post" class="space-y-4">
 
@@ -35,6 +40,11 @@
        class="text-red-500 text-sm mt-4 text-center">
         Credenciales incorrectas
     </p>
+
+    <a th:href="@{/password-recovery/reset}"
+       class="mt-5 block text-center text-sm font-medium text-blue-700 hover:text-blue-900">
+        Olvide mi contrasena
+    </a>
 
 </div>
 

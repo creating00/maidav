@@ -86,10 +86,17 @@ public class CreditAccountController {
         CreditAccount account = creditAccountService.findById(id);
         List<CreditInstallment> installments =
                 creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(id);
+        List<CreditInstallment> activeInstallments = installments.stream()
+                .filter(installment -> installment.getStatus() != InstallmentStatus.VOID)
+                .filter(installment -> !installment.isVoided())
+                .toList();
+        List<CreditInstallment> voidedInstallments = installments.stream()
+                .filter(installment -> installment.getStatus() == InstallmentStatus.VOID || installment.isVoided())
+                .toList();
         BigDecimal currentInstallment = null;
         Map<Long, BigDecimal> cashAmounts = new HashMap<>();
         BigDecimal cashRecargo = resolveCashRecargo();
-        for (CreditInstallment installment : installments) {
+        for (CreditInstallment installment : activeInstallments) {
             BigDecimal remaining = remainingAmount(installment.getAmount(), installment.getPaidAmount());
             BigDecimal paidAmount = installment.getPaidAmount() == null ? BigDecimal.ZERO : installment.getPaidAmount();
             BigDecimal cashAmount = paidAmount.compareTo(BigDecimal.ZERO) == 0 && remaining != null
@@ -105,6 +112,8 @@ public class CreditAccountController {
         }
         model.addAttribute("account", account);
         model.addAttribute("installments", installments);
+        model.addAttribute("activeInstallments", activeInstallments);
+        model.addAttribute("voidedInstallments", voidedInstallments);
         model.addAttribute("currentInstallmentAmount", currentInstallment);
         model.addAttribute("paymentFrequencyLabel", paymentFrequencyLabel(account));
         model.addAttribute("cashAmounts", cashAmounts);
@@ -219,6 +228,7 @@ public class CreditAccountController {
                                   RedirectAttributes redirectAttributes) {
         try {
             String voidedBy = authentication != null ? authentication.getName() : null;
+            // SOLO ADMIN PUEDE ANULAR
             // ANULACION DE CUOTA
             // AUDITORIA ANULACION
             creditAccountService.voidInstallment(id, installmentId, voidedBy, reason);

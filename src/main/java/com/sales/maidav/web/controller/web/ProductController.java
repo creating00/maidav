@@ -294,7 +294,7 @@ public class ProductController {
 
     // RESTRICCION POR ROL
     @GetMapping(value = "/barcode/label", produces = MediaType.TEXT_HTML_VALUE)
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')")
+    @PreAuthorize("hasAuthority('PRODUCT_BARCODE_LABEL')")
     public String barcodeLabel(@RequestParam String barcode,
                                @RequestParam(required = false) String description,
                                @RequestParam(required = false) String productCode,
@@ -307,7 +307,7 @@ public class ProductController {
     }
 
     @GetMapping(value = "/barcode/sheet", produces = MediaType.TEXT_HTML_VALUE)
-    @PreAuthorize("hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')")
+    @PreAuthorize("hasAuthority('PRODUCT_BARCODE_SHEET')")
     public String barcodeSheet(@RequestParam String barcode,
                                @RequestParam(required = false) String description,
                                @RequestParam(required = false) String productCode,

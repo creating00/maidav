@@ -24,5 +24,7 @@ public interface UserService {
     User findByEmail(String email);
 
     CurrentUserView findCurrentUserViewByEmail(String email);
+
+    void changePassword(String email, String currentPassword, String newPassword, String confirmPassword);
 }
 

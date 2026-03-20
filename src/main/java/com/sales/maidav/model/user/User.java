@@ -32,6 +32,9 @@ public class User extends BaseEntity {
     @Column(length = 255)
     private String address;
 
+    @Column(name = "national_id", length = 30)
+    private String nationalId;
+
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
@@ -56,6 +59,7 @@ public class User extends BaseEntity {
     public String getLastName() { return lastName; }
     public String getPhone() { return phone; }
     public String getAddress() { return address; }
+    public String getNationalId() { return nationalId; }
     public LocalDate getBirthDate() { return birthDate; }
     public String getPhotoPath() { return photoPath; }
 
@@ -81,6 +85,7 @@ public class User extends BaseEntity {
     public void setLastName(String lastName) { this.lastName = lastName; }
     public void setPhone(String phone) { this.phone = phone; }
     public void setAddress(String address) { this.address = address; }
+    public void setNationalId(String nationalId) { this.nationalId = nationalId; }
     public void setBirthDate(LocalDate birthDate) { this.birthDate = birthDate; }
     public void setPhotoPath(String photoPath) { this.photoPath = photoPath; }
 }

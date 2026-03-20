@@ -25,7 +25,7 @@ public class SecurityConfig {
 
         http
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/css/**", "/js/**", "/uploads/**").permitAll()
+                        .requestMatchers("/login", "/password-recovery/**", "/css/**", "/js/**", "/uploads/**").permitAll()
                         .requestMatchers("/access-denied").permitAll()
                         .requestMatchers("/dashboard/**").authenticated()
                         .requestMatchers("/users/**").hasAuthority("USER_READ")

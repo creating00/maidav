@@ -36,6 +36,18 @@ public class CreditPayment extends BaseEntity {
     @Column(name = "operation_token", length = 120)
     private String operationToken;
 
+    @Column(nullable = false)
+    private boolean reversal = false;
+
+    @Column(name = "reversal_of_payment_id")
+    private Long reversalOfPaymentId;
+
+    @Column(name = "target_installment_id")
+    private Long targetInstallmentId;
+
+    @Column(name = "reversal_reason", length = 255)
+    private String reversalReason;
+
     public CreditPayment() {}
 
     public CreditAccount getAccount() { return account; }
@@ -61,5 +73,17 @@ public class CreditPayment extends BaseEntity {
 
     public String getOperationToken() { return operationToken; }
     public void setOperationToken(String operationToken) { this.operationToken = operationToken; }
+
+    public boolean isReversal() { return reversal; }
+    public void setReversal(boolean reversal) { this.reversal = reversal; }
+
+    public Long getReversalOfPaymentId() { return reversalOfPaymentId; }
+    public void setReversalOfPaymentId(Long reversalOfPaymentId) { this.reversalOfPaymentId = reversalOfPaymentId; }
+
+    public Long getTargetInstallmentId() { return targetInstallmentId; }
+    public void setTargetInstallmentId(Long targetInstallmentId) { this.targetInstallmentId = targetInstallmentId; }
+
+    public String getReversalReason() { return reversalReason; }
+    public void setReversalReason(String reversalReason) { this.reversalReason = reversalReason; }
 }
 

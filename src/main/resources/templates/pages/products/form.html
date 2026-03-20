@@ -92,13 +92,13 @@
                             Generar codigo del sistema
                         </button>
                         <button type="button"
-                                sec:authorize="hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')"
+                                sec:authorize="hasAuthority('PRODUCT_BARCODE_LABEL')"
                                 id="printBarcodeBtn"
                                 class="rounded border border-indigo-300 px-3 py-2 text-sm text-indigo-700 hover:bg-indigo-50">
                             Ver etiqueta
                         </button>
                         <button type="button"
-                                sec:authorize="hasRole('ADMIN') or hasAuthority('PRODUCT_BARCODE_PRINT')"
+                                sec:authorize="hasAuthority('PRODUCT_BARCODE_SHEET')"
                                 id="printBarcodeSheetBtn"
                                 class="rounded border border-fuchsia-300 px-3 py-2 text-sm text-fuchsia-700 hover:bg-fuchsia-50">
                             Hoja de etiquetas
@@ -540,4 +540,6 @@
 
 </section>
 </html>
+
+
 
