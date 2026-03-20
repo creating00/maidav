@@ -6,11 +6,15 @@ import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.sale.SaleRepository;
+import com.sales.maidav.repository.user.UserRepository;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.List;
 
@@ -31,6 +35,8 @@ class SaleServiceImplTest {
     private CreditAccountRepository creditAccountRepository;
     @Mock
     private CreditInstallmentRepository creditInstallmentRepository;
+    @Mock
+    private UserRepository userRepository;
 
     private SaleServiceImpl saleService;
 
@@ -41,12 +47,26 @@ class SaleServiceImplTest {
                 saleItemRepository,
                 productRepository,
                 creditAccountRepository,
-                creditInstallmentRepository
+                creditInstallmentRepository,
+                userRepository
         );
+    }
+
+    @AfterEach
+    void tearDown() {
+        SecurityContextHolder.clearContext();
     }
 
     @Test
     void findAllUsesNewestFirstRepositoryMethod() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "admin@maidav.com",
+                        "secret",
+                        List.of(() -> "ROLE_ADMIN")
+                )
+        );
+
         Sale newest = new Sale();
         newest.setId(2L);
         Sale oldest = new Sale();
