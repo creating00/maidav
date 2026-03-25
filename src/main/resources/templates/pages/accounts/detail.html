@@ -49,6 +49,16 @@
             <p class="text-sm text-gray-500">Cuota actual</p>
             <p class="text-xl font-bold"
                th:text="${currentInstallmentAmount != null ? currentInstallmentAmount : '-'}"></p>
+            <div th:if="${currentInstallmentNumber != null}" class="mt-2 text-xs text-slate-600 space-y-1">
+                <div th:text="${'Cuota #' + currentInstallmentNumber}"></div>
+                <div th:if="${currentInstallmentAppliedCredit > 0}" class="rounded bg-emerald-50 px-2 py-1 text-emerald-700 font-semibold">
+                    <span th:text="${'Esta cuota baja de ' + currentInstallmentBaseAmount + ' a ' + currentInstallmentAmount + ' porque ya tenia ' + currentInstallmentAppliedCredit + ' a favor.'}"></span>
+                </div>
+                <div th:if="${currentInstallmentAppliedCredit == 0 and currentInstallmentCashPricing != null}"
+                     th:text="${currentInstallmentCashPricing ? 'Hoy se cobra valor contado.' : 'Hoy se cobra valor financiado.'}"></div>
+                <div th:if="${currentInstallmentExpiredCash > 0}" class="text-rose-600 line-through"
+                     th:text="${'Contado vencido: ' + currentInstallmentExpiredCash}"></div>
+            </div>
         </div>
         <div class="bg-white p-4 rounded shadow">
             <p class="text-sm text-gray-500">Saldo</p>
@@ -80,16 +90,20 @@
               th:attr="data-recargo=${cashRecargo}">
             <input type="number" step="0.01" name="amount" placeholder="Monto"
                    class="border rounded px-3 py-2 w-48"/>
+            <input type="hidden" name="operationToken" id="paymentOperationToken"/>
             <select name="paymentMethod" class="border rounded px-3 py-2">
-                <option value="BANK">Debito/Transferencia (cuota financiada)</option>
-                <option value="CASH">Efectivo (cuota en efectivo)</option>
+                <option value="BANK">Debito / Transferencia</option>
+                <option value="CASH">Efectivo</option>
             </select>
-            <button class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
+            <button id="paymentSubmitButton" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
                 Registrar
             </button>
         </form>
+        <p id="paymentProcessingState" class="mt-2 text-xs font-semibold text-blue-700 hidden">
+            Procesando pago...
+        </p>
         <p class="mt-2 text-xs text-gray-600">
-            El descuento en efectivo solo aplica si la cuota se cancela completa de una sola vez. Si hubo un pago parcial, el saldo restante pasa a cobrarse al valor financiado.
+            Hasta el vencimiento inclusive se cobra valor contado. Despues del vencimiento, o en planes diarios, se cobra valor financiado.
         </p>
     </div>
 
@@ -113,7 +127,7 @@
                 th:with="remaining=${inst.amount - (inst.paidAmount != null ? inst.paidAmount : 0)}">
                 <td class="px-4 py-3">
                     <input type="checkbox" name="installmentIds" th:value="${inst.id}"
-                           th:attr="data-remaining=${remaining},data-cash-remaining=${cashAmounts[inst.id]}"
+                           th:attr="data-remaining=${remaining},data-charge-amount=${chargeAmounts[inst.id]}"
                            form="paymentForm"
                            th:disabled="${inst.status.name() == 'PAID'}"/>
                 </td>
@@ -123,9 +137,22 @@
                     th:classappend="${inst.status.name() != 'PAID' and inst.dueDate.isBefore(T(java.time.LocalDate).now())} ? ' text-red-600' : ''">
                 </td>
                 <td class="px-4 py-3" th:text="${inst.amount}"></td>
-                <td class="px-4 py-3 font-semibold"
-                    th:text="${remaining}"
-                    th:classappend="${remaining > 0} ? ' text-amber-700' : ' text-green-700'"></td>
+                <td class="px-4 py-3">
+                    <div class="font-semibold"
+                         th:text="${chargeAmounts[inst.id]}"
+                         th:classappend="${chargeAmounts[inst.id] > 0} ? ' text-amber-700' : ' text-green-700'"></div>
+                    <div class="text-xs text-gray-500" th:text="${cashPricingAvailable[inst.id] ? 'Valor contado vigente' : 'Valor financiado vigente'}"></div>
+                    <div th:if="${appliedCreditAmounts[inst.id] > 0}"
+                         class="mt-1 rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
+                         th:text="${'Antes: ' + baseChargeAmounts[inst.id] + ' | A favor: ' + appliedCreditAmounts[inst.id] + ' | Pagas hoy: ' + chargeAmounts[inst.id]}"></div>
+                    <div class="text-xs text-slate-500" th:text="${'Saldo financiado: ' + financedAmounts[inst.id]}"></div>
+                    <div th:if="${appliedCreditAmounts[inst.id] > 0}"
+                         class="text-xs font-semibold text-emerald-700"
+                         th:text="${'Saldo a favor aplicado: ' + appliedCreditAmounts[inst.id]}"></div>
+                    <div th:if="${expiredCashAmounts[inst.id] > 0}"
+                         class="text-xs font-semibold text-rose-600 line-through"
+                         th:text="${'Contado vencido: ' + expiredCashAmounts[inst.id]}"></div>
+                </td>
                 <td class="px-4 py-3">
                     <span th:if="${inst.status.name() == 'PAID'}"
                           class="text-green-600 font-semibold">Pagado</span>
@@ -326,6 +353,9 @@
             }
             const amountInput = paymentForm.querySelector('input[name="amount"]');
             const methodSelect = paymentForm.querySelector('select[name="paymentMethod"]');
+            const operationTokenInput = document.getElementById('paymentOperationToken');
+            const paymentSubmitButton = document.getElementById('paymentSubmitButton');
+            const paymentProcessingState = document.getElementById('paymentProcessingState');
             const checkboxes = document.querySelectorAll('input[name="installmentIds"]');
             const paymentRows = document.querySelectorAll('[data-payment-row="true"]');
             const totalCashEl = document.getElementById('total-cash');
@@ -334,6 +364,7 @@
             const closingTotalCashEl = document.getElementById('closing-total-cash');
             const closingTotalBankEl = document.getElementById('closing-total-bank');
             const closingTotalGeneralEl = document.getElementById('closing-total-general');
+            let paymentSubmitting = false;
             function parseNumber(value) {
                 const num = parseFloat(value);
                 return Number.isFinite(num) ? num : 0;
@@ -349,9 +380,7 @@
                     if (!checkbox.checked) {
                         return;
                     }
-                    total += methodSelect && methodSelect.value === 'CASH'
-                        ? parseNumber(checkbox.dataset.cashRemaining)
-                        : parseNumber(checkbox.dataset.remaining);
+                    total += parseNumber(checkbox.dataset.chargeAmount);
                 });
                 if (amountInput) {
                     amountInput.value = total > 0 ? total.toFixed(2) : '';
@@ -405,6 +434,51 @@
                     closingTotalGeneralEl.textContent = money(totalGeneral);
                 }
             }
+
+            function selectedInstallmentsLabel() {
+                const selected = Array.from(checkboxes)
+                    .filter(checkbox => checkbox.checked)
+                    .map(checkbox => {
+                        const row = checkbox.closest('tr');
+                        return row ? row.children[1]?.textContent?.trim() : null;
+                    })
+                    .filter(Boolean);
+                return selected.length ? selected.join(', ') : 'las cuotas seleccionadas';
+            }
+
+            paymentForm.addEventListener('submit', function (event) {
+                if (paymentSubmitting) {
+                    // PREVENCION DOBLE SUBMIT
+                    event.preventDefault();
+                    return;
+                }
+
+                const amount = parseNumber(amountInput ? amountInput.value : 0);
+                const paymentMethod = methodSelect && methodSelect.value === 'CASH'
+                    ? 'efectivo'
+                    : 'debito / transferencia';
+                const installments = selectedInstallmentsLabel();
+                // CONFIRMACION REGISTRO PAGO
+                const confirmed = window.confirm(
+                    `Esta por registrar un pago de $${amount.toFixed(2)} en ${paymentMethod} para ${installments}. Desea continuar?`
+                );
+                if (!confirmed) {
+                    event.preventDefault();
+                    return;
+                }
+
+                paymentSubmitting = true;
+                if (operationTokenInput) {
+                    operationTokenInput.value = `account-pay-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+                }
+                if (paymentSubmitButton) {
+                    paymentSubmitButton.disabled = true;
+                    paymentSubmitButton.textContent = 'Procesando...';
+                }
+                if (paymentProcessingState) {
+                    paymentProcessingState.classList.remove('hidden');
+                }
+            });
 
             checkboxes.forEach(checkbox => {
                 checkbox.addEventListener('change', updateAmount);

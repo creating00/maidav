@@ -10,9 +10,11 @@ import com.sales.maidav.model.sale.InstallmentStatus;
 import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.settings.CompanySettings;
+import com.sales.maidav.service.sale.CreditPaymentPricingSupport;
 import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.sale.InvalidSaleException;
 import com.sales.maidav.service.settings.CompanySettingsService;
+import com.sales.maidav.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -41,11 +43,25 @@ public class CreditAccountController {
     private final CreditPaymentRepository creditPaymentRepository;
     private final CompanySettingsService companySettingsService;
     private final SaleItemRepository saleItemRepository;
+    private final UserService userService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('ARREARS_READ')")
-    public String list(@RequestParam(required = false) String q, Authentication authentication, Model model) {
+    public String list(@RequestParam(required = false) String q,
+                       @RequestParam(required = false) Long sellerId,
+                       Authentication authentication,
+                       Model model) {
         List<CreditAccount> accounts = creditAccountService.findAll();
+        Long effectiveSellerId = resolveSellerFilter(authentication, sellerId);
+        if (effectiveSellerId != null) {
+            // FILTRO POR VENDEDOR
+            // FILTRO VENDEDOR BACKEND
+            accounts = accounts.stream()
+                    .filter(account -> account.getSale() != null
+                            && account.getSale().getSeller() != null
+                            && effectiveSellerId.equals(account.getSale().getSeller().getId()))
+                    .toList();
+        }
         if (q != null && !q.isBlank()) {
             String term = q.trim().toLowerCase(Locale.ROOT);
             accounts = accounts.stream()
@@ -65,13 +81,16 @@ public class CreditAccountController {
                     .filter(installment -> installment.getStatus() != InstallmentStatus.VOID)
                     .filter(installment -> !installment.isVoided())
                     .findFirst()
-                    .map(installment -> remainingAmount(installment.getAmount(), installment.getPaidAmount()))
+                    .map(installment -> chargeAmount(account, installment))
                     .orElse(null);
             currentInstallments.put(account.getId(), currentAmount);
             dueSchedules.put(account.getId(), formatDueSchedule(account));
         }
         Map<Long, List<AccountProductItemView>> productsByAccount = buildProductsByAccount(accounts);
         model.addAttribute("q", q);
+        model.addAttribute("sellerId", effectiveSellerId);
+        // FILTRO VENDEDOR FRONTEND
+        model.addAttribute("sellerOptions", sellerOptions(authentication));
         model.addAttribute("accounts", accounts);
         model.addAttribute("currentInstallments", currentInstallments);
         model.addAttribute("dueSchedules", dueSchedules);
@@ -94,20 +113,53 @@ public class CreditAccountController {
                 .filter(installment -> installment.getStatus() == InstallmentStatus.VOID || installment.isVoided())
                 .toList();
         BigDecimal currentInstallment = null;
-        Map<Long, BigDecimal> cashAmounts = new HashMap<>();
+        Integer currentInstallmentNumber = null;
+        BigDecimal currentInstallmentBaseAmount = null;
+        BigDecimal currentInstallmentAppliedCredit = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal currentInstallmentExpiredCash = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        Boolean currentInstallmentCashPricing = null;
+        Map<Long, BigDecimal> chargeAmounts = new HashMap<>();
+        Map<Long, BigDecimal> baseChargeAmounts = new HashMap<>();
+        Map<Long, BigDecimal> financedAmounts = new HashMap<>();
+        Map<Long, Boolean> cashPricingAvailable = new HashMap<>();
+        Map<Long, BigDecimal> appliedCreditAmounts = new HashMap<>();
+        Map<Long, BigDecimal> expiredCashAmounts = new HashMap<>();
         BigDecimal cashRecargo = resolveCashRecargo();
         for (CreditInstallment installment : activeInstallments) {
             BigDecimal remaining = remainingAmount(installment.getAmount(), installment.getPaidAmount());
-            BigDecimal paidAmount = installment.getPaidAmount() == null ? BigDecimal.ZERO : installment.getPaidAmount();
-            BigDecimal cashAmount = paidAmount.compareTo(BigDecimal.ZERO) == 0 && remaining != null
-                    ? roundUpToFifty(remaining.divide(cashRecargo, 2, RoundingMode.HALF_UP))
-                    : remaining;
-            cashAmounts.put(installment.getId(), cashAmount);
+            BigDecimal chargeAmount = resolveChargeAmount(account, installment, remaining, LocalDate.now(), cashRecargo);
+            BigDecimal fullCashAmount = resolveFullCashAmount(account, installment, cashRecargo);
+            chargeAmounts.put(installment.getId(), chargeAmount);
+            financedAmounts.put(installment.getId(), remaining);
+            boolean usesCashValue = CreditPaymentPricingSupport.usesCashValue(
+                    account.getPaymentFrequency(),
+                    installment.getDueDate(),
+                    LocalDate.now()
+            );
+            cashPricingAvailable.put(installment.getId(), usesCashValue);
+            BigDecimal appliedCreditAmount = usesCashValue
+                    ? normalizeAmount(fullCashAmount.subtract(chargeAmount))
+                    : normalizeAmount(installment.getAmount().subtract(remaining));
+            if (appliedCreditAmount.compareTo(BigDecimal.ZERO) < 0) {
+                appliedCreditAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            }
+            BigDecimal baseChargeAmount = normalizeAmount(chargeAmount.add(appliedCreditAmount));
+            baseChargeAmounts.put(installment.getId(), baseChargeAmount);
+            appliedCreditAmounts.put(installment.getId(), appliedCreditAmount);
+            BigDecimal expiredCashAmount = !usesCashValue && fullCashAmount.compareTo(BigDecimal.ZERO) > 0
+                    ? fullCashAmount
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            expiredCashAmounts.put(installment.getId(), expiredCashAmount);
             if (currentInstallment == null
                     && installment.getStatus() != InstallmentStatus.PAID
                     && installment.getStatus() != InstallmentStatus.VOID
                     && !installment.isVoided()) {
-                currentInstallment = remaining;
+                currentInstallment = chargeAmount;
+                currentInstallmentNumber = installment.getInstallmentNumber();
+                currentInstallmentBaseAmount = baseChargeAmount;
+                currentInstallmentAppliedCredit = appliedCreditAmount;
+                currentInstallmentExpiredCash = expiredCashAmount;
+                currentInstallmentCashPricing = usesCashValue;
             }
         }
         model.addAttribute("account", account);
@@ -115,8 +167,18 @@ public class CreditAccountController {
         model.addAttribute("activeInstallments", activeInstallments);
         model.addAttribute("voidedInstallments", voidedInstallments);
         model.addAttribute("currentInstallmentAmount", currentInstallment);
+        model.addAttribute("currentInstallmentNumber", currentInstallmentNumber);
+        model.addAttribute("currentInstallmentBaseAmount", currentInstallmentBaseAmount);
+        model.addAttribute("currentInstallmentAppliedCredit", currentInstallmentAppliedCredit);
+        model.addAttribute("currentInstallmentExpiredCash", currentInstallmentExpiredCash);
+        model.addAttribute("currentInstallmentCashPricing", currentInstallmentCashPricing);
         model.addAttribute("paymentFrequencyLabel", paymentFrequencyLabel(account));
-        model.addAttribute("cashAmounts", cashAmounts);
+        model.addAttribute("chargeAmounts", chargeAmounts);
+        model.addAttribute("baseChargeAmounts", baseChargeAmounts);
+        model.addAttribute("financedAmounts", financedAmounts);
+        model.addAttribute("cashPricingAvailable", cashPricingAvailable);
+        model.addAttribute("appliedCreditAmounts", appliedCreditAmounts);
+        model.addAttribute("expiredCashAmounts", expiredCashAmounts);
         model.addAttribute("payments", creditPaymentRepository.findByAccount_IdOrderByPaidAtDescIdDesc(id));
         model.addAttribute("paymentMethods", PaymentCollectionMethod.values());
         model.addAttribute("cashRecargo", cashRecargo);
@@ -136,11 +198,13 @@ public class CreditAccountController {
                       @RequestParam BigDecimal amount,
                       @RequestParam(required = false) java.util.List<Long> installmentIds,
                       @RequestParam(required = false, defaultValue = "BANK") PaymentCollectionMethod paymentMethod,
+                      @RequestParam(required = false) String operationToken,
                       Authentication authentication,
                       RedirectAttributes redirectAttributes) {
         try {
             String registeredBy = authentication != null ? authentication.getName() : null;
-            creditAccountService.registerPayment(id, amount, installmentIds, registeredBy, paymentMethod);
+            // VALIDACION BACKEND PAGO
+            creditAccountService.registerPayment(id, amount, installmentIds, registeredBy, paymentMethod, operationToken);
             redirectAttributes.addFlashAttribute("successMessage", "Pago registrado correctamente");
         } catch (InvalidSaleException ex) {
             redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
@@ -473,6 +537,39 @@ public class CreditAccountController {
                 .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
+    private Long resolveSellerFilter(Authentication authentication, Long sellerId) {
+        if (isAdmin(authentication)) {
+            return sellerId == null || sellerId <= 0 ? null : sellerId;
+        }
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return null;
+        }
+        return userService.findByEmail(authentication.getName()).getId();
+    }
+
+    private List<SellerOption> sellerOptions(Authentication authentication) {
+        if (isAdmin(authentication)) {
+            return userService.findByRoleName("VENDEDOR").stream()
+                    .map(user -> new SellerOption(user.getId(), sellerLabel(user)))
+                    .toList();
+        }
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return List.of();
+        }
+        var currentUser = userService.findByEmail(authentication.getName());
+        return List.of(new SellerOption(currentUser.getId(), sellerLabel(currentUser)));
+    }
+
+    private String sellerLabel(com.sales.maidav.model.user.User user) {
+        if (user == null) {
+            return "-";
+        }
+        String firstName = user.getFirstName() == null ? "" : user.getFirstName().trim();
+        String lastName = user.getLastName() == null ? "" : user.getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+        return fullName.isEmpty() ? user.getEmail() : fullName;
+    }
+
     private BulkPaymentEntry parseBulkPaymentEntry(String line) {
         List<String> parts = splitBulkPaymentLine(line);
         if (parts.isEmpty() || isHeaderRow(parts)) {
@@ -580,15 +677,45 @@ public class CreditAccountController {
         return recargo;
     }
 
-    private BigDecimal roundUpToFifty(BigDecimal amount) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+    private BigDecimal chargeAmount(CreditAccount account, CreditInstallment installment) {
+        return resolveChargeAmount(
+                account,
+                installment,
+                remainingAmount(installment.getAmount(), installment.getPaidAmount()),
+                LocalDate.now(),
+                resolveCashRecargo()
+        );
+    }
+
+    private BigDecimal resolveChargeAmount(CreditAccount account,
+                                           CreditInstallment installment,
+                                           BigDecimal remaining,
+                                           LocalDate paymentDate,
+                                           BigDecimal cashRecargo) {
+        return CreditPaymentPricingSupport.resolveCollectedAmountDue(
+                remaining,
+                cashRecargo,
+                account.getPaymentFrequency(),
+                installment.getDueDate(),
+                paymentDate
+        );
+    }
+
+    private BigDecimal resolveFullCashAmount(CreditAccount account,
+                                             CreditInstallment installment,
+                                             BigDecimal cashRecargo) {
+        return CreditPaymentPricingSupport.resolveInstallmentCashValue(
+                installment.getAmount(),
+                cashRecargo,
+                account.getPaymentFrequency()
+        );
+    }
+
+    private BigDecimal normalizeAmount(BigDecimal amount) {
+        if (amount == null) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-        BigDecimal factor = new BigDecimal("50");
-        return amount
-                .divide(factor, 0, RoundingMode.CEILING)
-                .multiply(factor)
-                .setScale(2, RoundingMode.HALF_UP);
+        return amount.setScale(2, RoundingMode.HALF_UP);
     }
 
     private static class MutableClientGroup {
@@ -615,5 +742,6 @@ public class CreditAccountController {
     private record ClientGroupView(String clientName, String nationalId, BigDecimal totalBalance, int activeCredits,
                                    String badgeLabel, String badgeClass, List<ClientAccountItemView> accounts) {}
     private record BulkPaymentEntry(Long accountId, BigDecimal amount) {}
+    private record SellerOption(Long id, String label) {}
 }
 

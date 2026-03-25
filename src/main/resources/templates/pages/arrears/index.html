@@ -18,6 +18,19 @@
                 <option value="MEDIO" th:selected="${level == 'MEDIO'}">Medio</option>
                 <option value="ALTO" th:selected="${level == 'ALTO'}">Alto</option>
             </select>
+            <!-- FILTRO POR VENDEDOR -->
+            <!-- FILTRO VENDEDOR FRONTEND -->
+            <label class="text-sm text-gray-600" th:if="${!#lists.isEmpty(sellerOptions)}">Vendedor</label>
+            <select name="sellerId"
+                    th:if="${!#lists.isEmpty(sellerOptions)}"
+                    class="border rounded px-3 py-2">
+                <option value="" th:selected="${sellerId == null}">Todos los vendedores</option>
+                <option th:each="seller : ${sellerOptions}"
+                        th:value="${seller.id}"
+                        th:selected="${sellerId != null && seller.id == sellerId}"
+                        th:text="${seller.label}">
+                </option>
+            </select>
             <button class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900">
                 Aplicar
             </button>

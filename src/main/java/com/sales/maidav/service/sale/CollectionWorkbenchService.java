@@ -51,12 +51,48 @@ public class CollectionWorkbenchService {
 
         BigDecimal financedAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal cashAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal chargeAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal baseChargeAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal appliedCreditAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal expiredCashAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         Integer installmentNumber = null;
+        boolean cashPricingAvailable = false;
+        String chargeModeLabel = "Valor financiado";
         if (currentInstallment != null) {
             installmentNumber = currentInstallment.getInstallmentNumber();
             BigDecimal remaining = remainingAmount(currentInstallment.getAmount(), currentInstallment.getPaidAmount());
+            BigDecimal fullCashAmount = CreditPaymentPricingSupport.resolveInstallmentCashValue(
+                    currentInstallment.getAmount(),
+                    resolveCashRecargo(),
+                    account.getPaymentFrequency()
+            );
             financedAmount = normalize(remaining);
-            cashAmount = resolveCashAmount(remaining, currentInstallment.getPaidAmount());
+            cashPricingAvailable = CreditPaymentPricingSupport.usesCashValue(
+                    account.getPaymentFrequency(),
+                    currentInstallment.getDueDate(),
+                    LocalDate.now()
+            );
+            cashAmount = cashPricingAvailable
+                    ? resolveCashAmount(account, currentInstallment, remaining)
+                    : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            chargeAmount = CreditPaymentPricingSupport.resolveCollectedAmountDue(
+                    remaining,
+                    resolveCashRecargo(),
+                    account.getPaymentFrequency(),
+                    currentInstallment.getDueDate(),
+                    LocalDate.now()
+            );
+            chargeModeLabel = cashPricingAvailable ? "Valor contado" : "Valor financiado";
+            appliedCreditAmount = cashPricingAvailable
+                    ? normalize(fullCashAmount.subtract(chargeAmount))
+                    : normalize(currentInstallment.getAmount().subtract(financedAmount));
+            if (appliedCreditAmount.compareTo(BigDecimal.ZERO) < 0) {
+                appliedCreditAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            }
+            baseChargeAmount = normalize(chargeAmount.add(appliedCreditAmount));
+            if (!cashPricingAvailable && fullCashAmount.compareTo(BigDecimal.ZERO) > 0) {
+                expiredCashAmount = fullCashAmount;
+            }
         }
 
         boolean overdue = installments.stream()
@@ -82,10 +118,16 @@ public class CollectionWorkbenchService {
                 installmentNumber,
                 cashAmount,
                 financedAmount,
+                chargeAmount,
+                baseChargeAmount,
+                appliedCreditAmount,
+                expiredCashAmount,
                 normalize(account.getBalance()),
                 normalize(overdueAmount),
                 overdue ? "Atrasado" : "Al dia",
                 overdue ? "estadoA" : "estadoD",
+                cashPricingAvailable,
+                chargeModeLabel,
                 "/accounts/" + account.getId() + "#payments-section"
         );
     }
@@ -148,17 +190,16 @@ public class CollectionWorkbenchService {
         return description == null || description.isBlank() ? "Producto" : description.trim();
     }
 
-    private BigDecimal resolveCashAmount(BigDecimal financedAmount, BigDecimal paidAmount) {
-        BigDecimal financed = normalize(financedAmount);
-        BigDecimal paid = paidAmount == null ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP) : normalize(paidAmount);
-        if (financed.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        if (paid.compareTo(BigDecimal.ZERO) > 0) {
-            return financed;
-        }
-        BigDecimal recargo = resolveCashRecargo();
-        return roundUpToFifty(financed.divide(recargo, 2, RoundingMode.HALF_UP));
+    private BigDecimal resolveCashAmount(CreditAccount account,
+                                         CreditInstallment installment,
+                                         BigDecimal financedAmount) {
+        return CreditPaymentPricingSupport.resolveCollectedAmountDue(
+                financedAmount,
+                resolveCashRecargo(),
+                account.getPaymentFrequency(),
+                installment.getDueDate(),
+                LocalDate.now()
+        );
     }
 
     private BigDecimal resolveCashRecargo() {
@@ -168,17 +209,6 @@ public class CollectionWorkbenchService {
             return new BigDecimal("1.26");
         }
         return recargo;
-    }
-
-    private BigDecimal roundUpToFifty(BigDecimal amount) {
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-        }
-        BigDecimal factor = new BigDecimal("50");
-        return amount
-                .divide(factor, 0, RoundingMode.CEILING)
-                .multiply(factor)
-                .setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal remainingAmount(BigDecimal amount, BigDecimal paidAmount) {
@@ -207,10 +237,16 @@ public class CollectionWorkbenchService {
                                        Integer installmentNumber,
                                        BigDecimal cashAmount,
                                        BigDecimal financedAmount,
+                                       BigDecimal chargeAmount,
+                                       BigDecimal baseChargeAmount,
+                                       BigDecimal appliedCreditAmount,
+                                       BigDecimal expiredCashAmount,
                                        BigDecimal balance,
                                        BigDecimal overdueAmount,
                                        String statusLabel,
                                        String statusCssClass,
+                                       boolean cashPricingAvailable,
+                                       String chargeModeLabel,
                                        String detailUrl) {
     }
 

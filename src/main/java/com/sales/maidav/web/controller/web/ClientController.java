@@ -42,15 +42,29 @@ public class ClientController {
     @PreAuthorize("hasAuthority('CLIENT_READ')")
     public String list(
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long sellerId,
             Model model
     ) {
+        List<Client> clients;
 
         if (search != null && !search.isBlank()) {
-            model.addAttribute("clients", clientService.search(search));
+            clients = clientService.search(search);
             model.addAttribute("search", search);
         } else {
-            model.addAttribute("clients", clientService.findAll());
+            clients = clientService.findAll();
         }
+        // FILTRO POR VENDEDOR
+        // FILTRO VENDEDOR BACKEND
+        Long effectiveSellerId = resolveSellerFilter(sellerId);
+        if (effectiveSellerId != null) {
+            clients = clients.stream()
+                    .filter(client -> client.getSeller() != null && effectiveSellerId.equals(client.getSeller().getId()))
+                    .toList();
+        }
+        model.addAttribute("clients", clients);
+        model.addAttribute("sellerId", effectiveSellerId);
+        // FILTRO VENDEDOR FRONTEND
+        model.addAttribute("sellerOptions", sellerOptions());
 
         return "pages/clients/index";
     }
@@ -172,5 +186,43 @@ public class ClientController {
         }
         return authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()));
+    }
+
+    private Long resolveSellerFilter(Long sellerId) {
+        if (currentUserIsAdmin()) {
+            return sellerId == null || sellerId <= 0 ? null : sellerId;
+        }
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return null;
+        }
+        return userService.findByEmail(authentication.getName()).getId();
+    }
+
+    private List<SellerOption> sellerOptions() {
+        if (currentUserIsAdmin()) {
+            return userService.findByRoleName("VENDEDOR").stream()
+                    .map(user -> new SellerOption(user.getId(), sellerLabel(user)))
+                    .toList();
+        }
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            return List.of();
+        }
+        var currentUser = userService.findByEmail(authentication.getName());
+        return List.of(new SellerOption(currentUser.getId(), sellerLabel(currentUser)));
+    }
+
+    private String sellerLabel(com.sales.maidav.model.user.User user) {
+        if (user == null) {
+            return "-";
+        }
+        String firstName = user.getFirstName() == null ? "" : user.getFirstName().trim();
+        String lastName = user.getLastName() == null ? "" : user.getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+        return fullName.isEmpty() ? user.getEmail() : fullName;
+    }
+
+    private record SellerOption(Long id, String label) {
     }
 }

@@ -23,5 +23,6 @@ public interface CreditAccountService {
     void voidInstallment(Long accountId, Long installmentId, String voidedBy, String reason);
     long countMoroseClients();
     java.util.List<MorositySummary> getMorosity(MorosityLevel levelFilter);
+    java.util.List<MorositySummary> getMorosity(MorosityLevel levelFilter, Long requestedSellerId);
 }
 

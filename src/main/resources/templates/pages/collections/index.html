@@ -233,6 +233,10 @@
                 card.dataset.cobrado = 'no';
                 card.dataset.cashAmount = '0';
                 card.dataset.financedAmount = '0';
+                card.dataset.chargeAmount = '0';
+                card.dataset.appliedCreditAmount = '0';
+                card.dataset.expiredCashAmount = '0';
+                card.dataset.cashPricingAvailable = 'no';
                 card.dataset.operationToken = '';
                 card.dataset.detailUrl = '';
                 card.querySelector('.cliente').innerHTML = '';
@@ -242,6 +246,7 @@
                 card.querySelector('.financiada').innerHTML = '';
                 card.querySelector('.debe').innerHTML = '';
                 card.querySelector('.estado').innerHTML = '';
+                card.querySelector('.resumenCobro').innerHTML = '';
                 card.querySelector('.detalle').innerHTML = '';
                 card.querySelector('.cobro').value = '';
                 resetMessages(card);
@@ -265,6 +270,7 @@
                     <div class="campo financiada"></div>
                     <div class="campo debe"></div>
                     <div class="campo estado"></div>
+                    <div class="campo resumenCobro"></div>
 
                     <div class="campo">
                         Cobro
@@ -335,13 +341,19 @@
                     card.dataset.cobrado = 'no';
                     card.dataset.cashAmount = data.cashAmount || 0;
                     card.dataset.financedAmount = data.financedAmount || 0;
+                    card.dataset.chargeAmount = data.chargeAmount || 0;
+                    card.dataset.appliedCreditAmount = data.appliedCreditAmount || 0;
+                    card.dataset.expiredCashAmount = data.expiredCashAmount || 0;
+                    card.dataset.cashPricingAvailable = data.cashPricingAvailable ? 'si' : 'no';
                     card.dataset.operationToken = '';
                     card.dataset.detailUrl = data.detailUrl || '';
 
                     card.querySelector('.cliente').textContent = `Cliente: ${data.clientName || '-'}`;
                     card.querySelector('.producto').textContent = `Producto: ${data.productName || '-'}`;
                     card.querySelector('.cuota').textContent = `Cuota: ${data.installmentNumber != null ? data.installmentNumber : '-'}`;
-                    card.querySelector('.contado').textContent = `Cuota contado: $${money(data.cashAmount)}`;
+                    card.querySelector('.contado').textContent = data.cashPricingAvailable
+                        ? `Cuota contado: $${money(data.cashAmount)}`
+                        : 'Cuota contado: No aplica';
                     card.querySelector('.financiada').textContent = `Cuota financiada: $${money(data.financedAmount)}`;
                     card.querySelector('.debe').textContent = `Debe: $${money(data.balance)}`;
                     const overdueAmount = parseNumber(data.overdueAmount);
@@ -351,10 +363,24 @@
                     } else {
                         card.querySelector('.estado').innerHTML = `<span class="${data.statusCssClass || 'estadoD'}">${String(data.statusLabel || 'Al dia').toUpperCase()}</span>`;
                     }
-                    card.querySelector('.cobro').value = Number(data.financedAmount || 0).toFixed(2);
-                    card.querySelector('.detalle').innerHTML = data.detailUrl
-                        ? `<a class="detalle-link" href="${data.detailUrl}">Ver detalle de la cuenta</a>`
-                        : '';
+                    const chargeModeLabel = data.chargeModeLabel || 'Valor financiado';
+                    card.querySelector('.cobro').value = Number(data.chargeAmount || 0).toFixed(2);
+                    const appliedCreditAmount = parseNumber(data.appliedCreditAmount);
+                    const expiredCashAmount = parseNumber(data.expiredCashAmount);
+                    let resumenCobro = '';
+                    if (appliedCreditAmount > 0) {
+                        resumenCobro += `<div style="color:#047857;font-weight:700;">Saldo a favor aplicado: $${money(appliedCreditAmount)}</div>`;
+                    }
+                    if (expiredCashAmount > 0) {
+                        resumenCobro += `<div style="color:#dc2626;font-weight:700;text-decoration:line-through;">Contado vencido: $${money(expiredCashAmount)}</div>`;
+                    }
+                    card.querySelector('.resumenCobro').innerHTML = resumenCobro;
+                    card.querySelector('.detalle').innerHTML = `
+                        <div class="detalle-link" style="display:block;color:#0f172a;text-decoration:none;font-weight:700;">
+                            ${chargeModeLabel} vigente: $${money(data.chargeAmount)}
+                        </div>
+                        ${data.detailUrl ? `<a class="detalle-link" href="${data.detailUrl}">Ver detalle de la cuenta</a>` : ''}
+                    `;
                 } catch (error) {
                     clearCardDetails(card);
                     card.querySelector('.error').textContent = 'No se pudo consultar el credito';
@@ -384,24 +410,14 @@
             function resolveAmountForType(card, tipo) {
                 const amountInput = card.querySelector('.cobro');
                 const typedAmount = parseNumber(amountInput.value);
-                const financedDefault = parseNumber(card.dataset.financedAmount);
-                const cashDefault = parseNumber(card.dataset.cashAmount);
-
-                if (tipo === 'efectivo') {
-                    if (typedAmount <= 0) {
-                        amountInput.value = cashDefault.toFixed(2);
-                        return cashDefault;
-                    }
-                    if (cashDefault > 0 && financedDefault > 0 && approximatelyEqual(typedAmount, financedDefault)) {
-                        amountInput.value = cashDefault.toFixed(2);
-                        return cashDefault;
-                    }
-                    return typedAmount;
-                }
-
+                const chargeDefault = parseNumber(card.dataset.chargeAmount);
                 if (typedAmount <= 0) {
-                    amountInput.value = financedDefault.toFixed(2);
-                    return financedDefault;
+                    amountInput.value = chargeDefault.toFixed(2);
+                    return chargeDefault;
+                }
+                if (chargeDefault > 0 && approximatelyEqual(typedAmount, parseNumber(card.dataset.financedAmount))) {
+                    amountInput.value = chargeDefault.toFixed(2);
+                    return chargeDefault;
                 }
                 return typedAmount;
             }
@@ -505,4 +521,7 @@
 
 </section>
 </html>
+
+
+
 

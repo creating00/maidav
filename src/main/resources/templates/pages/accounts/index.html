@@ -18,9 +18,21 @@
         <span th:text="${errorMessage}"></span>
     </div>
 
-    <form method="get" th:action="@{/accounts}" class="mb-4 flex gap-2">
+    <form method="get" th:action="@{/accounts}" class="mb-4 flex flex-wrap gap-2 items-center">
         <input type="text" name="q" th:value="${q}" placeholder="Buscar por ID, cuenta, DNI, nombre o estado"
                class="w-full md:w-96 border rounded px-4 py-2"/>
+        <!-- FILTRO POR VENDEDOR -->
+        <!-- FILTRO VENDEDOR FRONTEND -->
+        <select name="sellerId"
+                th:if="${!#lists.isEmpty(sellerOptions)}"
+                class="border rounded px-4 py-2">
+            <option value="" th:selected="${sellerId == null}">Todos los vendedores</option>
+            <option th:each="seller : ${sellerOptions}"
+                    th:value="${seller.id}"
+                    th:selected="${sellerId != null && seller.id == sellerId}"
+                    th:text="${seller.label}">
+            </option>
+        </select>
         <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
     </form>
 

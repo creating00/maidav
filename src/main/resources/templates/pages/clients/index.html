@@ -23,12 +23,24 @@
 
     <!-- Buscador -->
     <form method="get" th:action="@{/clients}" class="mb-4">
-        <div class="flex gap-2 max-w-md">
+        <div class="flex flex-wrap gap-2 max-w-3xl items-center">
             <input type="text"
                    name="search"
                    th:value="${search}"
                    placeholder="Buscar por DNI/CUIT o nombre..."
                    class="w-full border px-3 py-2 rounded focus:ring focus:ring-blue-200"/>
+            <!-- FILTRO POR VENDEDOR -->
+            <!-- FILTRO VENDEDOR FRONTEND -->
+            <select name="sellerId"
+                    th:if="${!#lists.isEmpty(sellerOptions)}"
+                    class="border px-3 py-2 rounded focus:ring focus:ring-blue-200">
+                <option value="" th:selected="${sellerId == null}">Todos los vendedores</option>
+                <option th:each="seller : ${sellerOptions}"
+                        th:value="${seller.id}"
+                        th:selected="${sellerId != null && seller.id == sellerId}"
+                        th:text="${seller.label}">
+                </option>
+            </select>
 
             <button class="bg-gray-800 text-white px-4 py-2 rounded hover:bg-gray-900">
                 Buscar
