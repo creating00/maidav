@@ -5,8 +5,10 @@ import com.sales.maidav.repository.user.RoleRepository;
 import com.sales.maidav.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.util.List;
 
@@ -63,9 +65,16 @@ public class UserController {
 
     @PostMapping("/{id}/delete")
     @PreAuthorize("hasAuthority('USER_DELETE')")
-    public String delete(@PathVariable Long id) {
-
-        userService.delete(id);
+    public String delete(@PathVariable Long id,
+                         Authentication authentication,
+                         RedirectAttributes redirectAttributes) {
+        String currentUserEmail = authentication != null ? authentication.getName() : null;
+        var result = userService.delete(id, currentUserEmail);
+        if (result.deleted() || result.disabled()) {
+            redirectAttributes.addFlashAttribute("successMessage", result.message());
+        } else {
+            redirectAttributes.addFlashAttribute("errorMessage", result.message());
+        }
         return "redirect:/users";
     }
 }

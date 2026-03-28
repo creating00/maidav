@@ -39,5 +39,7 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
 
     @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
     Optional<Client> findWithRelationsByIdAndSeller_Id(Long id, Long sellerId);
+
+    long countBySeller_Id(Long sellerId);
 }
 

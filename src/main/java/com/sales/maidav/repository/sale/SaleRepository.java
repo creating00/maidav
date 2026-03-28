@@ -31,4 +31,6 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
 
     @Query(value = "select coalesce(max(id), 0) + 1 from sales", nativeQuery = true)
     Long nextSaleId();
+
+    long countBySeller_Id(Long sellerId);
 }

@@ -16,7 +16,7 @@ public interface UserService {
     User update(Long id, User user, List<Long> roleIds);
     User updateProfile(User user);
 
-    void delete(Long id);
+    UserDeleteResult delete(Long id, String currentUserEmail);
     long count();
 
     List<User> findByRoleName(String roleName);

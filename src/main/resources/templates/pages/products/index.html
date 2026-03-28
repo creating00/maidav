@@ -76,7 +76,7 @@
             <div>
                 <h2 class="text-base font-semibold text-sky-950">Escanear producto</h2>
                 <p class="text-sm text-sky-800">
-                    Desde el celular podés escanear el codigo de barras para ubicar el producto y ver stock, precio y financiacion.
+                    Desde el celular podï¿½s escanear el codigo de barras para ubicar el producto y ver stock, precio y financiacion.
                 </p>
             </div>
             <button type="button"
@@ -344,17 +344,13 @@
                                 <span sec:authorize="hasRole('ADMIN')" class="text-sm text-slate-600">Base: <strong class="js-base">$0.00</strong></span>
                             </div>
 
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div class="rounded border border-green-200 bg-green-50 px-3 py-2">
-                                    <p class="text-xs text-slate-700">Contado</p>
-                                    <p class="text-lg font-bold text-green-700 js-contado">$0.00</p>
-                                </div>
-                                <div class="rounded border border-indigo-200 bg-indigo-50 px-3 py-2">
-                                    <p class="text-xs text-slate-700">Debito/Transferencia</p>
+                            <div class="grid grid-cols-1 gap-3">
+                                <div class="rounded border border-indigo-200 bg-indigo-50 px-3 py-3">
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-700">Referencia comercial vigente</p>
                                     <p class="text-lg font-bold text-indigo-700 js-debito">$0.00</p>
+                                    <p class="mt-1 text-xs text-slate-600">Valor sugerido para compartir con el cliente.</p>
                                 </div>
                             </div>
-
                             <div class="overflow-x-auto mt-3">
                                 <table class="min-w-full text-xs">
                                     <thead class="bg-slate-100">
@@ -362,7 +358,6 @@
                                         <th class="px-2 py-2 text-left">Plan</th>
                                         <th class="px-2 py-2 text-left">Cantidad</th>
                                         <th class="px-2 py-2 text-left">Cuota financiada</th>
-                                        <th class="px-2 py-2 text-left">Cuota en efectivo</th>
                                     </tr>
                                     </thead>
                                     <tbody>
@@ -370,25 +365,21 @@
                                         <td class="px-2 py-2">Diaria</td>
                                         <td class="px-2 py-2 js-dias-label">144 dias</td>
                                         <td class="px-2 py-2 font-semibold js-dia">$0.00</td>
-                                        <td class="px-2 py-2 js-dia-ef">$0.00</td>
                                     </tr>
                                     <tr class="border-t">
                                         <td class="px-2 py-2">Semanal</td>
                                         <td class="px-2 py-2 js-semanas-label">13 semanas</td>
                                         <td class="px-2 py-2 font-semibold js-semanal">$0.00</td>
-                                        <td class="px-2 py-2 js-semanal-ef">$0.00</td>
                                     </tr>
                                     <tr class="border-t">
                                         <td class="px-2 py-2">Mensual corto</td>
                                         <td class="px-2 py-2 js-meses-corto-label">4 meses</td>
                                         <td class="px-2 py-2 font-semibold js-mensual-corto">$0.00</td>
-                                        <td class="px-2 py-2 js-mensual-corto-ef">$0.00</td>
                                     </tr>
                                     <tr class="border-t">
                                         <td class="px-2 py-2">Mensual largo</td>
                                         <td class="px-2 py-2 js-meses-largo-label">8 meses</td>
                                         <td class="px-2 py-2 font-semibold js-mensual-largo">$0.00</td>
-                                        <td class="px-2 py-2 js-mensual-largo-ef">$0.00</td>
                                     </tr>
                                     </tbody>
                                 </table>
@@ -551,19 +542,15 @@
                     '',
                     '?? Diaria ' + data.plans.DAILY.count + ' dias:',
                     money(data.plans.DAILY.fee) + ' financiado',
-                    '?? Pagando la cuota en efectivo: ' + money(data.plans.DAILY.cashFee),
                     '',
                     '?? Semanal ' + data.plans.WEEKLY.count + ' semanas:',
                     money(data.plans.WEEKLY.fee) + ' financiado',
-                    '?? Pagando la cuota en efectivo: ' + money(data.plans.WEEKLY.cashFee),
                     '',
                     '?? Mensual ' + data.plans.MONTHLY_SHORT.count + ' meses:',
                     money(data.plans.MONTHLY_SHORT.fee) + ' financiado',
-                    '?? Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_SHORT.cashFee),
                     '',
                     '?? Mensual ' + data.plans.MONTHLY_LONG.count + ' meses:',
                     money(data.plans.MONTHLY_LONG.fee) + ' financiado',
-                    '?? Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_LONG.cashFee)
                 ].join('\n');
             }
 
@@ -588,7 +575,6 @@
                 const data = calculatePlans(base);
 
                 setPanelText(panel, '.js-base', money(base));
-                setPanelText(panel, '.js-contado', money(data.contado));
                 setPanelText(panel, '.js-debito', money(data.debito));
                 setPanelText(panel, '.js-dias-label', data.cfg.dias + ' dias');
                 setPanelText(panel, '.js-semanas-label', data.cfg.semanas + ' semanas');
@@ -598,10 +584,6 @@
                 setPanelText(panel, '.js-semanal', money(data.plans.WEEKLY.fee));
                 setPanelText(panel, '.js-mensual-corto', money(data.plans.MONTHLY_SHORT.fee));
                 setPanelText(panel, '.js-mensual-largo', money(data.plans.MONTHLY_LONG.fee));
-                setPanelText(panel, '.js-dia-ef', money(data.plans.DAILY.cashFee));
-                setPanelText(panel, '.js-semanal-ef', money(data.plans.WEEKLY.cashFee));
-                setPanelText(panel, '.js-mensual-corto-ef', money(data.plans.MONTHLY_SHORT.cashFee));
-                setPanelText(panel, '.js-mensual-largo-ef', money(data.plans.MONTHLY_LONG.cashFee));
 
                 panel.dataset.whatsappText = buildWhatsAppText(panel, data);
             }
@@ -669,7 +651,7 @@
 
             async function openProductScanner() {
                 if (!window.BarcodeDetector) {
-                    showLookupResult('Este navegador no soporta escaneo nativo. Probá con Chrome en Android.', true);
+                    showLookupResult('Este navegador no soporta escaneo nativo. Probï¿½ con Chrome en Android.', true);
                     return;
                 }
                 try {
@@ -703,7 +685,7 @@
                         const row = resolveProductByBarcode(code);
                         closeProductScanner();
                         if (!row) {
-                            showLookupResult('No se encontró un producto con el codigo ' + code + '.', true);
+                            showLookupResult('No se encontrï¿½ un producto con el codigo ' + code + '.', true);
                             return;
                         }
                         showLookupResult('Producto encontrado: ' + (row.dataset.description || code), false);

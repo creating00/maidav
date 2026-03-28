@@ -36,32 +36,45 @@
         <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
     </form>
 
-    <div class="grid gap-4">
-        <article th:each="group : ${clientGroups}" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                <div>
-                    <h2 class="text-xl font-semibold text-slate-900" th:text="${group.clientName}"></h2>
-                    <p class="text-sm text-slate-500" th:text="${group.nationalId}"></p>
-                </div>
-                <div class="grid gap-3 sm:grid-cols-3">
-                    <div class="rounded-xl bg-slate-50 px-4 py-3">
-                        <p class="text-xs uppercase tracking-wide text-slate-500">Saldo total</p>
-                        <p class="text-lg font-bold text-slate-900" th:text="${group.totalBalance}"></p>
+    <div class="grid gap-5">
+        <article th:each="group : ${clientGroups}" class="overflow-hidden rounded-3xl border-2 border-slate-300 bg-white shadow-md">
+            <div class="border-b-2 border-slate-200 bg-slate-900 px-5 py-4 text-white">
+                <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-300">Cliente</p>
+                        <h2 class="mt-1 text-2xl font-bold text-white" th:text="${group.clientName}"></h2>
+                        <p class="mt-1 text-sm text-slate-300" th:text="${group.nationalId}"></p>
                     </div>
-                    <div class="rounded-xl bg-slate-50 px-4 py-3">
-                        <p class="text-xs uppercase tracking-wide text-slate-500">Creditos activos</p>
-                        <p class="text-lg font-bold text-slate-900" th:text="${group.activeCredits}"></p>
-                    </div>
-                    <div class="rounded-xl bg-slate-50 px-4 py-3">
-                        <p class="text-xs uppercase tracking-wide text-slate-500">Estado</p>
-                        <p class="text-sm font-semibold" th:text="${group.badgeLabel}" th:classappend="${' ' + group.badgeClass}"></p>
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        <div class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
+                            <p class="text-xs uppercase tracking-wide text-slate-300">Saldo total</p>
+                            <p class="text-lg font-bold text-white" th:text="${group.totalBalance}"></p>
+                        </div>
+                        <div class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
+                            <p class="text-xs uppercase tracking-wide text-slate-300">Creditos activos</p>
+                            <p class="text-lg font-bold text-white" th:text="${group.activeCredits}"></p>
+                        </div>
+                        <div class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
+                            <p class="text-xs uppercase tracking-wide text-slate-300">Estado</p>
+                            <p class="text-sm font-semibold" th:text="${group.badgeLabel}" th:classappend="${' ' + group.badgeClass}"></p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="mt-4 grid gap-3">
+            <div class="bg-slate-100 px-4 py-4 md:px-5">
+            <div class="grid gap-4">
                 <div th:each="account : ${group.accounts}"
-                     class="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-4">
+                     class="rounded-2xl border-2 border-slate-300 bg-white px-4 py-4 shadow-sm">
+                    <div class="mb-4 flex flex-col gap-2 border-b border-slate-200 pb-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Credito</p>
+                            <p class="mt-1 text-lg font-bold text-slate-900" th:text="${'ID #' + account.id + ' · ' + group.clientName}"></p>
+                            <p class="text-sm text-slate-600" th:text="${group.nationalId}"></p>
+                        </div>
+                        <span class="inline-flex rounded-full px-3 py-1 text-sm font-semibold" th:text="${account.badgeLabel}"
+                              th:classappend="${' ' + account.badgeClass}"></span>
+                    </div>
                     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                             <div>
@@ -97,8 +110,6 @@
                         </div>
 
                         <div class="flex flex-col items-start gap-3 lg:items-end">
-                            <span class="text-sm font-semibold" th:text="${account.badgeLabel}"
-                                  th:classappend="${' ' + account.badgeClass}"></span>
                             <a th:href="@{/accounts/{id}(id=${account.id})}"
                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
                                 Ver detalle
@@ -138,6 +149,7 @@
                         </div>
                     </details>
                 </div>
+            </div>
             </div>
         </article>
 

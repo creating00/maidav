@@ -2,6 +2,9 @@ package com.sales.maidav.service.user;
 
 import com.sales.maidav.model.user.Role;
 import com.sales.maidav.model.user.User;
+import com.sales.maidav.repository.client.ClientRepository;
+import com.sales.maidav.repository.sale.SaleRepository;
+import com.sales.maidav.repository.user.PasswordResetTokenRepository;
 import com.sales.maidav.repository.user.RoleRepository;
 import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.web.dto.CurrentUserView;
@@ -20,6 +23,9 @@ import java.util.Set;
 public class UserServiceImpl implements UserService{
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final ClientRepository clientRepository;
+    private final SaleRepository saleRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
 
     public List<User> findAll() {
@@ -82,8 +88,31 @@ public class UserServiceImpl implements UserService{
     }
 
     @Override
-    public void delete(Long id) {
-        userRepository.deleteById(id);
+    public UserDeleteResult delete(Long id, String currentUserEmail) {
+        User user = findById(id);
+
+        if (currentUserEmail != null && currentUserEmail.equalsIgnoreCase(user.getEmail())) {
+            return new UserDeleteResult(false, false, "No puede eliminar su propio usuario mientras esta logueado");
+        }
+
+        long salesCount = saleRepository.countBySeller_Id(id);
+        long clientsCount = clientRepository.countBySeller_Id(id);
+        boolean hasHistory = salesCount > 0 || clientsCount > 0;
+
+        if (hasHistory) {
+            user.setEnabled(false);
+            return new UserDeleteResult(
+                    false,
+                    true,
+                    "El usuario tiene historial asociado. Se desactivo para no romper ventas o clientes existentes"
+            );
+        }
+
+        passwordResetTokenRepository.deleteByUser_Id(id);
+        user.getRoles().clear();
+        userRepository.save(user);
+        userRepository.delete(user);
+        return new UserDeleteResult(true, false, "Usuario eliminado correctamente");
     }
 
     @Override
