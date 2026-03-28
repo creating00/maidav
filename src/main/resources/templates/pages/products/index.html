@@ -489,6 +489,13 @@
                 return '$' + parseNumber(value).toFixed(2);
             }
 
+            function setPanelText(panel, selector, value) {
+                const element = panel ? panel.querySelector(selector) : null;
+                if (element) {
+                    element.textContent = value;
+                }
+            }
+
             function getCalcConfig() {
                 function data(name, fallback) {
                     if (!calcConfigEl) {
@@ -538,26 +545,29 @@
                 const code = panel.dataset.code || '';
                 const description = panel.dataset.description || '';
                 return [
+                    'PRODUCTO',
                     (code ? code + ' - ' : '') + description,
                     '',
                     'OPCIONES DE PAGO',
+                    'Contado: ' + money(data.contado),
+                    'Debito/Transferencia: ' + money(data.debito),
                     '',
-                    'Diaria ' + data.plans.DAILY.count + ' dias:',
-                    money(data.plans.DAILY.fee) + ' financiado',
-                    'Cuota contado: No aplica',
+                    'PLAN DIARIO',
+                    data.plans.DAILY.count + ' dias de ' + money(data.plans.DAILY.fee),
+                    'Cuota en efectivo: No aplica',
                     '',
-                    'Semanal ' + data.plans.WEEKLY.count + ' semanas:',
-                    money(data.plans.WEEKLY.fee) + ' financiado',
-                    'Pagando la cuota en efectivo: ' + money(data.plans.WEEKLY.cashFee),
+                    'PLAN SEMANAL',
+                    data.plans.WEEKLY.count + ' semanas de ' + money(data.plans.WEEKLY.fee),
+                    'Cuota en efectivo: ' + money(data.plans.WEEKLY.cashFee),
                     '',
-                    'Mensual ' + data.plans.MONTHLY_SHORT.count + ' meses:',
-                    money(data.plans.MONTHLY_SHORT.fee) + ' financiado',
-                    'Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_SHORT.cashFee),
+                    'PLAN MENSUAL CORTO',
+                    data.plans.MONTHLY_SHORT.count + ' meses de ' + money(data.plans.MONTHLY_SHORT.fee),
+                    'Cuota en efectivo: ' + money(data.plans.MONTHLY_SHORT.cashFee),
                     '',
-                    'Mensual ' + data.plans.MONTHLY_LONG.count + ' meses:',
-                    money(data.plans.MONTHLY_LONG.fee) + ' financiado',
-                    'Pagando la cuota en efectivo: ' + money(data.plans.MONTHLY_LONG.cashFee)
-                ].join('\\n');
+                    'PLAN MENSUAL LARGO',
+                    data.plans.MONTHLY_LONG.count + ' meses de ' + money(data.plans.MONTHLY_LONG.fee),
+                    'Cuota en efectivo: ' + money(data.plans.MONTHLY_LONG.cashFee)
+                ].join('\n');
             }
 
             async function copyText(text) {
@@ -909,6 +919,4 @@
 
 </section>
 </html>
-
-
 
