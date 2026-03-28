@@ -160,14 +160,23 @@
                         Valores configurados por administracion. Seleccione la opcion y el sistema completa la financiacion automaticamente.
                     </p>
 
-                    <div class="grid grid-cols-1 gap-4 mt-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        <div class="rounded-lg border border-green-100 bg-white p-4">
+                            <div class="text-sm text-gray-600">Contado</div>
+                            <div class="text-2xl font-bold text-green-700" id="calcContado">$0</div>
+                            <button type="button"
+                                    id="applyCashBtn"
+                                    class="mt-2 rounded bg-green-600 px-3 py-1 text-white hover:bg-green-700">
+                                Aplicar contado
+                            </button>
+                        </div>
                         <div class="rounded-lg border border-indigo-100 bg-white p-4">
-                            <div class="text-sm text-gray-600">Referencia comercial vigente</div>
+                            <div class="text-sm text-gray-600">Debito / Transferencia</div>
                             <div class="text-2xl font-bold text-indigo-700" id="calcDebito">$0</div>
                             <button type="button"
                                     id="applyDebitBtn"
                                     class="mt-2 rounded bg-indigo-600 px-3 py-1 text-white hover:bg-indigo-700">
-                                Aplicar valor vigente
+                                Aplicar debito/transf
                             </button>
                         </div>
                     </div>
@@ -179,6 +188,7 @@
                                 <th class="px-3 py-2">Plan</th>
                                 <th class="px-3 py-2">Cantidad</th>
                                 <th class="px-3 py-2">Cuota financiada</th>
+                                <th class="px-3 py-2">Cuota en efectivo</th>
                                 <th class="px-3 py-2 text-right">Accion</th>
                             </tr>
                             </thead>
@@ -187,6 +197,7 @@
                                 <td class="px-3 py-2">Diaria</td>
                                 <td class="px-3 py-2" id="calcDiasLabel">144 dias</td>
                                 <td class="px-3 py-2 font-semibold" id="calcDia">$0</td>
+                                <td class="px-3 py-2" id="calcDiaEf">$0</td>
                                 <td class="px-3 py-2 text-right">
                                     <button type="button"
                                             class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
@@ -197,6 +208,7 @@
                                 <td class="px-3 py-2">Semanal</td>
                                 <td class="px-3 py-2" id="calcSemanasLabel">13 semanas</td>
                                 <td class="px-3 py-2 font-semibold" id="calcSem">$0</td>
+                                <td class="px-3 py-2" id="calcSemEf">$0</td>
                                 <td class="px-3 py-2 text-right">
                                     <button type="button"
                                             class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
@@ -207,6 +219,7 @@
                                 <td class="px-3 py-2">Mensual corto</td>
                                 <td class="px-3 py-2" id="calcMes4Label">4 meses</td>
                                 <td class="px-3 py-2 font-semibold" id="calcMes4">$0</td>
+                                <td class="px-3 py-2" id="calcMes4Ef">$0</td>
                                 <td class="px-3 py-2 text-right">
                                     <button type="button"
                                             class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
@@ -217,6 +230,7 @@
                                 <td class="px-3 py-2">Mensual largo</td>
                                 <td class="px-3 py-2" id="calcMes8Label">8 meses</td>
                                 <td class="px-3 py-2 font-semibold" id="calcMes8">$0</td>
+                                <td class="px-3 py-2" id="calcMes8Ef">$0</td>
                                 <td class="px-3 py-2 text-right">
                                     <button type="button"
                                             class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
@@ -486,6 +500,7 @@
             const draftStateInput = document.getElementById('draftStateInput');
             const firstRowTemplate = body.querySelector('tr') ? body.querySelector('tr').cloneNode(true) : null;
             const calcConfigEl = document.getElementById('calcConfig');
+            const applyCashBtn = document.getElementById('applyCashBtn');
             const applyDebitBtn = document.getElementById('applyDebitBtn');
             const weeksCountInput = document.querySelector('input[name="weeksCount"]');
             const discountInput = document.querySelector('input[name="discountAmount"]');
@@ -668,6 +683,7 @@
                 const base = getBaseCartTotal();
                 const data = calculatePlans(base);
 
+                setText('calcContado', money(data.contado));
                 setText('calcDebito', money(data.debito));
 
                 setText('calcDiasLabel', data.cfg.dias + ' dias');
@@ -679,6 +695,10 @@
                 setText('calcSem', money(data.plans.WEEKLY.fee));
                 setText('calcMes4', money(data.plans.MONTHLY_SHORT.fee));
                 setText('calcMes8', money(data.plans.MONTHLY_LONG.fee));
+                setText('calcDiaEf', money(data.plans.DAILY.cashFee));
+                setText('calcSemEf', money(data.plans.WEEKLY.cashFee));
+                setText('calcMes4Ef', money(data.plans.MONTHLY_SHORT.cashFee));
+                setText('calcMes8Ef', money(data.plans.MONTHLY_LONG.cashFee));
             }
 
             function applyTargetTotal(targetTotal) {
@@ -1306,6 +1326,23 @@
             if (discountInput) {
                 discountInput.addEventListener('input', updateCalculator);
             }
+            if (applyCashBtn) {
+                applyCashBtn.addEventListener('click', function () {
+                    const data = calculatePlans(getBaseCartTotal());
+                    if (!applyTargetTotal(data.contado)) {
+                        return;
+                    }
+                    if (paymentType) {
+                        paymentType.value = 'CASH';
+                    }
+                    toggleCreditFields();
+                    updateTotals();
+                    if (calcAppliedPlan) {
+                        calcAppliedPlan.textContent = 'Modo aplicado: Contado ' + money(data.contado);
+                    }
+                    saveDraft();
+                });
+            }
             if (applyDebitBtn) {
                 applyDebitBtn.addEventListener('click', function () {
                     const data = calculatePlans(getBaseCartTotal());
@@ -1318,7 +1355,7 @@
                     toggleCreditFields();
                     updateTotals();
                     if (calcAppliedPlan) {
-                        calcAppliedPlan.textContent = 'Modo aplicado: Valor vigente ' + money(data.debito);
+                        calcAppliedPlan.textContent = 'Modo aplicado: Debito/Transferencia ' + money(data.debito);
                     }
                     saveDraft();
                 });

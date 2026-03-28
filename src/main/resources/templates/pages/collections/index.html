@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="layout/main :: layout(~{::content}, 'Cobranza')">
 
@@ -411,13 +411,20 @@
                 const amountInput = card.querySelector('.cobro');
                 const typedAmount = parseNumber(amountInput.value);
                 const chargeDefault = parseNumber(card.dataset.chargeAmount);
+                const financedDefault = parseNumber(card.dataset.financedAmount);
+                const methodDefault = tipo === 'efectivo'
+                    ? chargeDefault
+                    : (financedDefault > 0 ? financedDefault : chargeDefault);
+                const oppositeDefault = tipo === 'efectivo'
+                    ? (financedDefault > 0 ? financedDefault : chargeDefault)
+                    : chargeDefault;
                 if (typedAmount <= 0) {
-                    amountInput.value = chargeDefault.toFixed(2);
-                    return chargeDefault;
+                    amountInput.value = methodDefault.toFixed(2);
+                    return methodDefault;
                 }
-                if (chargeDefault > 0 && approximatelyEqual(typedAmount, parseNumber(card.dataset.financedAmount))) {
-                    amountInput.value = chargeDefault.toFixed(2);
-                    return chargeDefault;
+                if (approximatelyEqual(typedAmount, chargeDefault) || approximatelyEqual(typedAmount, oppositeDefault)) {
+                    amountInput.value = methodDefault.toFixed(2);
+                    return methodDefault;
                 }
                 return typedAmount;
             }
