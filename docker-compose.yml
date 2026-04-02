@@ -30,8 +30,8 @@ services:
       APP_UPLOAD_DIR: ${APP_UPLOAD_DIR:-/app/uploads}
       SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
       PORT: ${PORT:-10000}
-    ports:
-      - "${PORT:-10000}:${PORT:-10000}"
+    expose:
+      - "${PORT:-10000}"
     volumes:
       - uploads:/app/uploads
 
