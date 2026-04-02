@@ -18,5 +18,5 @@ COPY --from=builder /app/target/*.jar /app/app.jar
 COPY docker/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-EXPOSE 8080
+EXPOSE 10000
 ENTRYPOINT ["/app/entrypoint.sh"]

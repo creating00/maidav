@@ -1,31 +1,38 @@
 services:
   db:
     image: postgres:16
-    container_name: maidav-db
+    restart: unless-stopped
     environment:
-      POSTGRES_DB: sales_db
-      POSTGRES_USER: sales
-      POSTGRES_PASSWORD: sales123
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: ${POSTGRES_DB:-sales_db}
+      POSTGRES_USER: ${POSTGRES_USER:-sales}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-this-strong-password}
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sales} -d ${POSTGRES_DB:-sales_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
 
   app:
-    build: .
-    container_name: maidav-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/sales_db
-      SPRING_DATASOURCE_USERNAME: sales
-      SPRING_DATASOURCE_PASSWORD: sales123
-      APP_UPLOAD_DIR: /app/uploads
-      SPRING_JPA_SHOW_SQL: "true"
-      SPRING_THYMELEAF_CACHE: "false"
-      PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-sales_db}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-sales}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-change-this-strong-password}
+      APP_UPLOAD_DIR: ${APP_UPLOAD_DIR:-/app/uploads}
+      SPRING_JPA_SHOW_SQL: ${SPRING_JPA_SHOW_SQL:-false}
+      SPRING_THYMELEAF_CACHE: ${SPRING_THYMELEAF_CACHE:-true}
+      PORT: ${PORT:-10000}
     ports:
-      - "8080:8080"
+      - "${PORT:-10000}:${PORT:-10000}"
     volumes:
       - uploads:/app/uploads
 
