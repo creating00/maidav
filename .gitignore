@@ -1,5 +1,7 @@
 HELP.md
 .env
+.m2/
+.codex-temp/
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
