@@ -17,6 +17,10 @@ spring:
     baseline-on-migrate: true
   thymeleaf:
     cache: true
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
 
 server:
   address: 0.0.0.0
