@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="layout/main :: layout(~{::content}, 'Detalle de presupuesto')">
+
+<section th:fragment="content">
+    <div class="mx-auto max-w-4xl">
+        <div th:if="${successMessage}"
+             class="mb-4 rounded-2xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700"
+             th:text="${successMessage}">
+        </div>
+
+        <div class="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+            <div class="bg-blue-900 px-6 py-5 text-white">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.28em] text-blue-100">ERP Confort Maidav</p>
+                        <h1 class="mt-2 text-2xl font-semibold"
+                            th:text="${quote.quoteNumber != null ? quote.quoteNumber : 'Presupuesto'}">
+                        </h1>
+                    </div>
+                    <span class="inline-flex rounded-full bg-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-wide"
+                          th:text="${quote.priceMode.name() == 'WHOLESALE' ? 'Mayorista' : 'Minorista'}">
+                    </span>
+                </div>
+            </div>
+
+            <div class="space-y-6 px-6 py-6">
+                <div class="grid gap-3 sm:grid-cols-3">
+                    <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-slate-500">Guardado</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900"
+                           th:text="${#temporals.format(quote.createdAt, 'yyyy-MM-dd HH:mm')}">
+                        </p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-slate-500">Productos</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900" th:text="${quote.itemCount}"></p>
+                    </div>
+                    <div class="rounded-2xl bg-slate-50 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-slate-500">Total estimado</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-900" th:text="${'$' + quote.totalAmount}"></p>
+                    </div>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="rounded-2xl bg-emerald-50 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-emerald-800">Contado</p>
+                        <p class="mt-1 text-sm font-semibold text-emerald-900" th:text="${'$' + quote.cashAmount}"></p>
+                    </div>
+                    <div class="rounded-2xl bg-indigo-50 px-4 py-3">
+                        <p class="text-xs uppercase tracking-wide text-indigo-800">Debito / transferencia</p>
+                        <p class="mt-1 text-sm font-semibold text-indigo-900" th:text="${'$' + quote.debitAmount}"></p>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Carro de productos</p>
+                    <div class="space-y-3">
+                        <article th:each="item : ${quote.items}"
+                                 class="quote-share-item flex items-start justify-between gap-4 rounded-3xl border border-slate-200 bg-slate-50 px-4 py-4"
+                                 th:attr="data-share=${item.productDescription + ' (' + item.productCode + ') x ' + item.quantity}">
+                            <div class="min-w-0">
+                                <h2 class="truncate text-base font-semibold text-slate-900"
+                                    th:text="${item.productDescription}">
+                                </h2>
+                                <p class="mt-1 text-sm text-slate-500" th:text="${'Cod: ' + item.productCode}"></p>
+                                <p class="mt-2 text-sm font-semibold text-slate-700" th:text="${item.quantity + ' unidad/es'}"></p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <p class="text-xs uppercase tracking-wide text-slate-500">Unitario</p>
+                                <p class="text-sm font-semibold text-slate-900" th:text="${'$' + item.unitPrice}"></p>
+                                <p class="mt-2 text-xs uppercase tracking-wide text-slate-500">Subtotal</p>
+                                <p class="text-sm font-semibold text-slate-900" th:text="${'$' + item.lineTotal}"></p>
+                            </div>
+                        </article>
+                    </div>
+                </div>
+
+                <div>
+                    <p class="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">Opciones de financiacion</p>
+                    <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+                        <div th:each="plan, stat : ${quote.planOptions}"
+                             class="quote-share-plan px-5 py-4"
+                             th:attr="data-share=${plan.promoText != null && !plan.promoText.isBlank() ? plan.title + ' | ' + plan.promoText : plan.title}"
+                             th:classappend="${!stat.last} ? ' border-b border-slate-200' : ''">
+                            <p class="text-base font-semibold text-slate-900" th:text="${plan.title}"></p>
+                            <p th:if="${plan.promoText != null && !plan.promoText.isBlank()}"
+                               class="mt-2 inline-flex rounded-xl bg-amber-100 px-3 py-2 text-sm font-medium text-amber-900"
+                               th:text="${plan.promoText}">
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col gap-3 border-t border-slate-200 pt-6 sm:flex-row">
+                    <button type="button"
+                            id="shareQuoteButton"
+                            class="inline-flex flex-1 items-center justify-center rounded-2xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-blue-700">
+                        Compartir
+                    </button>
+                    <a th:href="@{/quotes}"
+                       class="inline-flex flex-1 items-center justify-center rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+                        Volver al listado
+                    </a>
+                    <form sec:authorize="hasAuthority('QUOTE_DELETE')"
+                          th:action="@{/quotes/{id}/delete(id=${quote.id})}"
+                          method="post"
+                          class="flex-1"
+                          onsubmit="return confirm('Eliminar este presupuesto?');">
+                        <button class="inline-flex w-full items-center justify-center rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 transition hover:bg-red-100">
+                            Eliminar
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        (() => {
+            localStorage.removeItem('maidav-quote-draft');
+
+            const shareButton = document.getElementById('shareQuoteButton');
+            if (!shareButton) {
+                return;
+            }
+
+            const quoteNumber = /*[[${quote.quoteNumber}]]*/ 'Presupuesto';
+            const totalAmount = /*[[${quote.totalAmount}]]*/ '0.00';
+            const cashAmount = /*[[${quote.cashAmount}]]*/ '0.00';
+            const debitAmount = /*[[${quote.debitAmount}]]*/ '0.00';
+            const items = Array.from(document.querySelectorAll('.quote-share-item'))
+                .map(node => node.dataset.share)
+                .filter(Boolean);
+            const plans = Array.from(document.querySelectorAll('.quote-share-plan'))
+                .map(node => node.dataset.share)
+                .filter(Boolean);
+
+            function buildShareText() {
+                return [
+                    quoteNumber ? 'Presupuesto ' + quoteNumber : 'Presupuesto Maidav',
+                    '',
+                    'Productos:',
+                    items.map(item => '- ' + item).join('\n'),
+                    '',
+                    'Opciones de financiacion:',
+                    plans.map(plan => '- ' + plan).join('\n'),
+                    '',
+                    'Contado: $' + cashAmount,
+                    'Debito / transferencia: $' + debitAmount,
+                    'Total estimado: $' + totalAmount
+                ].join('\n');
+            }
+
+            async function shareQuote() {
+                const text = buildShareText();
+                try {
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: quoteNumber ? 'Presupuesto ' + quoteNumber : 'Presupuesto Maidav',
+                            text
+                        });
+                        return;
+                    }
+                    if (navigator.clipboard) {
+                        await navigator.clipboard.writeText(text);
+                        alert('Resumen copiado al portapapeles.');
+                        return;
+                    }
+                } catch (error) {
+                    if (error && error.name === 'AbortError') {
+                        return;
+                    }
+                }
+                alert(text);
+            }
+
+            shareButton.addEventListener('click', shareQuote);
+        })();
+    </script>
+
+</section>
+</html>

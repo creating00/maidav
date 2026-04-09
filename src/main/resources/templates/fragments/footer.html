@@ -1,7 +1,9 @@
 <footer th:fragment="footer"
         xmlns:th="http://www.thymeleaf.org"
-        class="bg-white text-center py-3 text-sm text-gray-500">
+        class="app-footer">
 
-    © <span th:text="${#dates.format(#dates.createNow(), 'yyyy')}"></span> Maidav
+    <div class="app-footer__copy">
+        Maidav <span th:text="${#dates.format(#dates.createNow(), 'yyyy')}">2026</span> | gestion comercial, cartera y cobranza
+    </div>
 
 </footer>

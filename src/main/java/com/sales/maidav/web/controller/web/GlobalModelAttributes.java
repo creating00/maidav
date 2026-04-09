@@ -42,6 +42,11 @@ public class GlobalModelAttributes {
         return userService == null ? null : userService.findCurrentUserViewByEmail(authentication.getName());
     }
 
+    @ModelAttribute("currentPath")
+    public String currentPath(HttpServletRequest request) {
+        return request == null ? "" : request.getRequestURI();
+    }
+
     private boolean isAuthenticated(Authentication authentication) {
         return authentication != null
                 && authentication.isAuthenticated()

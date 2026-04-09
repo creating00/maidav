@@ -1,215 +1,320 @@
 <aside th:fragment="sidebar"
        xmlns:th="http://www.thymeleaf.org"
        xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
-       class="w-64 bg-gray-800 text-white h-full overflow-y-auto">
+       class="app-sidebar h-full overflow-y-auto">
 
-    <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700 md:hidden">
-        <span class="font-semibold">Menu</span>
-        <button type="button"
-                class="inline-flex items-center justify-center rounded p-2 text-gray-200 hover:bg-gray-700"
-                @click="$dispatch('close-sidebar')"
-                aria-label="Cerrar menu">
-            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                <path d="M18 6 6 18"></path>
-                <path d="m6 6 12 12"></path>
-            </svg>
-        </button>
+    <div class="app-sidebar__frame">
+        <div class="app-sidebar__panel">
+            <div class="app-sidebar__mobile-head md:hidden">
+                <div>
+                    <p class="app-sidebar__eyebrow">Maidav</p>
+                    <p class="app-sidebar__title">Panel de operacion</p>
+                </div>
+                <button type="button"
+                        class="header-toggle"
+                        @click="$dispatch('close-sidebar')"
+                        aria-label="Cerrar menu">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M18 6 6 18"></path>
+                        <path d="m6 6 12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="hidden md:block px-3">
+                <p class="app-sidebar__eyebrow">Ruta diaria</p>
+                <p class="app-sidebar__title">Operacion, cartera y catalogo</p>
+            </div>
+
+            <nav class="grid gap-5"
+                 @click="if (window.innerWidth < 768 && $event.target.closest('a')) { $dispatch('close-sidebar'); }">
+
+                <div class="nav-section">
+                    <p class="nav-section__label">Operacion</p>
+
+                    <a th:href="@{/dashboard}"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/dashboard')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 12l9-9 9 9"></path>
+                                <path d="M9 21V9h6v12"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Dashboard</span>
+                            <span class="nav-link__hint">Lectura de cartera y resumen global</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/collections}"
+                       sec:authorize="hasAuthority('ARREARS_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/collections')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-cyan-700" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 7h16"></path>
+                                <path d="M6 3h12v18H6z"></path>
+                                <path d="M9 12h6"></path>
+                                <path d="M9 16h4"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Cobranza</span>
+                            <span class="nav-link__hint">Registro rapido de pagos del dia</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/accounts}"
+                       sec:authorize="hasAuthority('ARREARS_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/accounts')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-rose-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 4h16v16H4z"></path>
+                                <path d="M8 9h8"></path>
+                                <path d="M8 13h8"></path>
+                                <path d="M8 17h5"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Cuentas</span>
+                            <span class="nav-link__hint">Seguimiento detallado de creditos</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/arrears}"
+                       sec:authorize="hasAuthority('ARREARS_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/arrears')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 2l9 16H3L12 2Z"></path>
+                                <path d="M12 9v4"></path>
+                                <path d="M12 17h.01"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Morosidad</span>
+                            <span class="nav-link__hint">Atrasos, deuda vencida y seguimiento</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/sales}"
+                       sec:authorize="hasAuthority('SALES_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/sales')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-fuchsia-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 7h16v10H4z"></path>
+                                <path d="M7 7V5h10v2"></path>
+                                <path d="M12 10v4"></path>
+                                <path d="M9 12h6"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Ventas</span>
+                            <span class="nav-link__hint">Alta, detalle y seguimiento comercial</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/quotes}"
+                       sec:authorize="hasAuthority('QUOTE_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/quotes')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M6 3h9l5 5v13H6z"></path>
+                                <path d="M15 3v5h5"></path>
+                                <path d="M9 13h6"></path>
+                                <path d="M9 17h6"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Presupuestos</span>
+                            <span class="nav-link__hint">Cotizacion y comparacion de planes</span>
+                        </span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <p class="nav-section__label">Catalogo</p>
+
+                    <a th:href="@{/clients}"
+                       sec:authorize="hasAuthority('CLIENT_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/clients')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-teal-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"></path>
+                                <path d="M4 21v-1a8 8 0 0 1 16 0v1"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Clientes</span>
+                            <span class="nav-link__hint">Ficha, historial y asignacion</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/products}"
+                       sec:authorize="hasAuthority('PRODUCT_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/products')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-lime-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M7 3h10l4 4v10l-4 4H7l-4-4V7l4-4Z"></path>
+                                <path d="M9 7h6"></path>
+                                <path d="M9 12h6"></path>
+                                <path d="M9 17h4"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Productos</span>
+                            <span class="nav-link__hint">Stock, precios y financiacion</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/providers}"
+                       sec:authorize="hasAuthority('PROVIDER_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/providers')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-cyan-700" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M3 7h18v10H3z"></path>
+                                <path d="M7 7V5h10v2"></path>
+                                <path d="M7 17v2h10v-2"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Proveedores</span>
+                            <span class="nav-link__hint">Origen del catalogo y contactos</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/zones}"
+                       sec:authorize="hasAuthority('ZONE_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/zones')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-emerald-700" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"></path>
+                                <circle cx="12" cy="10" r="2.5"></circle>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Zonas</span>
+                            <span class="nav-link__hint">Mapa operativo y cobertura comercial</span>
+                        </span>
+                    </a>
+                </div>
+
+                <div class="nav-section">
+                    <p class="nav-section__label">Sistema</p>
+
+                    <a th:href="@{/profile}"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/profile')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"></path>
+                                <path d="M4 21v-1a8 8 0 0 1 16 0v1"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Mi perfil</span>
+                            <span class="nav-link__hint">Datos personales y seguridad</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/users}"
+                       sec:authorize="hasAuthority('USER_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/users')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-blue-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"></path>
+                                <path d="M6 21v-1a6 6 0 0 1 12 0v1"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Usuarios</span>
+                            <span class="nav-link__hint">Equipo, vendedores y accesos</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/roles}"
+                       sec:authorize="hasRole('ADMIN')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/roles')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-amber-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.6-4.9-2.6-4.9 2.6.9-5.6-4-3.9 5.5-.8L12 3Z"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Roles</span>
+                            <span class="nav-link__hint">Perfiles y alcance operativo</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/permissions}"
+                       sec:authorize="hasAuthority('PERMISSION_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/permissions')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4Z"></path>
+                                <path d="M9.5 12.5l2 2 4-4"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Permisos</span>
+                            <span class="nav-link__hint">Control fino de acciones por modulo</span>
+                        </span>
+                    </a>
+
+                    <a th:href="@{/settings}"
+                       sec:authorize="hasAuthority('SETTINGS_READ')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/settings')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5 text-orange-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"></path>
+                                <path d="M3 12l2.2-.5.7-1.6-1.3-1.8 2.1-2.1 1.8 1.3 1.6-.7L12 3l1.5 2.2 1.6.7 1.8-1.3 2.1 2.1-1.3 1.8.7 1.6L21 12l-2.2.5-.7 1.6 1.3 1.8-2.1 2.1-1.8-1.3-1.6.7L12 21l-1.5-2.2-1.6-.7-1.8 1.3-2.1-2.1 1.3-1.8-.7-1.6L3 12Z"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text">
+                            <span class="nav-link__label">Configuracion</span>
+                            <span class="nav-link__hint">Parametros de negocio y calculos</span>
+                        </span>
+                    </a>
+                </div>
+            </nav>
+
+            <div class="nav-note">
+                <p class="nav-note__label">Lectura rapida</p>
+                <p class="nav-note__title">Trabajo diario</p>
+                <p class="nav-note__copy">
+                    Empeza por dashboard para ver la cartera, luego entra a cobranza o cuentas segun la operacion que necesites resolver.
+                </p>
+            </div>
+        </div>
     </div>
 
-    <ul class="p-4 space-y-1"
-        @click="if (window.innerWidth < 768 && $event.target.closest('a')) { $dispatch('close-sidebar'); }">
-
-        <!-- DASHBOARD (todos los logueados) -->
-        <li>
-            <a th:href="@{/dashboard}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 12l9-9 9 9"></path>
-                    <path d="M9 21V9h6v12"></path>
-                </svg>
-                <span>Dashboard</span>
-            </a>
-        </li>
-
-        <!-- MI PERFIL -->
-        <li>
-            <a th:href="@{/profile}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"></path>
-                    <path d="M4 21v-1a8 8 0 0 1 16 0v1"></path>
-                </svg>
-                <span>Mi perfil</span>
-            </a>
-        </li>
-
-        <!-- USUARIOS (permiso especifico) -->
-        <li sec:authorize="hasAuthority('USER_READ')">
-            <a th:href="@{/users}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-sky-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"></path>
-                    <path d="M6 21v-1a6 6 0 0 1 12 0v1"></path>
-                </svg>
-                <span>Usuarios</span>
-            </a>
-        </li>
-
-        <!-- ROLES & PERMISOS (solo ADMIN) -->
-        <li sec:authorize="hasRole('ADMIN')">
-            <a th:href="@{/roles}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 3l2.5 5 5.5.8-4 3.9.9 5.6-4.9-2.6-4.9 2.6.9-5.6-4-3.9 5.5-.8L12 3Z"></path>
-                </svg>
-                <span>Roles</span>
-            </a>
-        </li>
-
-        <!-- PERMISOS -->
-        <li sec:authorize="hasAuthority('PERMISSION_READ')">
-            <a th:href="@{/permissions}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-violet-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4Z"></path>
-                    <path d="M9.5 12.5l2 2 4-4"></path>
-                </svg>
-                <span>Permisos</span>
-            </a>
-        </li>
-
-        <!-- CLIENTES -->
-        <li sec:authorize="hasAuthority('CLIENT_READ')">
-            <a th:href="@{/clients}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-teal-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M16 11a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"></path>
-                    <path d="M4 21v-1a8 8 0 0 1 16 0v1"></path>
-                </svg>
-                <span>Clientes</span>
-            </a>
-        </li>
-
-        <!-- VENTAS -->
-        <li sec:authorize="hasAuthority('SALES_READ')">
-            <a th:href="@{/sales}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-fuchsia-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M4 7h16v10H4z"></path>
-                    <path d="M7 7V5h10v2"></path>
-                    <path d="M12 10v4"></path>
-                    <path d="M9 12h6"></path>
-                </svg>
-                <span>Ventas</span>
-            </a>
-        </li>
-
-        <!-- COBRANZA -->
-        <li sec:authorize="hasAuthority('ARREARS_READ')">
-            <a th:href="@{/collections}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-cyan-200" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M4 7h16"></path>
-                    <path d="M6 3h12v18H6z"></path>
-                    <path d="M9 12h6"></path>
-                    <path d="M9 16h4"></path>
-                </svg>
-                <span>Cobranza</span>
-            </a>
-        </li>
-
-        <!-- CUENTAS -->
-        <li sec:authorize="hasAuthority('ARREARS_READ')">
-            <a th:href="@{/accounts}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-rose-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M4 4h16v16H4z"></path>
-                    <path d="M8 9h8"></path>
-                    <path d="M8 13h8"></path>
-                    <path d="M8 17h5"></path>
-                </svg>
-                <span>Cuentas</span>
-            </a>
-        </li>
-
-        <!-- MOROSIDAD -->
-        <li sec:authorize="hasAuthority('ARREARS_READ')">
-            <a th:href="@{/arrears}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-yellow-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 2l9 16H3L12 2Z"></path>
-                    <path d="M12 9v4"></path>
-                    <path d="M12 17h.01"></path>
-                </svg>
-                <span>Morosidad</span>
-            </a>
-        </li>
-
-        <!-- PRODUCTOS -->
-        <li sec:authorize="hasAuthority('PRODUCT_READ')">
-            <a th:href="@{/products}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-lime-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M7 3h10l4 4v10l-4 4H7l-4-4V7l4-4Z"></path>
-                    <path d="M9 7h6"></path>
-                    <path d="M9 12h6"></path>
-                    <path d="M9 17h4"></path>
-                </svg>
-                <span>Productos</span>
-            </a>
-        </li>
-
-        <!-- PROVEEDORES -->
-        <li sec:authorize="hasAuthority('PROVIDER_READ')">
-            <a th:href="@{/providers}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M3 7h18v10H3z"></path>
-                    <path d="M7 7V5h10v2"></path>
-                    <path d="M7 17v2h10v-2"></path>
-                </svg>
-                <span>Proveedores</span>
-            </a>
-        </li>
-
-        <!-- ZONAS -->
-        <li sec:authorize="hasAuthority('ZONE_READ')">
-            <a th:href="@{/zones}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-emerald-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 21s7-5.3 7-11a7 7 0 1 0-14 0c0 5.7 7 11 7 11Z"></path>
-                    <circle cx="12" cy="10" r="2.5"></circle>
-                </svg>
-                <span>Zonas</span>
-            </a>
-        </li>
-
-        <!-- CONFIGURACION -->
-        <li sec:authorize="hasAuthority('SETTINGS_READ')">
-            <a th:href="@{/settings}"
-               class="flex items-center gap-3 px-4 py-2 rounded hover:bg-gray-700">
-                <svg class="h-5 w-5 text-orange-300" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                    <path d="M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"></path>
-                    <path d="M3 12l2.2-.5.7-1.6-1.3-1.8 2.1-2.1 1.8 1.3 1.6-.7L12 3l1.5 2.2 1.6.7 1.8-1.3 2.1 2.1-1.3 1.8.7 1.6L21 12l-2.2.5-.7 1.6 1.3 1.8-2.1 2.1-1.8-1.3-1.6.7L12 21l-1.5-2.2-1.6-.7-1.8 1.3-2.1-2.1 1.3-1.8-.7-1.6L3 12Z"></path>
-                </svg>
-                <span>Configuracion</span>
-            </a>
-        </li>
-
-    </ul>
 </aside>

@@ -8,8 +8,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title th:text="${pageTitle} ?: 'Maidav'">Maidav</title>
     <link rel="icon" type="image/svg+xml" th:href="@{/favicon.svg}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;700&family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" th:href="@{/app.css}">
     <style>
         [x-cloak] { display: none !important; }
     </style>
@@ -19,10 +23,10 @@
       @open-sidebar.window="sidebarOpen = true"
       @close-sidebar.window="sidebarOpen = false"
       @toggle-sidebar.window="sidebarCollapsed = !sidebarCollapsed"
-      class="bg-gray-100 min-h-screen flex flex-col overflow-x-hidden">
+      class="app-body min-h-screen flex flex-col overflow-x-hidden">
 
 <!-- HEADER -->
-<div th:replace="fragments/header :: header"></div>
+<div th:replace="fragments/header :: header(${pageTitle})"></div>
 
 <!-- BODY -->
 <div class="flex flex-1 relative">
@@ -31,24 +35,26 @@
     <div x-cloak
          x-show="sidebarOpen"
          x-transition.opacity
-         class="fixed inset-0 bg-black/40 z-30 md:hidden"
+         class="fixed inset-0 z-30 bg-slate-950/35 backdrop-blur-sm md:hidden"
          @click="$dispatch('close-sidebar')"></div>
 
     <!-- SIDEBAR MOBILE -->
-    <div class="fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-200 md:hidden"
+    <div class="fixed inset-y-0 left-0 z-40 w-72 max-w-[92vw] transform transition-transform duration-200 md:hidden"
          :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
         <div th:replace="fragments/sidebar :: sidebar"></div>
     </div>
 
     <!-- SIDEBAR DESKTOP -->
     <div class="hidden md:block transition-all duration-200"
-         :class="sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-64'">
+         :class="sidebarCollapsed ? 'w-0 overflow-hidden' : 'w-72'">
         <div th:replace="fragments/sidebar :: sidebar"></div>
     </div>
 
     <!-- CONTENT -->
-    <main class="flex-1 p-4 md:p-6 min-w-0">
-        <div th:replace="${content}"></div>
+    <main class="app-main flex-1 min-w-0">
+        <div class="app-canvas">
+            <div th:replace="${content}"></div>
+        </div>
     </main>
 
 </div>

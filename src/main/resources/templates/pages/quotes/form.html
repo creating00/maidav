@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Nuevo presupuesto')">
+
+<section th:fragment="content">
+    <div class="mx-auto max-w-5xl">
+        <div class="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.25em] text-blue-700">ERP Confort Maidav</p>
+                <h1 class="text-3xl font-bold text-slate-900">Presupuestador movil</h1>
+                <p class="mt-1 text-sm text-slate-600">Arma el carrito, revisa la financiacion y guarda el presupuesto.</p>
+            </div>
+            <div class="rounded-2xl bg-white px-4 py-3 text-sm shadow-sm ring-1 ring-slate-200">
+                <span class="block text-xs uppercase tracking-wide text-slate-500">Numero estimado</span>
+                <strong th:text="${previewQuoteNumber}"></strong>
+            </div>
+        </div>
+
+        <form id="quoteForm" th:action="@{/quotes}" method="post" class="space-y-6">
+            <div th:if="${formError}" id="formErrorBox"
+                 class="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+                 th:text="${formError}"></div>
+            <input type="hidden" name="draftState" id="draftStateInput" th:value="${draftState}">
+            <div id="calcConfig" class="hidden"
+                 th:attr="data-recargo=${calculatorConfig.recargo},data-mult-contado=${calculatorConfig.multContado},data-mult-debito=${calculatorConfig.multDebito},data-dias=${calculatorConfig.dias},data-int-dia=${calculatorConfig.intDia},data-semanas=${calculatorConfig.semanas},data-int-sem=${calculatorConfig.intSem},data-meses-corto=${calculatorConfig.mesesCorto},data-int-mes-corto=${calculatorConfig.intMesCorto},data-meses-largo=${calculatorConfig.mesesLargo},data-int-mes-largo=${calculatorConfig.intMesLargo}"></div>
+
+            <div class="rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Carro de productos</p>
+                        <h2 class="mt-1 text-xl font-semibold">Productos cotizados</h2>
+                    </div>
+                    <select id="priceMode" name="priceMode"
+                            class="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-2 text-sm">
+                        <option value="RETAIL">Minorista</option>
+                        <option value="WHOLESALE">Mayorista</option>
+                    </select>
+                </div>
+
+                <div id="cartEmpty" class="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500">
+                    No agregaste productos todavia.
+                </div>
+                <div id="cartItems" class="space-y-3"></div>
+                <div id="hiddenQuoteInputs"></div>
+
+                <button type="button" id="toggleCatalogBtn"
+                        class="mt-4 w-full rounded-3xl border-2 border-dashed border-blue-400 px-4 py-4 text-sm font-semibold uppercase tracking-[0.2em] text-blue-700 hover:bg-blue-50">
+                    + Agregar producto
+                </button>
+
+                <div id="catalogPanel" class="mt-4 hidden rounded-3xl border border-slate-200 bg-slate-50 p-4">
+                    <input type="search" id="catalogSearch" placeholder="Buscar por codigo o descripcion"
+                           class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm">
+                    <div id="catalogList" class="mt-4 max-h-80 space-y-2 overflow-y-auto">
+                        <button type="button" th:each="product : ${products}" class="catalog-item flex w-full items-center justify-between gap-4 rounded-2xl bg-white px-4 py-3 text-left ring-1 ring-slate-200 hover:ring-blue-300"
+                                th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + product.description}">
+                            <span class="min-w-0">
+                                <strong class="block truncate text-sm text-slate-900" th:text="${product.description}"></strong>
+                                <span class="mt-1 block text-xs text-slate-500" th:text="${'Cod: ' + product.productCode + ' | Stock ' + product.stockAvailable}"></span>
+                            </span>
+                            <span class="text-xs text-slate-500"
+                                  th:text="${'$' + product.priceRetail + ' / $' + product.priceWholesale}"></span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="rounded-[2rem] bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Opciones de financiacion</p>
+                        <h2 class="mt-1 text-xl font-semibold">Resumen de cobro</h2>
+                    </div>
+                    <div class="rounded-2xl bg-slate-100 px-4 py-3 text-right">
+                        <p class="text-xs uppercase tracking-wide text-slate-500">Total productos</p>
+                        <p id="cartSubtotal" class="text-lg font-semibold">$0</p>
+                    </div>
+                </div>
+
+                <div class="grid gap-4 md:grid-cols-2">
+                    <div class="rounded-3xl bg-emerald-50 px-5 py-4 ring-1 ring-emerald-100">
+                        <p class="text-sm font-semibold text-emerald-800">Contado</p>
+                        <p id="cashTotal" class="mt-1 text-3xl font-bold text-emerald-900">$0</p>
+                    </div>
+                    <div class="rounded-3xl bg-indigo-50 px-5 py-4 ring-1 ring-indigo-100">
+                        <p class="text-sm font-semibold text-indigo-800">Debito / transferencia</p>
+                        <p id="debitTotal" class="mt-1 text-3xl font-bold text-indigo-900">$0</p>
+                    </div>
+                </div>
+
+                <div class="mt-5 space-y-3 text-sm">
+                    <div class="rounded-3xl border border-slate-200 px-5 py-4"><p id="dailyPlanMain" class="font-semibold">Son 144 dias de $0</p></div>
+                    <div class="rounded-3xl border border-slate-200 px-5 py-4"><p id="weeklyPlanMain" class="font-semibold">Son 13 semanas de $0</p><p id="weeklyPlanPromo" class="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-amber-900">Si abonas en efectivo pagas la cuota $0</p></div>
+                    <div class="rounded-3xl border border-slate-200 px-5 py-4"><p id="shortPlanMain" class="font-semibold">Son 4 meses de $0</p><p id="shortPlanPromo" class="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-amber-900">Si abonas en efectivo pagas la cuota $0</p></div>
+                    <div class="rounded-3xl border border-slate-200 px-5 py-4"><p id="longPlanMain" class="font-semibold">Son 8 meses de $0</p><p id="longPlanPromo" class="mt-2 inline-flex rounded-full bg-amber-100 px-3 py-1 text-amber-900">Si abonas en efectivo pagas la cuota $0</p></div>
+                </div>
+            </div>
+
+            <div class="flex flex-col gap-3 pb-8">
+                <button type="submit" class="w-full rounded-3xl bg-emerald-600 px-5 py-4 text-base font-semibold text-white hover:bg-emerald-700">Guardar presupuesto</button>
+                <button type="button" id="shareQuoteBtn" class="w-full rounded-3xl bg-blue-600 px-5 py-4 text-base font-semibold text-white hover:bg-blue-700">Compartir</button>
+                <p id="shareStatus" class="text-center text-sm text-slate-500"></p>
+            </div>
+        </form>
+    </div>
+
+    <template id="cartItemTemplate">
+        <article class="rounded-[1.75rem] bg-slate-50 p-4 ring-1 ring-slate-200">
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div class="min-w-0">
+                    <h3 data-description class="truncate text-base font-semibold text-slate-900"></h3>
+                    <p data-code class="mt-1 text-sm text-slate-500"></p>
+                    <p data-price class="mt-2 text-sm font-medium text-slate-700"></p>
+                    <p data-line-total class="mt-1 text-sm text-slate-500"></p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <input data-quantity type="number" min="1" step="1" class="w-24 rounded-2xl border border-slate-300 bg-white px-3 py-2 text-sm">
+                    <button type="button" data-remove class="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700">Eliminar</button>
+                </div>
+            </div>
+        </article>
+    </template>
+
+    <script>
+        (() => {
+            const $ = id => document.getElementById(id);
+            const draftKey = 'maidav-quote-draft';
+            const catalogItems = Array.from(document.querySelectorAll('.catalog-item'));
+            const catalog = new Map();
+            let cart = [];
+
+            const parse = value => Number(String(value ?? 0).replace(',', '.')) || 0;
+            const money = value => new Intl.NumberFormat('es-AR', {style: 'currency', currency: 'ARS', maximumFractionDigits: 0}).format(parse(value));
+            const calc = $('calcConfig');
+            const cfg = n => parse(calc?.dataset[n]);
+            const round50 = value => value > 0 ? Math.ceil(value / 50) * 50 : 0;
+
+            function status(message, tone) {
+                const el = $('shareStatus');
+                if (!el) return;
+                el.textContent = message || '';
+                el.className = 'text-center text-sm ' + (tone === 'error' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-700' : 'text-slate-500');
+            }
+
+            function unitPrice(product) {
+                return $('priceMode')?.value === 'WHOLESALE' ? product.wholesale : product.retail;
+            }
+
+            function subtotal() {
+                return cart.reduce((sum, item) => sum + unitPrice(catalog.get(item.productId)) * item.quantity, 0);
+            }
+
+            function plans(base) {
+                const recargo = cfg('recargo') || 1.26;
+                const daily = round50((base * (cfg('intDia') || 2) * recargo) / (cfg('dias') || 144));
+                const weekly = round50((base * (cfg('intSem') || 2) * recargo) / (cfg('semanas') || 13));
+                const short = round50((base * (cfg('intMesCorto') || 2) * recargo) / (cfg('mesesCorto') || 4));
+                const long = round50((base * (cfg('intMesLargo') || 2.5) * recargo) / (cfg('mesesLargo') || 8));
+                return {
+                    cash: round50(base * (cfg('multContado') || 1.30)),
+                    debit: round50(base * (cfg('multDebito') || 1.50)),
+                    daily: {count: cfg('dias') || 144, fee: daily},
+                    weekly: {count: cfg('semanas') || 13, fee: weekly, cash: round50(weekly / recargo)},
+                    short: {count: cfg('mesesCorto') || 4, fee: short, cash: round50(short / recargo)},
+                    long: {count: cfg('mesesLargo') || 8, fee: long, cash: round50(long / recargo)}
+                };
+            }
+
+            function syncHiddenInputs() {
+                const container = $('hiddenQuoteInputs');
+                container.innerHTML = '';
+                cart.forEach(item => {
+                    ['productIds', 'quantities'].forEach((name, index) => {
+                        const input = document.createElement('input');
+                        input.type = 'hidden';
+                        input.name = name;
+                        input.value = String(index === 0 ? item.productId : item.quantity);
+                        container.appendChild(input);
+                    });
+                });
+                const draft = JSON.stringify({priceMode: $('priceMode')?.value || 'RETAIL', cart});
+                $('draftStateInput').value = draft;
+                localStorage.setItem(draftKey, draft);
+            }
+
+            function renderPlans() {
+                const summary = plans(subtotal());
+                $('cartSubtotal').textContent = money(subtotal());
+                $('cashTotal').textContent = money(summary.cash);
+                $('debitTotal').textContent = money(summary.debit);
+                $('dailyPlanMain').textContent = `Son ${summary.daily.count} dias de ${money(summary.daily.fee)}`;
+                $('weeklyPlanMain').textContent = `Son ${summary.weekly.count} semanas de ${money(summary.weekly.fee)}`;
+                $('weeklyPlanPromo').textContent = `Si abonas en efectivo pagas la cuota ${money(summary.weekly.cash)}`;
+                $('shortPlanMain').textContent = `Son ${summary.short.count} meses de ${money(summary.short.fee)}`;
+                $('shortPlanPromo').textContent = `Si abonas en efectivo pagas la cuota ${money(summary.short.cash)}`;
+                $('longPlanMain').textContent = `Son ${summary.long.count} meses de ${money(summary.long.fee)}`;
+                $('longPlanPromo').textContent = `Si abonas en efectivo pagas la cuota ${money(summary.long.cash)}`;
+            }
+
+            function renderCart() {
+                const wrap = $('cartItems');
+                wrap.innerHTML = '';
+                $('cartEmpty').classList.toggle('hidden', cart.length > 0);
+                cart.forEach(item => {
+                    const product = catalog.get(item.productId);
+                    const fragment = $('cartItemTemplate').content.cloneNode(true);
+                    fragment.querySelector('[data-description]').textContent = product.description;
+                    fragment.querySelector('[data-code]').textContent = `Cod: ${product.code} | Stock actual ${product.stock}`;
+                    fragment.querySelector('[data-price]').textContent = `Precio unitario ${money(unitPrice(product))}`;
+                    fragment.querySelector('[data-line-total]').textContent = `Total linea ${money(unitPrice(product) * item.quantity)}`;
+                    const quantityInput = fragment.querySelector('[data-quantity]');
+                    quantityInput.value = String(item.quantity);
+                    quantityInput.addEventListener('change', e => { item.quantity = Math.max(1, Math.round(parse(e.target.value))); renderCart(); });
+                    fragment.querySelector('[data-remove]').addEventListener('click', () => { cart = cart.filter(current => current.productId !== item.productId); renderCart(); });
+                    wrap.appendChild(fragment);
+                });
+                syncHiddenInputs();
+                renderPlans();
+            }
+
+            function validate() {
+                return !cart.length ? 'Debe agregar al menos un producto.' :
+                    cart.some(item => !item.productId || item.quantity < 1) ? 'Las cantidades del carrito deben ser validas.' : '';
+            }
+
+            function showError(message) {
+                const box = $('formErrorBox');
+                if (box) {
+                    box.textContent = message;
+                    box.classList.remove('hidden');
+                } else {
+                    status(message, 'error');
+                }
+            }
+
+            async function shareQuote() {
+                const error = validate();
+                if (error) {
+                    showError(error);
+                    return;
+                }
+                const summary = plans(subtotal());
+                const text = [
+                    'Presupuesto Maidav',
+                    `Tipo de precio: ${$('priceMode').value === 'WHOLESALE' ? 'Mayorista' : 'Minorista'}`,
+                    '',
+                    'Productos:',
+                    ...cart.map(item => `- ${catalog.get(item.productId).description} (${item.quantity} u.)`),
+                    '',
+                    `Total productos: ${money(subtotal())}`,
+                    `Contado: ${money(summary.cash)}`,
+                    `Debito / transferencia: ${money(summary.debit)}`,
+                    `Diario: ${summary.daily.count} dias de ${money(summary.daily.fee)}`,
+                    `Semanal: ${summary.weekly.count} semanas de ${money(summary.weekly.fee)} | Efectivo ${money(summary.weekly.cash)}`,
+                    `Mensual corto: ${summary.short.count} meses de ${money(summary.short.fee)} | Efectivo ${money(summary.short.cash)}`,
+                    `Mensual largo: ${summary.long.count} meses de ${money(summary.long.fee)} | Efectivo ${money(summary.long.cash)}`
+                ].join('\n');
+                if (navigator.share) {
+                    await navigator.share({title: 'Presupuesto Maidav', text});
+                    status('Presupuesto listo para compartir.', 'success');
+                    return;
+                }
+                await navigator.clipboard.writeText(text);
+                status('Resumen copiado al portapapeles.', 'success');
+            }
+
+            function restoreDraft(raw) {
+                if (!raw) return;
+                try {
+                    const draft = JSON.parse(raw);
+                    if (draft.priceMode) $('priceMode').value = draft.priceMode;
+                    cart = Array.isArray(draft.cart) ? draft.cart.filter(item => item && catalog.has(String(item.productId))).map(item => ({productId: String(item.productId), quantity: Math.max(1, Math.round(parse(item.quantity)))})) : [];
+                    renderCart();
+                } catch (_) {
+                    localStorage.removeItem(draftKey);
+                }
+            }
+
+            catalogItems.forEach(button => {
+                const id = String(button.dataset.productId);
+                catalog.set(id, {productId: id, description: button.dataset.description || '', code: button.dataset.code || '', retail: parse(button.dataset.retail), wholesale: parse(button.dataset.wholesale), stock: button.dataset.stock || '0'});
+                button.addEventListener('click', () => {
+                    const existing = cart.find(item => item.productId === id);
+                    existing ? existing.quantity += 1 : cart.push({productId: id, quantity: 1});
+                    renderCart();
+                    $('catalogPanel').classList.add('hidden');
+                    status('Producto agregado al presupuesto.', 'success');
+                });
+            });
+
+            $('toggleCatalogBtn')?.addEventListener('click', () => $('catalogPanel').classList.toggle('hidden'));
+            $('catalogSearch')?.addEventListener('input', e => {
+                const term = e.target.value.trim().toLowerCase();
+                catalogItems.forEach(button => button.classList.toggle('hidden', !!term && !(button.dataset.search || '').toLowerCase().includes(term)));
+            });
+            $('priceMode')?.addEventListener('change', renderCart);
+            $('shareQuoteBtn')?.addEventListener('click', () => shareQuote().catch(() => status('No se pudo compartir el presupuesto.', 'error')));
+            $('quoteForm')?.addEventListener('submit', event => {
+                const error = validate();
+                if (error) {
+                    event.preventDefault();
+                    showError(error);
+                    return;
+                }
+                syncHiddenInputs();
+            });
+
+            restoreDraft($('draftStateInput')?.value || localStorage.getItem(draftKey));
+            renderPlans();
+        })();
+    </script>
+</section>
+</html>

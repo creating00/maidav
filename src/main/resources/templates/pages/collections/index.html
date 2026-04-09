@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
       th:replace="layout/main :: layout(~{::content}, 'Cobranza')">
 
@@ -10,162 +10,78 @@
                   data-csrf-header=${_csrf.headerName},
                   data-csrf-token=${_csrf.token}">
 
-        <style>
-            .collections-page {
-                font-family: Arial, sans-serif;
-                background: #eef2f7;
-                margin: 0;
-                padding: 10px;
-                border-radius: 18px;
-            }
+        <div class="collections-hero">
+            <p class="collections-kicker">Cobranza diaria</p>
+            <h1>Registro operativo de pagos</h1>
+            <p>
+                Busca una cuenta, valida el valor vigente y registra el pago en efectivo o transferencia
+                sin salir del flujo de trabajo.
+            </p>
+            <div class="collections-hero-metrics">
+                <span class="collections-chip">Cobros de calle</span>
+                <span class="collections-chip">Cartera al dia</span>
+                <span class="collections-chip">Cierre rapido</span>
+            </div>
+        </div>
 
-            .collections-page h2 {
-                text-align: center;
-                margin-bottom: 15px;
-            }
+        <div class="collections-layout">
+            <div class="collections-stage">
+                <div class="collections-stage-header">
+                    <div>
+                        <h2>Mesada de trabajo</h2>
+                        <p>Agrega tarjetas activas, resuelve cada cuenta y sigue avanzando sin perder contexto.</p>
+                    </div>
+                    <span class="collections-counter">
+                        <span id="totalCards">0</span>&nbsp;cobros activos
+                    </span>
+                </div>
 
-            .collections-page .tarjeta {
-                background: white;
-                padding: 15px;
-                border-radius: 12px;
-                margin-bottom: 12px;
-                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.10);
-            }
+                <div id="contenedor"></div>
 
-            .collections-page .campo {
-                margin-bottom: 8px;
-                font-size: 16px;
-            }
+                <button type="button" class="agregar" id="agregarCobro">
+                    Agregar otro cobro
+                </button>
+            </div>
 
-            .collections-page input {
-                width: 100%;
-                padding: 10px;
-                font-size: 16px;
-                border-radius: 8px;
-                border: 1px solid #ccc;
-                margin-top: 4px;
-                box-sizing: border-box;
-            }
+            <aside class="collections-side">
+                <h2>Resumen del dia</h2>
+                <p class="collections-side__copy">
+                    Los totales se actualizan al registrar pagos. Usa este lateral para tener una lectura
+                    rapida del cierre parcial mientras cobras.
+                </p>
 
-            .collections-page .botones {
-                display: flex;
-                gap: 10px;
-                margin-top: 10px;
-            }
+                <div class="totales">
+                    <div class="collections-total collections-total--cash">
+                        <span class="collections-total__label">Efectivo</span>
+                        <strong class="collections-total__value">$<span id="totalEfectivo">0,00</span></strong>
+                    </div>
 
-            .collections-page button {
-                flex: 1;
-                padding: 12px;
-                font-size: 16px;
-                border: none;
-                border-radius: 10px;
-                color: white;
-                cursor: pointer;
-            }
+                    <div class="collections-total collections-total--bank">
+                        <span class="collections-total__label">Transferencia / debito</span>
+                        <strong class="collections-total__value">$<span id="totalDebito">0,00</span></strong>
+                    </div>
 
-            .collections-page button:disabled {
-                opacity: 0.65;
-                cursor: not-allowed;
-            }
+                    <div class="collections-total collections-total--all">
+                        <span class="collections-total__label">Total del dia</span>
+                        <strong class="collections-total__value">$<span id="totalGeneral">0,00</span></strong>
+                    </div>
+                </div>
 
-            .collections-page .buscar {
-                background: #444;
-                margin-top: 6px;
-            }
-
-            .collections-page .aplicar {
-                background: #1e88e5;
-            }
-
-            .collections-page .efectivo {
-                background: #27ae60;
-            }
-
-            .collections-page .debito {
-                background: #2f80ed;
-            }
-
-            .collections-page .agregar {
-                width: 100%;
-                padding: 15px;
-                font-size: 18px;
-                background: #ff9800;
-                border: none;
-                border-radius: 10px;
-                color: white;
-                margin-top: 10px;
-            }
-
-            .collections-page .estadoA {
-                color: red;
-                font-weight: bold;
-            }
-
-            .collections-page .estadoD {
-                color: green;
-                font-weight: bold;
-            }
-
-            .collections-page .cobrado {
-                margin-top: 10px;
-                font-size: 18px;
-                color: #27ae60;
-                font-weight: bold;
-            }
-
-            .collections-page .error {
-                margin-top: 10px;
-                font-size: 16px;
-                color: red;
-                font-weight: bold;
-            }
-
-            .collections-page .totales {
-                margin-top: 20px;
-                background: white;
-                padding: 15px;
-                border-radius: 12px;
-                font-size: 18px;
-                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
-            }
-
-            .collections-page .detalle-link {
-                display: inline-flex;
-                margin-top: 10px;
-                color: #1d4ed8;
-                font-size: 14px;
-                font-weight: bold;
-                text-decoration: none;
-            }
-
-            .collections-page .detalle-link:hover {
-                text-decoration: underline;
-            }
-
-            .collections-page .processing {
-                margin-top: 10px;
-                font-size: 15px;
-                color: #1d4ed8;
-                font-weight: bold;
-            }
-
-            @media (max-width: 640px) {
-                .collections-page .botones {
-                    flex-direction: column;
-                }
-            }
-        </style>
-
-        <h2>Cobranza del dia</h2>
-
-        <div id="contenedor"></div>
-
-        <button type="button" class="agregar" id="agregarCobro">+ Agregar cobro</button>
-
-        <div class="totales">
-            Efectivo: $<span id="totalEfectivo">0,00</span><br><br>
-            Transferencia / Debito: $<span id="totalDebito">0,00</span><br><br>
-            Total del dia: $<span id="totalGeneral">0,00</span>
+                <div class="collections-side__list">
+                    <div class="collections-side__item">
+                        <span>Paso 1</span>
+                        <p>Busca el credito por ID y revisa el valor vigente antes de cobrar.</p>
+                    </div>
+                    <div class="collections-side__item">
+                        <span>Paso 2</span>
+                        <p>Aplica la cuota sugerida o ajusta el monto si necesitas registrar otro valor.</p>
+                    </div>
+                    <div class="collections-side__item">
+                        <span>Paso 3</span>
+                        <p>Confirma el medio de pago y usa el enlace al detalle para validar la cuenta.</p>
+                    </div>
+                </div>
+            </aside>
         </div>
     </div>
 
@@ -185,6 +101,7 @@
             const totalEfectivoEl = document.getElementById('totalEfectivo');
             const totalDebitoEl = document.getElementById('totalDebito');
             const totalGeneralEl = document.getElementById('totalGeneral');
+            const totalCardsEl = document.getElementById('totalCards');
 
             let totalEfectivo = 0;
             let totalDebito = 0;
@@ -222,6 +139,24 @@
                 totalGeneralEl.textContent = money(totalEfectivo + totalDebito);
             }
 
+            function updateCardCounter() {
+                if (totalCardsEl) {
+                    totalCardsEl.textContent = String(container.children.length);
+                }
+            }
+
+            function setCardBadge(card, tone, label) {
+                const badge = card.querySelector('.tarjeta-badge');
+                if (!badge) {
+                    return;
+                }
+                badge.textContent = label || 'Pendiente';
+                badge.classList.remove('is-alert', 'is-ok', 'is-paid');
+                if (tone) {
+                    badge.classList.add(tone);
+                }
+            }
+
             function resetMessages(card) {
                 card.querySelector('.cobrado').innerHTML = '';
                 card.querySelector('.processing').innerHTML = '';
@@ -249,6 +184,7 @@
                 card.querySelector('.resumenCobro').innerHTML = '';
                 card.querySelector('.detalle').innerHTML = '';
                 card.querySelector('.cobro').value = '';
+                setCardBadge(card, '', 'Pendiente');
                 resetMessages(card);
             }
 
@@ -257,24 +193,36 @@
                 card.className = 'tarjeta';
                 card.dataset.cobrado = 'no';
                 card.innerHTML = `
-                    <div class="campo">
-                        ID credito
-                        <input class="idcredito" inputmode="numeric" autocomplete="off">
-                        <button type="button" class="buscar">Buscar credito</button>
+                    <div class="tarjeta-head">
+                        <div>
+                            <p class="tarjeta-kicker">Cobro individual</p>
+                            <h3 class="tarjeta-title">Credito en seguimiento</h3>
+                        </div>
+                        <span class="tarjeta-badge">Pendiente</span>
                     </div>
 
-                    <div class="campo cliente"></div>
-                    <div class="campo producto"></div>
-                    <div class="campo cuota"></div>
-                    <div class="campo contado"></div>
-                    <div class="campo financiada"></div>
-                    <div class="campo debe"></div>
-                    <div class="campo estado"></div>
-                    <div class="campo resumenCobro"></div>
+                    <div class="campo campo-input">
+                        <label>ID credito</label>
+                        <div class="campo-inline">
+                            <input class="idcredito" inputmode="numeric" autocomplete="off" placeholder="Ej: 1452">
+                            <button type="button" class="buscar">Buscar credito</button>
+                        </div>
+                    </div>
 
-                    <div class="campo">
-                        Cobro
-                        <input class="cobro" inputmode="decimal" autocomplete="off">
+                    <div class="tarjeta-grid">
+                        <div class="campo campo-data cliente" data-empty="Cliente pendiente"></div>
+                        <div class="campo campo-data producto" data-empty="Producto pendiente"></div>
+                        <div class="campo campo-data cuota" data-empty="Cuota pendiente"></div>
+                        <div class="campo campo-data contado" data-empty="Valor contado"></div>
+                        <div class="campo campo-data financiada" data-empty="Valor financiado"></div>
+                        <div class="campo campo-data debe" data-empty="Saldo pendiente"></div>
+                        <div class="campo campo-data estado" data-empty="Estado de cuenta"></div>
+                        <div class="campo campo-data resumenCobro" data-empty="Sin novedades de cobro"></div>
+                    </div>
+
+                    <div class="campo campo-amount">
+                        <label>Cobro</label>
+                        <input class="cobro" inputmode="decimal" autocomplete="off" placeholder="Monto a registrar">
                     </div>
 
                     <div class="botones">
@@ -282,8 +230,8 @@
                     </div>
 
                     <div class="botones">
-                        <button type="button" class="efectivo">EFECTIVO</button>
-                        <button type="button" class="debito">TRANSF</button>
+                        <button type="button" class="efectivo">Efectivo</button>
+                        <button type="button" class="debito">Transferencia</button>
                     </div>
 
                     <div class="cobrado"></div>
@@ -291,6 +239,8 @@
                     <div class="error"></div>
                     <div class="detalle"></div>
                 `;
+
+                setCardBadge(card, '', 'Pendiente');
 
                 card.querySelector('.buscar').addEventListener('click', function () {
                     buscarCredito(card);
@@ -356,29 +306,33 @@
                         : 'Cuota contado: No aplica';
                     card.querySelector('.financiada').textContent = `Cuota financiada: $${money(data.financedAmount)}`;
                     card.querySelector('.debe').textContent = `Debe: $${money(data.balance)}`;
+
                     const overdueAmount = parseNumber(data.overdueAmount);
-                    if (String(data.statusLabel || '').toUpperCase() === 'ATRASADO' && overdueAmount > 0) {
-                        // MOSTRAR MONTO ATRASO
-                        card.querySelector('.estado').innerHTML = `<span class="${data.statusCssClass || 'estadoA'}">${String(data.statusLabel || 'Atrasado').toUpperCase()} - $${money(overdueAmount)}</span>`;
+                    const statusLabel = String(data.statusLabel || 'Al dia').toUpperCase();
+                    if (statusLabel === 'ATRASADO' && overdueAmount > 0) {
+                        card.querySelector('.estado').innerHTML = `<span class="${data.statusCssClass || 'estadoA'}">${statusLabel} - $${money(overdueAmount)}</span>`;
+                        setCardBadge(card, 'is-alert', 'Atrasado');
                     } else {
-                        card.querySelector('.estado').innerHTML = `<span class="${data.statusCssClass || 'estadoD'}">${String(data.statusLabel || 'Al dia').toUpperCase()}</span>`;
+                        card.querySelector('.estado').innerHTML = `<span class="${data.statusCssClass || 'estadoD'}">${statusLabel}</span>`;
+                        setCardBadge(card, 'is-ok', statusLabel);
                     }
+
                     const chargeModeLabel = data.chargeModeLabel || 'Valor financiado';
                     card.querySelector('.cobro').value = Number(data.chargeAmount || 0).toFixed(2);
+
                     const appliedCreditAmount = parseNumber(data.appliedCreditAmount);
                     const expiredCashAmount = parseNumber(data.expiredCashAmount);
                     let resumenCobro = '';
                     if (appliedCreditAmount > 0) {
-                        resumenCobro += `<div style="color:#047857;font-weight:700;">Saldo a favor aplicado: $${money(appliedCreditAmount)}</div>`;
+                        resumenCobro += `<div class="estadoD">Saldo a favor aplicado: $${money(appliedCreditAmount)}</div>`;
                     }
                     if (expiredCashAmount > 0) {
-                        resumenCobro += `<div style="color:#dc2626;font-weight:700;text-decoration:line-through;">Contado vencido: $${money(expiredCashAmount)}</div>`;
+                        resumenCobro += `<div class="estadoA">Contado vencido: $${money(expiredCashAmount)}</div>`;
                     }
                     card.querySelector('.resumenCobro').innerHTML = resumenCobro;
+
                     card.querySelector('.detalle').innerHTML = `
-                        <div class="detalle-link" style="display:block;color:#0f172a;text-decoration:none;font-weight:700;">
-                            ${chargeModeLabel} vigente: $${money(data.chargeAmount)}
-                        </div>
+                        <div class="detalle-link">${chargeModeLabel} vigente: $${money(data.chargeAmount)}</div>
                         ${data.detailUrl ? `<a class="detalle-link" href="${data.detailUrl}">Ver detalle de la cuenta</a>` : ''}
                     `;
                 } catch (error) {
@@ -390,21 +344,21 @@
             function aplicarCuota(card) {
                 resetMessages(card);
                 if (card.dataset.cobrado === 'si') {
-                    card.querySelector('.error').textContent = 'YA INGRESO EL PAGO';
+                    card.querySelector('.error').textContent = 'El pago ya fue registrado';
                     return;
                 }
                 if (!card.dataset.accountId) {
-                    card.querySelector('.error').textContent = 'Busque un credito antes de aplicar la cuota';
+                    card.querySelector('.error').textContent = 'Busca un credito antes de aplicar la cuota';
                     return;
                 }
 
                 const monto = parseNumber(card.querySelector('.cobro').value);
                 if (monto <= 0) {
-                    card.querySelector('.error').textContent = 'Ingrese un monto valido para aplicar';
+                    card.querySelector('.error').textContent = 'Ingresa un monto valido para aplicar';
                     return;
                 }
 
-                card.querySelector('.cobrado').textContent = `CUOTA APLICADA $${money(monto)}`;
+                card.querySelector('.cobrado').textContent = `Cuota aplicada $${money(monto)}`;
             }
 
             function resolveAmountForType(card, tipo) {
@@ -432,27 +386,27 @@
             async function registrar(card, tipo) {
                 resetMessages(card);
                 if (card.dataset.cobrado === 'si') {
-                    card.querySelector('.error').innerHTML = 'YA INGRESO EL PAGO<br>Agregue otro cobro si quiere registrar otro pago';
+                    card.querySelector('.error').innerHTML = 'El pago ya fue ingresado.<br>Agrega otro cobro si necesitas registrar una nueva operacion.';
                     return;
                 }
                 if (!card.dataset.accountId) {
-                    card.querySelector('.error').textContent = 'Busque un credito antes de registrar el cobro';
+                    card.querySelector('.error').textContent = 'Busca un credito antes de registrar el cobro';
                     return;
                 }
 
                 const monto = resolveAmountForType(card, tipo);
                 if (monto <= 0) {
-                    card.querySelector('.error').textContent = 'Ingrese un monto valido para registrar';
+                    card.querySelector('.error').textContent = 'Ingresa un monto valido para registrar';
                     return;
                 }
 
                 const paymentMethod = tipo === 'efectivo' ? 'CASH' : 'BANK';
                 const paymentLabel = tipo === 'efectivo' ? 'efectivo' : 'transferencia / debito';
-                // CONFIRMACION COBRANZA
-                const confirmed = window.confirm(`Esta por registrar un pago en ${paymentLabel} por $${money(monto)}. Desea continuar?`);
+                const confirmed = window.confirm(`Vas a registrar un pago en ${paymentLabel} por $${money(monto)}. Deseas continuar?`);
                 if (!confirmed) {
                     return;
                 }
+
                 const body = new URLSearchParams();
                 const operationToken = `collection-${card.dataset.accountId}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
                 body.set('accountId', card.dataset.accountId);
@@ -460,8 +414,8 @@
                 body.set('paymentMethod', paymentMethod);
                 body.set('operationToken', operationToken);
                 card.dataset.operationToken = operationToken;
+
                 const actionButtons = Array.from(card.querySelectorAll('button'));
-                // PREVENIR DOBLE PAGO
                 actionButtons.forEach(button => {
                     button.disabled = true;
                 });
@@ -491,9 +445,10 @@
                         totalDebito += Number(data.amount || monto);
                     }
                     updateTotals();
+                    setCardBadge(card, 'is-paid', 'Cobrado');
                     card.querySelector('.processing').textContent = '';
 
-                    let message = `COBRADO $${money(data.amount || monto)}`;
+                    let message = `Cobrado $${money(data.amount || monto)}`;
                     if (data.paymentMethodLabel) {
                         message += ` - ${data.paymentMethodLabel}`;
                     }
@@ -518,17 +473,15 @@
 
             function agregarTarjeta() {
                 container.appendChild(buildCard());
+                updateCardCounter();
             }
 
             addButton.addEventListener('click', agregarTarjeta);
             agregarTarjeta();
             updateTotals();
+            updateCardCounter();
         })();
     </script>
 
 </section>
 </html>
-
-
-
-
