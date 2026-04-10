@@ -4,37 +4,49 @@
 
 <section th:fragment="content">
 
-    <div class="flex justify-between mb-6">
-        <h1 class="text-2xl font-bold">Roles</h1>
-        <a th:href="@{/roles/new}"
-           class="bg-blue-600 text-white px-4 py-2 rounded">
-            Nuevo Rol
-        </a>
+    <div class="app-page-toolbar">
+        <div class="app-page-toolbar__copy">
+            <h1 class="text-2xl font-bold">Roles</h1>
+            <p>Perfiles operativos y permisos agrupados para el equipo.</p>
+        </div>
+
+        <div class="app-page-toolbar__actions">
+            <a th:href="@{/roles/new}"
+               class="bg-blue-600 text-white px-4 py-2 rounded">
+                Nuevo rol
+            </a>
+        </div>
     </div>
 
-    <table class="w-full bg-white rounded shadow">
-        <thead class="bg-gray-100">
-        <tr>
-            <th class="p-3 text-left">Nombre</th>
-            <th class="p-3">Permisos</th>
-            <th class="p-3 text-right">Acciones</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="r : ${roles}">
-            <td class="p-3" th:text="${r.name}"></td>
-            <td class="p-3 text-sm">
-                <span th:each="p : ${r.permissions}"
-                      th:text="${p.name}"
-                      class="inline-block bg-gray-200 px-2 py-1 rounded mr-1">
-                </span>
-            </td>
-            <td class="p-3 text-right">
-                <a th:href="@{|/roles/${r.id}/edit|}" class="text-blue-600">Editar</a>
-            </td>
-        </tr>
-        </tbody>
-    </table>
+    <div class="overflow-x-auto">
+        <table class="app-simple-table">
+            <thead>
+            <tr>
+                <th class="text-left">Nombre</th>
+                <th>Permisos</th>
+                <th class="text-right">Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="r : ${roles}">
+                <td class="font-semibold" th:text="${r.name}"></td>
+                <td class="text-sm">
+                    <div class="flex flex-wrap gap-2">
+                        <span th:each="p : ${r.permissions}"
+                              th:text="${p.name}"
+                              class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                        </span>
+                    </div>
+                </td>
+                <td class="text-right">
+                    <div class="app-inline-actions">
+                        <a th:href="@{|/roles/${r.id}/edit|}" class="text-blue-600">Editar</a>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
 
 </section>
 </html>

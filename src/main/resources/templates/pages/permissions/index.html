@@ -4,39 +4,49 @@
 
 <section th:fragment="content">
 
-    <div class="flex justify-between mb-6">
-        <h1 class="text-2xl font-bold">Permisos</h1>
-        <a th:href="@{/permissions/new}"
-           class="bg-blue-600 text-white px-4 py-2 rounded">
-            Nuevo Permiso
-        </a>
+    <div class="app-page-toolbar">
+        <div class="app-page-toolbar__copy">
+            <h1 class="text-2xl font-bold">Permisos</h1>
+            <p>Control fino de acciones disponibles por modulo.</p>
+        </div>
+
+        <div class="app-page-toolbar__actions">
+            <a th:href="@{/permissions/new}"
+               class="bg-blue-600 text-white px-4 py-2 rounded">
+                Nuevo permiso
+            </a>
+        </div>
     </div>
 
-    <table class="w-full bg-white rounded shadow">
-        <thead class="bg-gray-100">
-        <tr>
-            <th class="p-3 text-left">Nombre</th>
-            <th class="p-3 text-right">Acciones</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="p : ${permissions}">
-            <td class="p-3" th:text="${p.name}"></td>
-            <td class="p-3 text-right space-x-2">
-                <a th:href="@{|/permissions/${p.id}/edit|}"
-                   class="text-blue-600">Editar</a>
+    <div class="overflow-x-auto">
+        <table class="app-simple-table">
+            <thead>
+            <tr>
+                <th class="text-left">Nombre</th>
+                <th class="text-right">Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="p : ${permissions}">
+                <td class="font-semibold" th:text="${p.name}"></td>
+                <td class="text-right">
+                    <div class="app-inline-actions">
+                        <a th:href="@{|/permissions/${p.id}/edit|}"
+                           class="text-blue-600">Editar</a>
 
-                <form th:action="@{|/permissions/${p.id}/delete|}"
-                      method="post" class="inline">
-                    <button class="text-red-600"
-                            onclick="return confirm('¿Eliminar?')">
-                        Eliminar
-                    </button>
-                </form>
-            </td>
-        </tr>
-        </tbody>
-    </table>
+                        <form th:action="@{|/permissions/${p.id}/delete|}"
+                              method="post" class="inline">
+                            <button class="text-red-600"
+                                    onclick="return confirm('Eliminar?')">
+                                Eliminar
+                            </button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
 
 </section>
 </html>

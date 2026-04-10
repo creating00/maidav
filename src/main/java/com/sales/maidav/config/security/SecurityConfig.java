@@ -28,6 +28,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/login",
                                 "/password-recovery/**",
+                                "/app.css",
                                 "/css/**",
                                 "/js/**",
                                 "/uploads/**",

@@ -194,6 +194,7 @@ body.auth-shell::before {
     display: flex;
     align-items: center;
     gap: 10px;
+    min-width: 0;
 }
 
 .stock-pill {
@@ -667,6 +668,8 @@ body.auth-shell::before {
 }
 
 .app-main .overflow-x-auto {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
     border: 1px solid var(--line-soft);
     border-radius: 28px;
     background: rgba(255, 255, 255, 0.84);
@@ -852,15 +855,18 @@ body.auth-shell::before {
 
 .auth-login-grid {
     display: grid;
-    grid-template-columns: minmax(320px, 1.05fr) minmax(320px, 0.95fr);
-    gap: 22px;
-    width: min(100%, 1120px);
+    grid-template-columns: minmax(380px, 1.2fr) minmax(360px, 0.86fr);
+    gap: 24px;
+    width: min(100%, 1180px);
     align-items: stretch;
 }
 
 .auth-login-story {
     position: relative;
     overflow: hidden;
+    display: grid;
+    align-content: start;
+    min-height: 720px;
     padding: 34px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 34px;
@@ -880,10 +886,31 @@ body.auth-shell::before {
     pointer-events: none;
 }
 
+.auth-login-story::after {
+    content: "";
+    position: absolute;
+    inset: 24px 24px auto auto;
+    width: 160px;
+    height: 160px;
+    border-radius: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+        repeating-linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.06) 0,
+            rgba(255, 255, 255, 0.06) 1px,
+            transparent 1px,
+            transparent 18px
+        );
+    opacity: 0.7;
+    pointer-events: none;
+}
+
 .auth-login-story__brand {
     display: flex;
     align-items: flex-start;
     gap: 16px;
+    max-width: 30rem;
 }
 
 .auth-login-story__mark {
@@ -931,6 +958,39 @@ body.auth-shell::before {
     margin-top: 26px;
 }
 
+.auth-login-story__metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.auth-login-metric {
+    padding: 14px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(12px);
+}
+
+.auth-login-metric span {
+    display: block;
+    color: rgba(248, 250, 252, 0.62);
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+}
+
+.auth-login-metric strong {
+    display: block;
+    margin-top: 8px;
+    color: #fff;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1.3;
+}
+
 .auth-login-chip {
     display: inline-flex;
     align-items: center;
@@ -950,6 +1010,7 @@ body.auth-shell::before {
     display: grid;
     gap: 14px;
     margin-top: 28px;
+    max-width: 34rem;
 }
 
 .auth-login-story__item {
@@ -994,12 +1055,96 @@ body.auth-shell::before {
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 34px;
+    max-width: 460px;
+    margin-left: auto;
+    padding: 36px;
+}
+
+.auth-login-mobile-strip {
+    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.auth-login-mobile-strip span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--line-soft);
+    border-radius: 999px;
+    background: var(--surface-muted);
+    color: var(--ink);
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
 }
 
 .auth-card__header {
     display: grid;
     gap: 8px;
+}
+
+.auth-label {
+    display: block;
+    color: var(--ink);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+.auth-alert {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border: 1px solid transparent;
+    border-radius: 18px;
+    font-size: 0.92rem;
+    font-weight: 700;
+    line-height: 1.5;
+}
+
+.auth-alert--success {
+    border-color: rgba(22, 121, 92, 0.18);
+    background: var(--money-soft);
+    color: var(--money-strong);
+}
+
+.auth-alert--error {
+    border-color: rgba(180, 77, 84, 0.18);
+    background: var(--danger-soft);
+    color: var(--danger-strong);
+}
+
+.auth-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 50px;
+    margin-top: 4px;
+    padding: 0 18px;
+    border: 1px solid transparent;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+    color: #fff;
+    font-weight: 800;
+    box-shadow: 0 20px 34px -26px rgba(23, 63, 82, 0.82);
+    cursor: pointer;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+
+.auth-submit:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 22px 36px -24px rgba(28, 92, 114, 0.7);
+    filter: saturate(1.02);
+}
+
+.auth-submit:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 4px var(--focus);
 }
 
 .auth-card::before {
@@ -1077,6 +1222,12 @@ body.auth-shell::before {
 
 .auth-link:hover {
     color: var(--accent-strong);
+}
+
+@media (min-width: 769px) {
+    .auth-login-story__metrics {
+        margin-top: auto;
+    }
 }
 
 .collections-page {
@@ -1571,6 +1722,73 @@ body.auth-shell::before {
     line-height: 1.5;
 }
 
+.app-page-toolbar {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.app-page-toolbar__copy {
+    min-width: 0;
+}
+
+.app-page-toolbar__copy p {
+    margin-top: 6px;
+    color: var(--ink-muted);
+    font-size: 0.94rem;
+}
+
+.app-page-toolbar__actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.app-simple-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.app-simple-table thead {
+    background: rgba(23, 34, 43, 0.04);
+}
+
+.app-simple-table th,
+.app-simple-table td {
+    padding: 15px 18px;
+}
+
+.app-simple-table th {
+    color: var(--ink-soft);
+    font-size: 0.74rem;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.app-simple-table tbody td {
+    color: var(--ink-strong);
+    border-top: 1px solid var(--line-soft);
+    vertical-align: top;
+}
+
+.app-simple-table tbody tr:hover {
+    background: rgba(255, 250, 242, 0.72);
+}
+
+.app-inline-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
 @media (max-width: 1024px) {
     .collections-layout {
         grid-template-columns: 1fr;
@@ -1582,9 +1800,37 @@ body.auth-shell::before {
         padding-inline: 14px;
     }
 
+    .app-header__inner {
+        gap: 12px;
+    }
+
     .header-brand__page,
     .user-email small {
         display: none;
+    }
+
+    .header-brand__mark {
+        width: 40px;
+        height: 40px;
+        border-radius: 14px;
+        font-size: 1rem;
+    }
+
+    .header-brand__name {
+        font-size: 1rem;
+    }
+
+    .header-actions {
+        gap: 8px;
+    }
+
+    .stock-pill,
+    .user-button {
+        min-width: 0;
+    }
+
+    .user-dropdown {
+        width: min(220px, calc(100vw - 24px));
     }
 
     .app-sidebar__frame {
@@ -1641,7 +1887,13 @@ body.auth-shell::before {
     }
 
     .auth-login-story {
-        padding: 24px;
+        order: 2;
+        padding: 22px;
+        border-radius: 28px;
+    }
+
+    .auth-login-story {
+        min-height: auto;
     }
 
     .auth-login-story .auth-heading {
@@ -1649,7 +1901,153 @@ body.auth-shell::before {
         font-size: clamp(1.85rem, 7vw, 2.45rem);
     }
 
+    .auth-login-story__brand {
+        gap: 12px;
+    }
+
+    .auth-login-story__mark {
+        width: 48px;
+        height: 48px;
+        border-radius: 16px;
+        font-size: 1.2rem;
+    }
+
+    .auth-login-story__chips {
+        margin-top: 20px;
+    }
+
+    .auth-login-story__metrics {
+        grid-template-columns: 1fr;
+        gap: 10px;
+        margin-top: 18px;
+    }
+
+    .auth-login-story__list {
+        gap: 10px;
+        margin-top: 18px;
+    }
+
+    .auth-login-story__item {
+        padding: 14px 16px;
+        border-radius: 20px;
+    }
+
     .auth-card--login {
+        order: 1;
         padding: 24px;
+        border-radius: 28px;
+        max-width: none;
+        margin-left: 0;
+    }
+
+    .auth-heading--compact {
+        font-size: clamp(1.8rem, 7vw, 2.2rem);
+    }
+
+    .auth-copy {
+        line-height: 1.55;
+    }
+
+    .auth-stack {
+        margin-top: 20px;
+        gap: 14px;
+    }
+
+    .auth-login-mobile-strip {
+        display: flex;
+    }
+
+    .auth-footer--login {
+        margin-top: 18px;
+        padding-top: 16px;
+    }
+
+    .app-page-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 14px;
+    }
+
+    .app-page-toolbar__actions {
+        justify-content: stretch;
+    }
+
+    .app-page-toolbar__actions > * {
+        flex: 1 1 100%;
+    }
+
+    .app-main .overflow-x-auto table,
+    .app-simple-table,
+    .users-table {
+        min-width: 680px;
+    }
+}
+
+@media (max-width: 560px) {
+    .auth-shell {
+        padding: 14px;
+    }
+
+    .auth-shell--login {
+        padding: 14px;
+    }
+
+    .auth-login-grid {
+        gap: 14px;
+    }
+
+    .auth-card {
+        padding: 22px;
+        border-radius: 26px;
+    }
+
+    .auth-card::before {
+        border-radius: 26px 26px 0 0;
+    }
+
+    .auth-card--login {
+        padding: 22px;
+    }
+
+    .auth-login-story {
+        padding: 18px;
+        border-radius: 24px;
+    }
+
+    .auth-login-story__chips {
+        display: none;
+    }
+
+    .auth-login-story__metrics {
+        margin-top: 16px;
+    }
+
+    .auth-login-story__list {
+        display: none;
+    }
+
+    .auth-field__label-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .app-header__inner {
+        flex-wrap: wrap;
+    }
+
+    .app-header__inner > * {
+        min-width: 0;
+    }
+
+    .header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .stock-pill,
+    .user-button {
+        flex: 1 1 0;
+        justify-content: center;
     }
 }

@@ -5,10 +5,13 @@
 
 <section th:fragment="content">
 
-    <div class="flex justify-between items-center mb-6">
-        <h1 class="text-2xl font-bold">Productos</h1>
+    <div class="app-page-toolbar">
+        <div class="app-page-toolbar__copy">
+            <h1 class="text-2xl font-bold">Productos</h1>
+            <p>Catalogo, stock y financiacion listos para consulta rapida desde mostrador o celular.</p>
+        </div>
 
-        <div class="flex items-center gap-2">
+        <div class="app-page-toolbar__actions">
             <button sec:authorize="hasAuthority('PRODUCT_UPDATE')"
                     type="button"
                     id="open-adjustments-history"
@@ -33,7 +36,7 @@
     </div>
 
     <div th:if="${lowStockOnly}"
-         class="mb-4 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 flex items-center justify-between">
+         class="mb-4 flex flex-col gap-2 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
         <span>Mostrando productos con stock bajo</span>
         <a th:href="@{/products}" class="text-sm text-amber-900 hover:underline">Ver todos</a>
     </div>
