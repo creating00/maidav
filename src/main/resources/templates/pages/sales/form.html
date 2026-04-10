@@ -340,6 +340,7 @@
                     </div>
                 </div>
             </div>
+            <div class="sale-items-shell">
             <table class="min-w-full text-sm" id="itemsTable">
                 <thead class="bg-gray-100 text-left">
                 <tr>
@@ -376,6 +377,8 @@
                                 <input type="text"
                                        class="product-combobox__input"
                                        placeholder="Buscar por codigo o descripcion"
+                                       data-placeholder-default="Buscar por codigo o descripcion"
+                                       data-placeholder-mobile="Producto o codigo"
                                        autocomplete="off"
                                        spellcheck="false"
                                        aria-label="Buscar producto"/>
@@ -408,13 +411,14 @@
                 </tr>
                 </tbody>
             </table>
+            </div>
 
-            <div class="mt-3 flex items-center justify-between">
+            <div class="sale-items-summary mt-3 flex items-center justify-between">
                 <button type="button" id="addRow"
                         class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">
                     + Agregar producto
                 </button>
-                <div class="text-sm text-gray-700">
+                <div class="sale-items-summary__totals text-sm text-gray-700">
                     <span class="mr-4">Total productos: <strong id="totalItems">0</strong></span>
                     <span>Total carrito: <strong id="totalAmount">0.00</strong></span>
                 </div>
@@ -795,6 +799,18 @@
                 combobox.classList.toggle('has-selection', Boolean(label));
             }
 
+            function syncProductComboboxPlaceholder(row) {
+                const input = row.querySelector('.product-combobox__input');
+                if (!input) {
+                    return;
+                }
+                const mobilePlaceholder = input.dataset.placeholderMobile || 'Producto o codigo';
+                const defaultPlaceholder = input.dataset.placeholderDefault || 'Buscar por codigo o descripcion';
+                input.placeholder = window.matchMedia('(max-width: 480px)').matches
+                    ? mobilePlaceholder
+                    : defaultPlaceholder;
+            }
+
             function renderProductComboboxOptions(row, searchTerm) {
                 if (!row) {
                     return [];
@@ -923,6 +939,7 @@
                 input.setAttribute('aria-autocomplete', 'list');
                 input.setAttribute('aria-expanded', 'false');
 
+                syncProductComboboxPlaceholder(row);
                 syncProductComboboxFromSelect(row);
 
                 input.addEventListener('focus', function () {
@@ -1783,6 +1800,11 @@
                 if (!event.target.closest('.product-combobox')) {
                     closeAllProductComboboxes();
                 }
+            });
+            window.addEventListener('resize', function () {
+                body.querySelectorAll('tr').forEach(function (row) {
+                    syncProductComboboxPlaceholder(row);
+                });
             });
             updateTotals();
             if (discountInput) {
