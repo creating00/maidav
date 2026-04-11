@@ -5,6 +5,7 @@ import com.sales.maidav.model.quote.QuotePriceMode;
 import com.sales.maidav.service.product.ProductService;
 import com.sales.maidav.service.quote.InvalidQuoteException;
 import com.sales.maidav.service.quote.QuoteCalculator;
+import com.sales.maidav.service.quote.QuoteDocumentService;
 import com.sales.maidav.service.quote.QuoteService;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.ui.ExtendedModelMap;
 import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
@@ -29,6 +33,8 @@ class QuoteControllerTest {
     private ProductService productService;
     @Mock
     private CompanySettingsService companySettingsService;
+    @Mock
+    private QuoteDocumentService quoteDocumentService;
 
     private QuoteController quoteController;
 
@@ -38,7 +44,8 @@ class QuoteControllerTest {
                 quoteService,
                 productService,
                 companySettingsService,
-                new QuoteCalculator()
+                new QuoteCalculator(),
+                quoteDocumentService
         );
     }
 
@@ -82,5 +89,22 @@ class QuoteControllerTest {
         assertThat(view).isEqualTo("pages/quotes/form");
         assertThat(model.get("formError")).isEqualTo("Debe agregar al menos un producto");
         assertThat(model.get("draftState")).isEqualTo("{\"priceMode\":\"RETAIL\",\"items\":[]}");
+    }
+
+    @Test
+    void downloadPdfReturnsInlinePdfResponse() {
+        Quote quote = new Quote();
+        quote.setId(9L);
+        quote.setQuoteNumber("P-000009");
+
+        when(quoteService.findById(9L)).thenReturn(quote);
+        when(quoteDocumentService.generateQuotePdf(quote)).thenReturn(new byte[]{1, 2, 3});
+
+        ResponseEntity<byte[]> response = quoteController.downloadPdf(9L);
+
+        assertThat(response.getStatusCode().is2xxSuccessful()).isTrue();
+        assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PDF);
+        assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).contains("inline");
+        assertThat(response.getBody()).containsExactly(1, 2, 3);
     }
 }

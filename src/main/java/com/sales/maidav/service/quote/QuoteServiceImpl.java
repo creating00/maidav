@@ -55,6 +55,15 @@ public class QuoteServiceImpl implements QuoteService {
 
     @Override
     public Quote create(QuotePriceMode priceMode, List<QuoteItemInput> inputs) {
+        Quote quote = buildQuote(priceMode, inputs);
+        quoteRepository.save(quote);
+        if (quote.getQuoteNumber() == null || quote.getQuoteNumber().isBlank()) {
+            quote.setQuoteNumber(formatNumber("P-", quote.getId()));
+        }
+        return quote;
+    }
+
+    private Quote buildQuote(QuotePriceMode priceMode, List<QuoteItemInput> inputs) {
         if (priceMode == null) {
             throw new InvalidQuoteException("Debe seleccionar el tipo de precio");
         }
@@ -125,11 +134,6 @@ public class QuoteServiceImpl implements QuoteService {
             option.setFeeAmount(snapshot.feeAmount());
             option.setCashFeeAmount(snapshot.cashFeeAmount());
             quote.addPlanOption(option);
-        }
-
-        quoteRepository.save(quote);
-        if (quote.getQuoteNumber() == null || quote.getQuoteNumber().isBlank()) {
-            quote.setQuoteNumber(formatNumber("P-", quote.getId()));
         }
         return quote;
     }

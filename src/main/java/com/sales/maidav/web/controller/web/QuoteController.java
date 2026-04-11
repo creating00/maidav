@@ -3,12 +3,17 @@ package com.sales.maidav.web.controller.web;
 import com.sales.maidav.model.quote.Quote;
 import com.sales.maidav.model.quote.QuotePriceMode;
 import com.sales.maidav.service.product.ProductService;
+import com.sales.maidav.service.quote.QuoteDocumentService;
 import com.sales.maidav.service.quote.InvalidQuoteException;
 import com.sales.maidav.service.quote.QuoteCalculator;
 import com.sales.maidav.service.quote.QuoteItemInput;
 import com.sales.maidav.service.quote.QuoteService;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -32,6 +37,7 @@ public class QuoteController {
     private final ProductService productService;
     private final CompanySettingsService companySettingsService;
     private final QuoteCalculator quoteCalculator;
+    private final QuoteDocumentService quoteDocumentService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('QUOTE_READ')")
@@ -61,6 +67,34 @@ public class QuoteController {
     public String detail(@PathVariable Long id, Model model) {
         model.addAttribute("quote", quoteService.findById(id));
         return "pages/quotes/detail";
+    }
+
+    @GetMapping("/{id}/pdf")
+    @PreAuthorize("hasAuthority('QUOTE_READ')")
+    public ResponseEntity<byte[]> downloadPdf(@PathVariable Long id) {
+        Quote quote = quoteService.findById(id);
+        byte[] pdf = quoteDocumentService.generateQuotePdf(quote);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(pdfFileName(quote), java.nio.charset.StandardCharsets.UTF_8)
+                        .build().toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
+    }
+
+    @PostMapping("/share/pdf")
+    @PreAuthorize("hasAuthority('QUOTE_CREATE')")
+    public ResponseEntity<byte[]> sharePdf(@RequestParam(required = false) QuotePriceMode priceMode,
+                                           @RequestParam(name = "productIds", required = false) List<Long> productIds,
+                                           @RequestParam(name = "quantities", required = false) List<Integer> quantities) {
+        String previewNumber = quoteService.previewNextQuoteNumber();
+        byte[] pdf = quoteDocumentService.generatePreviewPdf(previewNumber, priceMode, buildItems(productIds, quantities));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(previewNumber + ".pdf", java.nio.charset.StandardCharsets.UTF_8)
+                        .build().toString())
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @PostMapping
@@ -118,5 +152,12 @@ public class QuoteController {
 
     private boolean contains(String value, String term) {
         return value != null && value.toLowerCase(Locale.ROOT).contains(term);
+    }
+
+    private String pdfFileName(Quote quote) {
+        String quoteNumber = quote.getQuoteNumber() == null || quote.getQuoteNumber().isBlank()
+                ? "presupuesto"
+                : quote.getQuoteNumber().trim().replace(' ', '-');
+        return quoteNumber + ".pdf";
     }
 }
