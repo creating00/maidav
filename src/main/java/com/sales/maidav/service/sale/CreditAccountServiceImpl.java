@@ -39,10 +39,14 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     @Override
     public List<CreditAccount> findAll() {
         if (isCurrentUserAdmin()) {
-            return creditAccountRepository.findAll();
+            return creditAccountRepository.findAll().stream()
+                    .filter(account -> account.getStatus() != AccountStatus.VOID)
+                    .toList();
         }
         Long sellerId = currentUserId();
-        return sellerId == null ? List.of() : creditAccountRepository.findBySale_Seller_Id(sellerId);
+        return sellerId == null ? List.of() : creditAccountRepository.findBySale_Seller_Id(sellerId).stream()
+                .filter(account -> account.getStatus() != AccountStatus.VOID)
+                .toList();
     }
 
     @Override
@@ -90,6 +94,9 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             throw new InvalidSaleException("El pago debe ser mayor a cero");
         }
         CreditAccount account = findById(accountId);
+        if (account.getStatus() == AccountStatus.VOID) {
+            throw new InvalidSaleException("La cuenta esta anulada");
+        }
         if (account.getStatus() == AccountStatus.CLOSED) {
             throw new InvalidSaleException("La cuenta ya esta saldada");
         }
@@ -543,8 +550,12 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         // FILTRO VENDEDOR BACKEND
         Long sellerId = admin ? normalizeFilterId(requestedSellerId) : currentUserId();
         List<CreditAccount> accounts = admin
-                ? creditAccountRepository.findAll()
-                : sellerId == null ? List.of() : creditAccountRepository.findBySale_Seller_Id(sellerId);
+                ? creditAccountRepository.findAll().stream()
+                    .filter(account -> account.getStatus() != AccountStatus.VOID)
+                    .toList()
+                : sellerId == null ? List.of() : creditAccountRepository.findBySale_Seller_Id(sellerId).stream()
+                    .filter(account -> account.getStatus() != AccountStatus.VOID)
+                    .toList();
         if (admin && sellerId != null) {
             accounts = accounts.stream()
                     .filter(account -> account.getSale() != null

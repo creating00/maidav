@@ -1,6 +1,11 @@
 package com.sales.maidav.service.sale;
 
 import com.sales.maidav.model.product.Product;
+import com.sales.maidav.model.sale.AccountStatus;
+import com.sales.maidav.model.sale.CreditAccount;
+import com.sales.maidav.model.sale.CreditInstallment;
+import com.sales.maidav.model.sale.InstallmentStatus;
+import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.sale.SaleStatus;
@@ -121,6 +126,55 @@ class SaleServiceImplTest {
         assertThat(secondProduct.getStockAvailable()).isEqualTo(5);
         verify(productRepository).save(firstProduct);
         verify(productRepository).save(secondProduct);
+    }
+
+    @Test
+    void voidSaleAlsoVoidsRelatedCreditAccount() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "admin@maidav.com",
+                        "secret",
+                        List.of(() -> "ROLE_ADMIN")
+                )
+        );
+
+        Sale sale = new Sale();
+        sale.setId(17L);
+        sale.setStatus(SaleStatus.ACTIVE);
+        sale.setPaymentType(PaymentType.CREDIT);
+
+        CreditAccount account = new CreditAccount();
+        account.setId(31L);
+        account.setStatus(AccountStatus.OPEN);
+        account.setBalance(new java.math.BigDecimal("1200.00"));
+
+        CreditInstallment firstInstallment = new CreditInstallment();
+        firstInstallment.setId(101L);
+        firstInstallment.setStatus(InstallmentStatus.PENDING);
+        firstInstallment.setPaidAmount(new java.math.BigDecimal("300.00"));
+
+        CreditInstallment secondInstallment = new CreditInstallment();
+        secondInstallment.setId(102L);
+        secondInstallment.setStatus(InstallmentStatus.PARTIAL);
+        secondInstallment.setPaidAmount(new java.math.BigDecimal("50.00"));
+
+        when(saleRepository.findById(17L)).thenReturn(Optional.of(sale));
+        when(creditAccountRepository.findBySale_Id(17L)).thenReturn(Optional.of(account));
+        when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(31L))
+                .thenReturn(List.of(firstInstallment, secondInstallment));
+        when(saleItemRepository.findBySale_IdOrderByIdAsc(17L)).thenReturn(List.of());
+
+        saleService.voidSale(17L);
+
+        assertThat(sale.getStatus()).isEqualTo(SaleStatus.VOID);
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.VOID);
+        assertThat(account.getBalance()).isEqualByComparingTo("0.00");
+        assertThat(firstInstallment.getStatus()).isEqualTo(InstallmentStatus.VOID);
+        assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.VOID);
+        assertThat(firstInstallment.isVoided()).isTrue();
+        assertThat(secondInstallment.isVoided()).isTrue();
+        assertThat(firstInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
+        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
     }
 
     @Test

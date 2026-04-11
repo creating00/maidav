@@ -20,6 +20,7 @@ public interface CreditPaymentRepository extends JpaRepository<CreditPayment, Lo
             select coalesce(sum(payment.amount), 0)
             from CreditPayment payment
             where payment.paidAt <= :cutoffDate
+              and payment.account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
               and (:sellerId is null or payment.account.sale.seller.id = :sellerId)
               and (:zoneId is null or payment.account.client.zone.id = :zoneId)
             """)

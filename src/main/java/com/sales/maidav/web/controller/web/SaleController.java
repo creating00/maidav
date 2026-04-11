@@ -58,12 +58,30 @@ public class SaleController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('SALES_READ')")
-    public String list(@RequestParam(required = false) String q, Model model) {
+    public String list(@RequestParam(required = false) String q,
+                       @RequestParam(required = false) PaymentType paymentType,
+                       @RequestParam(required = false, defaultValue = "false") boolean showVoided,
+                       @RequestParam(required = false, defaultValue = "0") int page,
+                       Model model) {
+        final int pageSize = 20;
         List<Sale> sales = saleService.findAll();
+        if (!showVoided) {
+            sales = sales.stream()
+                    .filter(sale -> sale.getStatus() != com.sales.maidav.model.sale.SaleStatus.VOID)
+                    .toList();
+        }
+        if (paymentType != null) {
+            sales = sales.stream()
+                    .filter(sale -> paymentType == sale.getPaymentType())
+                    .toList();
+        }
+        Map<Long, String> displayNumbers = buildDisplayNumbers(sales);
         if (q != null && !q.isBlank()) {
             String term = q.trim().toLowerCase(Locale.ROOT);
+            Map<Long, String> visibleNumbers = displayNumbers;
             sales = sales.stream()
-                    .filter(s -> contains(s.getSaleNumber(), term)
+                    .filter(s -> contains(visibleNumbers.get(s.getId()), term)
+                            || contains(s.getSaleNumber(), term)
                             || contains(s.getClient() != null ? s.getClient().getNationalId() : null, term)
                             || contains(s.getClient() != null ? s.getClient().getFirstName() : null, term)
                             || contains(s.getClient() != null ? s.getClient().getLastName() : null, term)
@@ -71,9 +89,32 @@ public class SaleController {
                             || contains(s.getPaymentType() != null ? s.getPaymentType().name() : null, term)
                             || contains(s.getStatus() != null ? s.getStatus().name() : null, term))
                     .toList();
+            displayNumbers = buildDisplayNumbers(sales);
         }
+
+        int safePage = Math.max(page, 0);
+        int totalItems = sales.size();
+        int totalPages = totalItems == 0 ? 1 : (int) Math.ceil((double) totalItems / pageSize);
+        if (safePage >= totalPages) {
+            safePage = totalPages - 1;
+        }
+        int fromIndex = Math.min(safePage * pageSize, totalItems);
+        int toIndex = Math.min(fromIndex + pageSize, totalItems);
+        List<Sale> pagedSales = sales.subList(fromIndex, toIndex);
+        displayNumbers = buildDisplayNumbers(pagedSales);
+
         model.addAttribute("q", q);
-        model.addAttribute("sales", sales);
+        model.addAttribute("paymentType", paymentType);
+        model.addAttribute("showVoided", showVoided);
+        model.addAttribute("sales", pagedSales);
+        model.addAttribute("saleDisplayNumbers", displayNumbers);
+        model.addAttribute("paymentTypes", PaymentType.values());
+        model.addAttribute("page", safePage);
+        model.addAttribute("pageSize", pageSize);
+        model.addAttribute("totalItems", totalItems);
+        model.addAttribute("totalPages", totalPages);
+        model.addAttribute("hasPrevious", safePage > 0);
+        model.addAttribute("hasNext", safePage + 1 < totalPages);
         return "pages/sales/index";
     }
 
@@ -239,6 +280,43 @@ public class SaleController {
             Long nextAccountId = creditAccountRepository.nextAccountId();
             model.addAttribute("previewAccountNumber", formatNumber("C-", nextAccountId));
         }
+    }
+
+    private Map<Long, String> buildDisplayNumbers(List<Sale> sales) {
+        Map<Long, String> displayNumbers = new HashMap<>();
+        if (sales == null || sales.isEmpty()) {
+            return displayNumbers;
+        }
+
+        List<Long> creditSaleIds = sales.stream()
+                .filter(sale -> sale.getId() != null && sale.getPaymentType() == PaymentType.CREDIT)
+                .map(Sale::getId)
+                .toList();
+        Map<Long, String> accountNumberBySaleId = new HashMap<>();
+        if (!creditSaleIds.isEmpty()) {
+            for (CreditAccount account : creditAccountRepository.findBySale_IdIn(creditSaleIds)) {
+                if (account.getSale() != null && account.getSale().getId() != null) {
+                    accountNumberBySaleId.put(account.getSale().getId(), account.getAccountNumber());
+                }
+            }
+        }
+
+        for (Sale sale : sales) {
+            if (sale.getId() == null) {
+                continue;
+            }
+            String displayNumber = sale.getPaymentType() == PaymentType.CREDIT
+                    ? accountNumberBySaleId.get(sale.getId())
+                    : sale.getSaleNumber();
+            if (displayNumber == null || displayNumber.isBlank()) {
+                displayNumber = sale.getSaleNumber();
+            }
+            if (displayNumber == null || displayNumber.isBlank()) {
+                displayNumber = String.valueOf(sale.getId());
+            }
+            displayNumbers.put(sale.getId(), displayNumber);
+        }
+        return displayNumbers;
     }
 
     private String formatNumber(String prefix, Long id) {

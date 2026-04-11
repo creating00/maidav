@@ -172,12 +172,39 @@ public class SaleServiceImpl implements SaleService {
             return;
         }
         sale.setStatus(SaleStatus.VOID);
+        voidCreditAccountForSale(sale);
 
         List<SaleItem> items = saleItemRepository.findBySale_IdOrderByIdAsc(id);
         for (SaleItem item : items) {
             Product product = item.getProduct();
             product.setStockAvailable(product.getStockAvailable() + item.getQuantity());
             productRepository.save(product);
+        }
+    }
+
+    private void voidCreditAccountForSale(Sale sale) {
+        if (sale == null || sale.getId() == null || sale.getPaymentType() != PaymentType.CREDIT) {
+            return;
+        }
+        CreditAccount account = creditAccountRepository.findBySale_Id(sale.getId()).orElse(null);
+        if (account == null || account.getStatus() == AccountStatus.VOID) {
+            return;
+        }
+
+        account.setBalance(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        account.setStatus(AccountStatus.VOID);
+
+        List<CreditInstallment> installments =
+                creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId());
+        for (CreditInstallment installment : installments) {
+            installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+            installment.setStatus(InstallmentStatus.VOID);
+            installment.setPaidAt(null);
+            installment.setVoided(true);
+            installment.setVoidedAt(LocalDateTime.now());
+            if (installment.getVoidReason() == null || installment.getVoidReason().isBlank()) {
+                installment.setVoidReason("Venta anulada");
+            }
         }
     }
 

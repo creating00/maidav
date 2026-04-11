@@ -25,13 +25,26 @@
         <span th:if="${accountNumber}" th:text="${' | Numero de cuenta: ' + accountNumber}"></span>
     </div>
 
-    <form method="get" th:action="@{/sales}" class="mb-4 flex gap-2">
+    <form method="get" th:action="@{/sales}" class="mb-4 flex flex-wrap items-center gap-2">
         <input type="text" name="q" th:value="${q}" placeholder="Buscar por numero, cliente, vendedor o estado"
                class="w-full md:w-96 border rounded px-4 py-2"/>
+        <select name="paymentType" class="border rounded px-4 py-2">
+            <option value="" th:selected="${paymentType == null}">Todas las ventas</option>
+            <option th:each="type : ${paymentTypes}"
+                    th:value="${type}"
+                    th:selected="${paymentType != null && type == paymentType}"
+                    th:text="${type.name() == 'CREDIT' ? 'Ventas a credito' : 'Ventas contado'}">
+            </option>
+        </select>
+        <label class="inline-flex items-center gap-2 rounded border px-3 py-2 text-sm text-slate-700">
+            <input type="checkbox" name="showVoided" value="true" th:checked="${showVoided}">
+            Mostrar anuladas
+        </label>
         <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
     </form>
 
     <div class="bg-white rounded shadow overflow-x-auto">
+        <div class="max-h-[48rem] overflow-y-auto">
         <table class="min-w-full text-sm">
             <thead class="bg-gray-100 text-left">
             <tr>
@@ -47,7 +60,7 @@
             </thead>
             <tbody>
             <tr th:each="sale : ${sales}" class="border-t hover:bg-gray-50">
-                <td class="px-4 py-3" th:text="${sale.saleNumber != null ? sale.saleNumber : sale.id}"></td>
+                <td class="px-4 py-3" th:text="${saleDisplayNumbers[sale.id] != null ? saleDisplayNumbers[sale.id] : (sale.saleNumber != null ? sale.saleNumber : sale.id)}"></td>
                 <td class="px-4 py-3" th:text="${#temporals.format(sale.saleDate, 'yyyy-MM-dd HH:mm')}"></td>
                 <td class="px-4 py-3"
                     th:text="${sale.client.nationalId + ' - ' + sale.client.firstName + ' ' + sale.client.lastName}">
@@ -88,6 +101,26 @@
             </tr>
             </tbody>
         </table>
+        </div>
+    </div>
+
+    <div th:if="${totalPages > 1}" class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
+        <p class="text-slate-500"
+           th:text="${'Mostrando ' + (page * pageSize + 1) + ' a ' + (page * pageSize + #lists.size(sales)) + ' de ' + totalItems + ' ventas'}"></p>
+        <div class="flex items-center gap-2">
+            <a th:if="${hasPrevious}"
+               th:href="@{/sales(q=${q}, paymentType=${paymentType}, showVoided=${showVoided}, page=${page - 1})}"
+               class="rounded border border-gray-300 px-3 py-2 hover:bg-gray-100">
+                Anterior
+            </a>
+            <span class="rounded border border-slate-200 px-3 py-2 text-slate-600"
+                  th:text="${'Pagina ' + (page + 1) + ' de ' + totalPages}"></span>
+            <a th:if="${hasNext}"
+               th:href="@{/sales(q=${q}, paymentType=${paymentType}, showVoided=${showVoided}, page=${page + 1})}"
+               class="rounded border border-gray-300 px-3 py-2 hover:bg-gray-100">
+                Siguiente
+            </a>
+        </div>
     </div>
 
 </section>

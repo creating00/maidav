@@ -406,7 +406,7 @@ public class CreditAccountController {
             );
 
             group.totalBalance = group.totalBalance.add(account.getBalance());
-            if (account.getStatus() != AccountStatus.CLOSED) {
+            if (account.getStatus() == AccountStatus.OPEN) {
                 group.activeCredits++;
             }
             if (badge.priority > group.badge.priority) {

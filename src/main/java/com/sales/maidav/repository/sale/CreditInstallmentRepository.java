@@ -29,6 +29,8 @@ public interface CreditInstallmentRepository extends JpaRepository<CreditInstall
             select coalesce(sum(installment.amount), 0)
             from CreditInstallment installment
             where installment.dueDate <= :cutoffDate
+              and installment.status <> com.sales.maidav.model.sale.InstallmentStatus.VOID
+              and installment.account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
               and (:sellerId is null or installment.account.sale.seller.id = :sellerId)
               and (:zoneId is null or installment.account.client.zone.id = :zoneId)
             """)
@@ -47,6 +49,7 @@ public interface CreditInstallmentRepository extends JpaRepository<CreditInstall
             from CreditInstallment installment
             where installment.dueDate < :cutoffDate
               and installment.status in :pendingStatuses
+              and installment.account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
               and (:sellerId is null or installment.account.sale.seller.id = :sellerId)
               and (:zoneId is null or installment.account.client.zone.id = :zoneId)
             """)
