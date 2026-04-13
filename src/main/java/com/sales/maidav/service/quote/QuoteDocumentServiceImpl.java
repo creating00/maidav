@@ -109,6 +109,7 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
         CompanySettings settings = companySettingsService.getSettings();
         List<QuotePdfItem> items = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal financingBaseAmount = BigDecimal.ZERO;
 
         for (QuoteItemInput input : inputs) {
             if (input.productId() == null || input.quantity() == null || input.quantity() <= 0) {
@@ -116,8 +117,12 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
             }
             Product product = productRepository.findById(input.productId())
                     .orElseThrow(() -> new InvalidQuoteException("Producto no encontrado"));
-            BigDecimal unitPrice = resolveUnitPrice(product, priceMode);
+            BigDecimal unitPrice = QuotePricingSupport.resolveVisibleUnitPrice(product, priceMode);
+            BigDecimal financingUnitPrice = QuotePricingSupport.resolveFinancingUnitPrice(product, priceMode);
             BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(input.quantity())).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal financingLineTotal = financingUnitPrice
+                    .multiply(BigDecimal.valueOf(input.quantity()))
+                    .setScale(2, RoundingMode.HALF_UP);
             items.add(new QuotePdfItem(
                     product.getDescription(),
                     product.getProductCode(),
@@ -127,10 +132,12 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
                     lineTotal
             ));
             totalAmount = totalAmount.add(lineTotal);
+            financingBaseAmount = financingBaseAmount.add(financingLineTotal);
         }
 
         BigDecimal normalizedTotal = scaled(totalAmount);
-        List<QuotePdfPlan> plans = quoteCalculator.calculatePlanSnapshots(normalizedTotal, settings).stream()
+        BigDecimal normalizedFinancingBaseAmount = scaled(financingBaseAmount);
+        List<QuotePdfPlan> plans = quoteCalculator.calculatePlanSnapshots(normalizedFinancingBaseAmount, settings).stream()
                 .map(plan -> new QuotePdfPlan(plan.title(), plan.promoText()))
                 .toList();
 
@@ -142,20 +149,10 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
                 items,
                 plans,
                 normalizedTotal,
-                quoteCalculator.calculateCashTotal(normalizedTotal, settings),
-                quoteCalculator.calculateDebitTotal(normalizedTotal, settings)
+                quoteCalculator.calculateCashTotal(normalizedFinancingBaseAmount, settings),
+                quoteCalculator.calculateDebitTotal(normalizedFinancingBaseAmount, settings)
         );
         return renderPdf(model);
-    }
-
-    private BigDecimal resolveUnitPrice(Product product, QuotePriceMode priceMode) {
-        BigDecimal price = priceMode == QuotePriceMode.WHOLESALE
-                ? product.getPriceWholesale()
-                : product.getPriceRetail();
-        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidQuoteException("El producto no tiene precio disponible para el presupuesto");
-        }
-        return scaled(price);
     }
 
     private byte[] renderPdf(QuotePdfModel model) {

@@ -32,6 +32,9 @@ public class Quote extends BaseEntity {
     @Column(name = "pricing_base_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal pricingBaseAmount = BigDecimal.ZERO;
 
+    @Column(name = "financing_base_amount", nullable = false, precision = 12, scale = 2)
+    private BigDecimal financingBaseAmount = BigDecimal.ZERO;
+
     @Column(name = "cash_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal cashAmount = BigDecimal.ZERO;
 
@@ -95,6 +98,14 @@ public class Quote extends BaseEntity {
 
     public void setPricingBaseAmount(BigDecimal pricingBaseAmount) {
         this.pricingBaseAmount = pricingBaseAmount;
+    }
+
+    public BigDecimal getFinancingBaseAmount() {
+        return financingBaseAmount;
+    }
+
+    public void setFinancingBaseAmount(BigDecimal financingBaseAmount) {
+        this.financingBaseAmount = financingBaseAmount;
     }
 
     public BigDecimal getTotalAmount() {

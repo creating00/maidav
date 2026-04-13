@@ -76,6 +76,7 @@ public class QuoteServiceImpl implements QuoteService {
 
         List<QuoteItem> items = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal financingBaseAmount = BigDecimal.ZERO;
 
         for (int index = 0; index < inputs.size(); index++) {
             QuoteItemInput input = inputs.get(index);
@@ -89,8 +90,12 @@ public class QuoteServiceImpl implements QuoteService {
             Product product = productRepository.findById(input.productId())
                     .orElseThrow(() -> new InvalidQuoteException("Producto no encontrado"));
 
-            BigDecimal unitPrice = resolveUnitPrice(product, priceMode);
+            BigDecimal unitPrice = QuotePricingSupport.resolveVisibleUnitPrice(product, priceMode);
+            BigDecimal financingUnitPrice = QuotePricingSupport.resolveFinancingUnitPrice(product, priceMode);
             BigDecimal lineTotal = unitPrice
+                    .multiply(BigDecimal.valueOf(input.quantity()))
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal financingLineTotal = financingUnitPrice
                     .multiply(BigDecimal.valueOf(input.quantity()))
                     .setScale(2, RoundingMode.HALF_UP);
 
@@ -106,9 +111,11 @@ public class QuoteServiceImpl implements QuoteService {
             items.add(item);
 
             totalAmount = totalAmount.add(lineTotal);
+            financingBaseAmount = financingBaseAmount.add(financingLineTotal);
         }
 
         BigDecimal pricingBaseAmount = totalAmount.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal normalizedFinancingBaseAmount = financingBaseAmount.setScale(2, RoundingMode.HALF_UP);
 
         Quote quote = new Quote();
         quote.setSeller(seller);
@@ -116,15 +123,16 @@ public class QuoteServiceImpl implements QuoteService {
         quote.setItemCount(items.size());
         quote.setProductSummary(buildProductSummary(items));
         quote.setPricingBaseAmount(pricingBaseAmount);
-        quote.setCashAmount(quoteCalculator.calculateCashTotal(pricingBaseAmount, settings));
-        quote.setDebitAmount(quoteCalculator.calculateDebitTotal(pricingBaseAmount, settings));
+        quote.setFinancingBaseAmount(normalizedFinancingBaseAmount);
+        quote.setCashAmount(quoteCalculator.calculateCashTotal(normalizedFinancingBaseAmount, settings));
+        quote.setDebitAmount(quoteCalculator.calculateDebitTotal(normalizedFinancingBaseAmount, settings));
         quote.setTotalAmount(totalAmount.setScale(2, RoundingMode.HALF_UP));
 
         for (QuoteItem item : items) {
             quote.addItem(item);
         }
 
-        for (QuotePlanSnapshot snapshot : quoteCalculator.calculatePlanSnapshots(pricingBaseAmount, settings)) {
+        for (QuotePlanSnapshot snapshot : quoteCalculator.calculatePlanSnapshots(normalizedFinancingBaseAmount, settings)) {
             QuotePlanOption option = new QuotePlanOption();
             option.setDisplayOrder(snapshot.displayOrder());
             option.setPlanType(snapshot.planType());
@@ -147,16 +155,6 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     public String previewNextQuoteNumber() {
         return formatNumber("P-", quoteRepository.nextQuoteId());
-    }
-
-    private BigDecimal resolveUnitPrice(Product product, QuotePriceMode priceMode) {
-        BigDecimal price = priceMode == QuotePriceMode.WHOLESALE
-                ? product.getPriceWholesale()
-                : product.getPriceRetail();
-        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new InvalidQuoteException("El producto no tiene precio disponible para el presupuesto");
-        }
-        return price.setScale(2, RoundingMode.HALF_UP);
     }
 
     private String buildProductSummary(List<QuoteItem> items) {
