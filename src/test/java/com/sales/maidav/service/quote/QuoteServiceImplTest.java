@@ -85,13 +85,14 @@ class QuoteServiceImplTest {
         assertThat(quote.getItemCount()).isEqualTo(1);
         assertThat(quote.getTotalAmount()).isEqualByComparingTo("40000.00");
         assertThat(quote.getPricingBaseAmount()).isEqualByComparingTo("40000.00");
-        assertThat(quote.getCashAmount()).isEqualByComparingTo("52000.00");
-        assertThat(quote.getDebitAmount()).isEqualByComparingTo("60000.00");
+        assertThat(quote.getFinancingBaseAmount()).isEqualByComparingTo("24200.00");
+        assertThat(quote.getCashAmount()).isEqualByComparingTo("31500.00");
+        assertThat(quote.getDebitAmount()).isEqualByComparingTo("36300.00");
         assertThat(quote.getItems()).hasSize(1);
         assertThat(quote.getItems().get(0).getProductCode()).isEqualTo("PRD-DEMO");
         assertThat(quote.getPlanOptions()).hasSize(4);
-        assertThat(quote.getPlanOptions().get(0).getTitle()).isEqualTo("Son 144 dias de $700");
-        assertThat(quote.getPlanOptions().get(1).getPromoText()).isEqualTo("Si abonas en efectivo pagas la cuota $6200");
+        assertThat(quote.getPlanOptions().get(0).getTitle()).isEqualTo("Son 144 dias de $450");
+        assertThat(quote.getPlanOptions().get(1).getPromoText()).isEqualTo("Si abonas en efectivo pagas la cuota $3750");
     }
 
     @Test

@@ -107,7 +107,7 @@
                            class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm">
                     <div id="catalogList" class="mt-4 grid gap-3 md:grid-cols-2">
                         <button type="button" th:each="product : ${products}" class="catalog-item quote-product-card flex w-full items-center gap-4 rounded-[1.6rem] p-3 text-left"
-                                th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + product.description}">
+                                th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-cost-vat=${product.cost * (100 + product.vatRate) / 100},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + product.description}">
                             <span class="quote-image-frame flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.35rem]">
                                 <img th:if="${product.imagePath}" th:src="${product.imagePath}" alt="Producto" class="h-full w-full object-cover"/>
                                 <span th:if="${product.imagePath == null}" class="quote-title text-xl font-bold text-[var(--quote-copper)]">+</span>
@@ -268,10 +268,21 @@
                 return $('priceMode')?.value === 'WHOLESALE' ? product.wholesale : product.retail;
             }
 
+            function financingUnitPrice(product) {
+                return product.costVat > 0 ? product.costVat : unitPrice(product);
+            }
+
             function subtotal() {
                 return cart.reduce((sum, item) => {
                     const product = catalog.get(item.productId);
                     return product ? sum + unitPrice(product) * item.quantity : sum;
+                }, 0);
+            }
+
+            function financingSubtotal() {
+                return cart.reduce((sum, item) => {
+                    const product = catalog.get(item.productId);
+                    return product ? sum + financingUnitPrice(product) * item.quantity : sum;
                 }, 0);
             }
 
@@ -309,7 +320,7 @@
             }
 
             function renderPlans() {
-                const summary = plans(subtotal());
+                const summary = plans(financingSubtotal());
                 if ($('cartCount')) {
                     $('cartCount').textContent = String(cart.reduce((sum, item) => sum + item.quantity, 0));
                 }
@@ -374,7 +385,7 @@
             }
 
             function buildShareText() {
-                const summary = plans(subtotal());
+                const summary = plans(financingSubtotal());
                 return [
                     'Presupuesto Maidav',
                     `Tipo de precio: ${$('priceMode').value === 'WHOLESALE' ? 'Mayorista' : 'Minorista'}`,
@@ -393,7 +404,7 @@
             }
 
             function buildShareModel() {
-                const summary = plans(subtotal());
+                const summary = plans(financingSubtotal());
                 return {
                     title: 'Presupuesto Maidav',
                     subtitle: $('priceMode').value === 'WHOLESALE' ? 'Precio mayorista' : 'Precio minorista',
@@ -660,6 +671,7 @@
                     image: button.dataset.image || '',
                     retail: parse(button.dataset.retail),
                     wholesale: parse(button.dataset.wholesale),
+                    costVat: parse(button.dataset.costVat),
                     stock: button.dataset.stock || '0'
                 });
                 button.addEventListener('click', () => {
