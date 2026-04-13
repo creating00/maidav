@@ -3,7 +3,6 @@
       th:replace="layout/main :: layout(~{::content}, 'Nueva venta')">
 
 <section th:fragment="content">
-
     <div class="mb-6">
         <h1 class="text-2xl font-bold">Nueva Venta</h1>
         <p class="text-gray-500 text-sm">Seleccione cliente, productos y forma de pago</p>
@@ -565,6 +564,82 @@
             let firstDueDateManuallyEdited = false;
             let activeProductCombobox = null;
             let productComboboxSequence = 0;
+
+            function currentViewportHeight() {
+                return window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            }
+
+            function isCompactMobileViewport() {
+                const visualWidth = window.visualViewport ? window.visualViewport.width : 0;
+                return window.matchMedia('(max-width: 640px)').matches || (visualWidth > 0 && visualWidth <= 640);
+            }
+
+            function updateProductComboboxPanelLayout(row) {
+                if (!row) {
+                    return;
+                }
+                const combobox = row.querySelector('.product-combobox');
+                const input = row.querySelector('.product-combobox__input');
+                const panel = row.querySelector('.product-combobox__panel');
+                const optionsContainer = row.querySelector('.product-combobox__options');
+                const emptyState = row.querySelector('.product-combobox__empty');
+                if (!combobox || !input || !panel || !optionsContainer) {
+                    return;
+                }
+
+                const isMobileViewport = isCompactMobileViewport();
+                const viewportHeight = currentViewportHeight();
+                const rect = input.getBoundingClientRect();
+                const margin = isMobileViewport ? 12 : 16;
+                const mobilePanelHeight = Math.max(220, Math.min(Math.floor(viewportHeight * 0.58), 360));
+                const spaceBelow = Math.max(140, Math.floor(viewportHeight - rect.bottom - margin));
+                const spaceAbove = Math.max(140, Math.floor(rect.top - margin));
+                const reservedEmptyHeight = emptyState && !emptyState.classList.contains('hidden') ? 64 : 0;
+                const shouldDropUp = !isMobileViewport && spaceBelow < 220 && spaceAbove > spaceBelow;
+                const availableHeight = shouldDropUp ? spaceAbove : spaceBelow;
+                const maxHeight = isMobileViewport
+                    ? mobilePanelHeight
+                    : Math.max(140, Math.min(availableHeight, 320));
+
+                combobox.classList.toggle('product-combobox--dropup', shouldDropUp);
+                if (isMobileViewport) {
+                    panel.style.position = '';
+                    panel.style.left = '';
+                    panel.style.right = '';
+                    panel.style.top = '';
+                    panel.style.bottom = '';
+                } else {
+                    panel.style.position = 'absolute';
+                    panel.style.left = '0';
+                    panel.style.right = '0';
+                    panel.style.top = shouldDropUp ? 'auto' : 'calc(100% + 0.4rem)';
+                    panel.style.bottom = shouldDropUp ? 'calc(100% + 0.4rem)' : 'auto';
+                }
+                panel.style.maxHeight = (maxHeight + reservedEmptyHeight) + 'px';
+                optionsContainer.style.maxHeight = maxHeight + 'px';
+            }
+
+            function ensureProductComboboxVisible(row) {
+                if (!row) {
+                    return;
+                }
+                const input = row.querySelector('.product-combobox__input');
+                if (!input) {
+                    return;
+                }
+                const viewportHeight = currentViewportHeight();
+                const rect = input.getBoundingClientRect();
+                const topSafeArea = 16;
+                const bottomSafeArea = window.matchMedia('(max-width: 640px)').matches ? 150 : 80;
+                if (rect.top >= topSafeArea && rect.bottom <= viewportHeight - bottomSafeArea) {
+                    return;
+                }
+                input.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'nearest',
+                    inline: 'nearest'
+                });
+            }
             let productSearchFilterTimer = null;
             let productCatalogCache = null;
 
@@ -895,6 +970,7 @@
                 });
 
                 emptyState.classList.toggle('hidden', matchingOptions.length > 0);
+                updateProductComboboxPanelLayout(row);
                 return matchingOptions;
             }
 
@@ -914,6 +990,8 @@
                 combobox.dataset.open = 'true';
                 input.setAttribute('aria-expanded', 'true');
                 activeProductCombobox = row;
+                updateProductComboboxPanelLayout(row);
+                ensureProductComboboxVisible(row);
                 highlightProductComboboxOption(row, 0);
             }
 
@@ -926,6 +1004,7 @@
                 const toggle = row.querySelector('.product-combobox__toggle');
                 const panel = row.querySelector('.product-combobox__panel');
                 const combobox = row.querySelector('.product-combobox');
+                const control = row.querySelector('.product-combobox__control');
                 if (!select || !input || !toggle || !panel || !combobox) {
                     return;
                 }
@@ -942,6 +1021,17 @@
                 syncProductComboboxPlaceholder(row);
                 syncProductComboboxFromSelect(row);
 
+                function activateProductCombobox() {
+                    openProductCombobox(row);
+                    window.setTimeout(function () {
+                        if (document.activeElement !== input) {
+                            input.focus({preventScroll: true});
+                        }
+                        updateProductComboboxPanelLayout(row);
+                        ensureProductComboboxVisible(row);
+                    }, 0);
+                }
+
                 input.addEventListener('focus', function () {
                     openProductCombobox(row);
                     if (input.value === (input.dataset.selectedLabel || '')) {
@@ -950,6 +1040,10 @@
                             input.select();
                         }, 0);
                     }
+                    window.setTimeout(function () {
+                        updateProductComboboxPanelLayout(row);
+                        ensureProductComboboxVisible(row);
+                    }, 180);
                 });
 
                 input.addEventListener('input', function () {
@@ -1007,10 +1101,40 @@
                     }, 120);
                 });
 
+                if (control) {
+                    control.addEventListener('click', function (event) {
+                        if (event.target === toggle) {
+                            return;
+                        }
+                        activateProductCombobox();
+                    });
+                    control.addEventListener('pointerdown', function (event) {
+                        if (event.pointerType !== 'touch' || event.target === toggle) {
+                            return;
+                        }
+                        event.preventDefault();
+                        activateProductCombobox();
+                    });
+                    control.addEventListener('touchstart', function (event) {
+                        if (event.target === toggle) {
+                            return;
+                        }
+                        event.preventDefault();
+                        activateProductCombobox();
+                    }, {passive: false});
+                }
+
+                toggle.addEventListener('pointerdown', function (event) {
+                    if (event.pointerType !== 'touch') {
+                        return;
+                    }
+                    event.preventDefault();
+                    activateProductCombobox();
+                });
+
                 toggle.addEventListener('click', function () {
                     if (panel.classList.contains('hidden')) {
-                        input.focus();
-                        openProductCombobox(row);
+                        activateProductCombobox();
                         return;
                     }
                     closeProductCombobox(row);
@@ -1035,6 +1159,7 @@
                 if (activeProductCombobox) {
                     const activeInput = activeProductCombobox.querySelector('.product-combobox__input');
                     renderProductComboboxOptions(activeProductCombobox, activeInput ? activeInput.value : '');
+                    updateProductComboboxPanelLayout(activeProductCombobox);
                     highlightProductComboboxOption(activeProductCombobox, 0);
                 }
             }
@@ -2398,6 +2523,19 @@
                 quickClientToggle.addEventListener('change', function () {
                     toggleQuickClientMode();
                     saveDraft();
+                });
+            }
+            window.addEventListener('resize', function () {
+                if (activeProductCombobox) {
+                    updateProductComboboxPanelLayout(activeProductCombobox);
+                }
+            });
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', function () {
+                    if (activeProductCombobox) {
+                        updateProductComboboxPanelLayout(activeProductCombobox);
+                        ensureProductComboboxVisible(activeProductCombobox);
+                    }
                 });
             }
 

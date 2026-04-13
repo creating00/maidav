@@ -1,0 +1,95 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------------< com.sales:maidav >--------------------------
+[INFO] Building maidav 0.0.1-SNAPSHOT
+[INFO]   from pom.xml
+[INFO] --------------------------------[ jar ]---------------------------------
+[INFO] 
+[INFO] >>> spring-boot:3.5.9:run (default-cli) > test-compile @ maidav >>>
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ maidav ---
+[INFO] Copying 3 resources from src\main\resources to target\classes
+[INFO] Copying 82 resources from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.14.1:compile (default-compile) @ maidav ---
+[INFO] Recompiling the module because of added or removed source files.
+[INFO] Compiling 123 source files with javac [debug parameters release 21] to target\classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ maidav ---
+[INFO] skip non existing resourceDirectory C:\workspace\Proyectos FullStacks\Maidav Confort\maidav\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.14.1:testCompile (default-testCompile) @ maidav ---
+[INFO] Recompiling the module because of changed dependency.
+[INFO] Compiling 7 source files with javac [debug parameters release 21] to target\test-classes
+[INFO] Annotation processing is enabled because one or more processors were found
+  on the class path. A future release of javac may disable annotation processing
+  unless at least one processor is specified by name (-processor), or a search
+  path is specified (--processor-path, --processor-module-path), or annotation
+  processing is enabled explicitly (-proc:only, -proc:full).
+  Use -Xlint:-options to suppress this message.
+  Use -proc:none to disable annotation processing.
+[INFO] 
+[INFO] <<< spring-boot:3.5.9:run (default-cli) < test-compile @ maidav <<<
+[INFO] 
+[INFO] 
+[INFO] --- spring-boot:3.5.9:run (default-cli) @ maidav ---
+[INFO] Attaching agents: []
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v3.5.9)
+
+2026-04-13T16:50:18.110-03:00  INFO 12856 --- [maidav] [  restartedMain] com.sales.maidav.MaidavApplication       : Starting MaidavApplication using Java 21.0.1 with PID 12856 (C:\workspace\Proyectos FullStacks\Maidav Confort\maidav\target\classes started by jonat in C:\workspace\Proyectos FullStacks\Maidav Confort\maidav)
+2026-04-13T16:50:18.121-03:00  INFO 12856 --- [maidav] [  restartedMain] com.sales.maidav.MaidavApplication       : No active profile set, falling back to 1 default profile: "default"
+2026-04-13T16:50:18.722-03:00  INFO 12856 --- [maidav] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2026-04-13T16:50:18.724-03:00  INFO 12856 --- [maidav] [  restartedMain] .e.DevToolsPropertyDefaultsPostProcessor : For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2026-04-13T16:50:24.639-03:00  INFO 12856 --- [maidav] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-04-13T16:50:25.217-03:00  INFO 12856 --- [maidav] [  restartedMain] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 543 ms. Found 18 JPA repository interfaces.
+2026-04-13T16:50:29.261-03:00  INFO 12856 --- [maidav] [  restartedMain] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+2026-04-13T16:50:29.332-03:00  INFO 12856 --- [maidav] [  restartedMain] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+2026-04-13T16:50:29.333-03:00  INFO 12856 --- [maidav] [  restartedMain] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.50]
+2026-04-13T16:50:29.599-03:00  INFO 12856 --- [maidav] [  restartedMain] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+2026-04-13T16:50:29.613-03:00  INFO 12856 --- [maidav] [  restartedMain] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 10883 ms
+2026-04-13T16:50:30.009-03:00 ERROR 12856 --- [maidav] [  restartedMain] o.s.b.web.embedded.tomcat.TomcatStarter  : Error starting Tomcat context. Exception: org.springframework.beans.factory.UnsatisfiedDependencyException. Message: Error creating bean with name 'authenticationRefreshFilter' defined in file [C:\workspace\Proyectos FullStacks\Maidav Confort\maidav\target\classes\com\sales\maidav\config\security\AuthenticationRefreshFilter.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'userDetailsServiceImpl' defined in file [C:\workspace\Proyectos FullStacks\Maidav Confort\maidav\target\classes\com\sales\maidav\service\user\UserDetailsServiceImpl.class]: Unsatisfied dependency expressed through constructor parameter 0: Error creating bean with name 'userRepository' defined in com.sales.maidav.repository.user.UserRepository defined in @EnableJpaRepositories declared on JpaRepositoriesRegistrar.EnableJpaRepositoriesConfiguration: Cannot resolve reference to bean 'jpaSharedEM_entityManagerFactory' while setting bean property 'entityManager'
+2026-04-13T16:50:30.159-03:00  INFO 12856 --- [maidav] [  restartedMain] o.apache.catalina.core.StandardService   : Stopping service [Tomcat]
+2026-04-13T16:50:30.199-03:00  WARN 12856 --- [maidav] [  restartedMain] ConfigServletWebServerApplicationContext : Exception encountered during context initialization - cancelling refresh attempt: org.springframework.context.ApplicationContextException: Unable to start web server
+2026-04-13T16:50:30.237-03:00  INFO 12856 --- [maidav] [  restartedMain] .s.b.a.l.ConditionEvaluationReportLogger : 
+
+Error starting ApplicationContext. To display the condition evaluation report re-run your application with 'debug' enabled.
+2026-04-13T16:50:30.370-03:00 ERROR 12856 --- [maidav] [  restartedMain] o.s.b.d.LoggingFailureAnalysisReporter   : 
+
+***************************
+APPLICATION FAILED TO START
+***************************
+
+Description:
+
+Failed to configure a DataSource: 'url' attribute is not specified and no embedded datasource could be configured.
+
+Reason: Failed to determine a suitable driver class
+
+
+Action:
+
+Consider the following:
+	If you want an embedded database (H2, HSQL or Derby), please put it on the classpath.
+	If you have database settings to be loaded from a particular profile you may need to activate it (no profiles are currently active).
+
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  01:25 min
+[INFO] Finished at: 2026-04-13T16:50:30-03:00
+[INFO] ------------------------------------------------------------------------
