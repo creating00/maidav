@@ -1031,11 +1031,36 @@
                 syncProductComboboxPlaceholder(row);
                 syncProductComboboxFromSelect(row);
 
-                function activateProductCombobox() {
+                function focusProductComboboxInput(selectText) {
+                    try {
+                        input.focus({preventScroll: true});
+                    } catch (_) {
+                        input.focus();
+                    }
+                    if (!selectText) {
+                        return;
+                    }
+                    if (isCompactMobileViewport() && typeof input.setSelectionRange === 'function') {
+                        const length = (input.value || '').length;
+                        input.setSelectionRange(length, length);
+                        return;
+                    }
+                    if (typeof input.select === 'function') {
+                        input.select();
+                    }
+                }
+
+                function activateProductCombobox(options) {
+                    const settings = options || {};
+                    const shouldFocusInput = settings.focusInput !== false;
+                    const shouldSelectText = Boolean(settings.selectText);
+                    if (shouldFocusInput && document.activeElement !== input) {
+                        focusProductComboboxInput(shouldSelectText);
+                    }
                     openProductCombobox(row);
                     window.setTimeout(function () {
-                        if (document.activeElement !== input) {
-                            input.focus({preventScroll: true});
+                        if (shouldFocusInput && document.activeElement !== input) {
+                            focusProductComboboxInput(shouldSelectText);
                         }
                         updateProductComboboxPanelLayout(row);
                         ensureProductComboboxVisible(row);
@@ -1116,21 +1141,30 @@
                         if (event.target === toggle) {
                             return;
                         }
-                        activateProductCombobox();
+                        activateProductCombobox({
+                            focusInput: true,
+                            selectText: input.value === (input.dataset.selectedLabel || '')
+                        });
                     });
                     control.addEventListener('pointerdown', function (event) {
                         if (event.pointerType !== 'touch' || event.target === toggle) {
                             return;
                         }
                         event.preventDefault();
-                        activateProductCombobox();
+                        activateProductCombobox({
+                            focusInput: true,
+                            selectText: input.value === (input.dataset.selectedLabel || '')
+                        });
                     });
                     control.addEventListener('touchstart', function (event) {
                         if (event.target === toggle) {
                             return;
                         }
                         event.preventDefault();
-                        activateProductCombobox();
+                        activateProductCombobox({
+                            focusInput: true,
+                            selectText: input.value === (input.dataset.selectedLabel || '')
+                        });
                     }, {passive: false});
                 }
 
@@ -1139,12 +1173,18 @@
                         return;
                     }
                     event.preventDefault();
-                    activateProductCombobox();
+                    activateProductCombobox({
+                        focusInput: true,
+                        selectText: input.value === (input.dataset.selectedLabel || '')
+                    });
                 });
 
                 toggle.addEventListener('click', function () {
                     if (panel.classList.contains('hidden')) {
-                        activateProductCombobox();
+                        activateProductCombobox({
+                            focusInput: true,
+                            selectText: input.value === (input.dataset.selectedLabel || '')
+                        });
                         return;
                     }
                     closeProductCombobox(row);
