@@ -377,7 +377,7 @@
                                        class="product-combobox__input"
                                        placeholder="Buscar por codigo o descripcion"
                                        data-placeholder-default="Buscar por codigo o descripcion"
-                                       data-placeholder-mobile="Producto o codigo"
+                                       data-placeholder-mobile="Abrir catalogo de productos"
                                        autocomplete="off"
                                        spellcheck="false"
                                        aria-label="Buscar producto"/>
@@ -392,6 +392,15 @@
                                     <p class="product-combobox__sheet-kicker">Catalogo</p>
                                     <p class="product-combobox__sheet-title">Elegi un producto</p>
                                     <p class="product-combobox__sheet-copy">Vista mobile con imagen, codigo, stock y precio.</p>
+                                    <div class="product-combobox__sheet-search-wrap">
+                                        <input type="search"
+                                               class="product-combobox__sheet-search"
+                                               placeholder="Buscar por codigo o descripcion"
+                                               autocomplete="off"
+                                               spellcheck="false"
+                                               inputmode="search"
+                                               aria-label="Buscar producto dentro del catalogo"/>
+                                    </div>
                                 </div>
                                 <div class="product-combobox__empty hidden">No se encontraron productos</div>
                                 <div class="product-combobox__options"></div>
@@ -801,6 +810,7 @@
                 }
                 const panel = row.querySelector('.product-combobox__panel');
                 const input = row.querySelector('.product-combobox__input');
+                const sheetSearch = row.querySelector('.product-combobox__sheet-search');
                 const combobox = row.querySelector('.product-combobox');
                 if (panel) {
                     panel.classList.add('hidden');
@@ -813,8 +823,50 @@
                     input.setAttribute('aria-expanded', 'false');
                     input.removeAttribute('aria-activedescendant');
                 }
+                if (sheetSearch) {
+                    sheetSearch.value = '';
+                    if (document.activeElement === sheetSearch) {
+                        sheetSearch.blur();
+                    }
+                }
                 if (activeProductCombobox === row) {
                     activeProductCombobox = null;
+                }
+            }
+
+            function getProductComboboxSheetSearch(row) {
+                return row ? row.querySelector('.product-combobox__sheet-search') : null;
+            }
+
+            function getProductComboboxSearchInput(row) {
+                const inlineInput = row ? row.querySelector('.product-combobox__input') : null;
+                const sheetSearch = getProductComboboxSheetSearch(row);
+                return isCompactMobileViewport() && sheetSearch ? sheetSearch : inlineInput;
+            }
+
+            function getProductComboboxSearchValue(row) {
+                const searchInput = getProductComboboxSearchInput(row);
+                return searchInput ? searchInput.value : '';
+            }
+
+            function syncProductComboboxInteractionMode(row) {
+                if (!row) {
+                    return;
+                }
+                const input = row.querySelector('.product-combobox__input');
+                const sheetSearch = getProductComboboxSheetSearch(row);
+                const isMobileViewport = isCompactMobileViewport();
+                if (input) {
+                    input.readOnly = isMobileViewport;
+                    input.setAttribute('inputmode', isMobileViewport ? 'none' : 'search');
+                    input.classList.toggle('product-combobox__input--trigger', isMobileViewport);
+                }
+                if (sheetSearch) {
+                    sheetSearch.disabled = !isMobileViewport;
+                    sheetSearch.tabIndex = isMobileViewport ? 0 : -1;
+                    if (!isMobileViewport) {
+                        sheetSearch.value = '';
+                    }
                 }
             }
 
@@ -874,18 +926,26 @@
                 input.value = label;
                 input.dataset.selectedLabel = label;
                 combobox.classList.toggle('has-selection', Boolean(label));
+                const sheetSearch = getProductComboboxSheetSearch(row);
+                if (sheetSearch && activeProductCombobox !== row) {
+                    sheetSearch.value = '';
+                }
             }
 
             function syncProductComboboxPlaceholder(row) {
                 const input = row.querySelector('.product-combobox__input');
+                const sheetSearch = getProductComboboxSheetSearch(row);
                 if (!input) {
                     return;
                 }
-                const mobilePlaceholder = input.dataset.placeholderMobile || 'Producto o codigo';
+                const mobilePlaceholder = input.dataset.placeholderMobile || 'Abrir catalogo de productos';
                 const defaultPlaceholder = input.dataset.placeholderDefault || 'Buscar por codigo o descripcion';
-                input.placeholder = window.matchMedia('(max-width: 480px)').matches
+                input.placeholder = isCompactMobileViewport()
                     ? mobilePlaceholder
                     : defaultPlaceholder;
+                if (sheetSearch) {
+                    sheetSearch.placeholder = defaultPlaceholder;
+                }
             }
 
             function renderProductComboboxOptions(row, searchTerm) {
@@ -899,7 +959,8 @@
                 if (!select || !combobox || !optionsContainer || !emptyState) {
                     return [];
                 }
-                const normalized = (searchTerm || '').trim().toLowerCase();
+                const activeSearchTerm = searchTerm === undefined ? getProductComboboxSearchValue(row) : searchTerm;
+                const normalized = (activeSearchTerm || '').trim().toLowerCase();
                 const selectedValue = select.value;
                 const matchingOptions = getVisibleProductCatalogItems(row, normalized);
 
@@ -984,18 +1045,27 @@
                 return matchingOptions;
             }
 
-            function openProductCombobox(row) {
+            function openProductCombobox(row, options) {
                 if (!row) {
                     return;
                 }
+                const settings = options || {};
                 closeAllProductComboboxes(row);
                 const input = row.querySelector('.product-combobox__input');
                 const panel = row.querySelector('.product-combobox__panel');
                 const combobox = row.querySelector('.product-combobox');
+                const sheetSearch = getProductComboboxSheetSearch(row);
                 if (!input || !panel || !combobox) {
                     return;
                 }
-                renderProductComboboxOptions(row, input.value);
+                syncProductComboboxInteractionMode(row);
+                if (sheetSearch && isCompactMobileViewport() && settings.resetSearch) {
+                    sheetSearch.value = '';
+                }
+                const searchTerm = settings.searchTerm === undefined
+                    ? getProductComboboxSearchValue(row)
+                    : settings.searchTerm;
+                renderProductComboboxOptions(row, searchTerm);
                 panel.classList.remove('hidden');
                 combobox.dataset.open = 'true';
                 input.setAttribute('aria-expanded', 'true');
@@ -1015,7 +1085,8 @@
                 const panel = row.querySelector('.product-combobox__panel');
                 const combobox = row.querySelector('.product-combobox');
                 const control = row.querySelector('.product-combobox__control');
-                if (!select || !input || !toggle || !panel || !combobox) {
+                const sheetSearch = getProductComboboxSheetSearch(row);
+                if (!select || !input || !toggle || !panel || !combobox || !sheetSearch) {
                     return;
                 }
 
@@ -1030,23 +1101,25 @@
 
                 syncProductComboboxPlaceholder(row);
                 syncProductComboboxFromSelect(row);
+                syncProductComboboxInteractionMode(row);
 
                 function focusProductComboboxInput(selectText) {
+                    const focusTarget = getProductComboboxSearchInput(row) || input;
                     try {
-                        input.focus({preventScroll: true});
+                        focusTarget.focus({preventScroll: true});
                     } catch (_) {
-                        input.focus();
+                        focusTarget.focus();
                     }
                     if (!selectText) {
                         return;
                     }
-                    if (isCompactMobileViewport() && typeof input.setSelectionRange === 'function') {
-                        const length = (input.value || '').length;
-                        input.setSelectionRange(length, length);
+                    if (typeof focusTarget.select === 'function' && !isCompactMobileViewport()) {
+                        focusTarget.select();
                         return;
                     }
-                    if (typeof input.select === 'function') {
-                        input.select();
+                    if (typeof focusTarget.setSelectionRange === 'function') {
+                        const length = (focusTarget.value || '').length;
+                        focusTarget.setSelectionRange(0, length);
                     }
                 }
 
@@ -1054,12 +1127,18 @@
                     const settings = options || {};
                     const shouldFocusInput = settings.focusInput !== false;
                     const shouldSelectText = Boolean(settings.selectText);
-                    if (shouldFocusInput && document.activeElement !== input) {
+                    const shouldFocusAfterOpen = isCompactMobileViewport();
+                    const focusTarget = getProductComboboxSearchInput(row) || input;
+                    if (!shouldFocusAfterOpen && shouldFocusInput && document.activeElement !== focusTarget) {
                         focusProductComboboxInput(shouldSelectText);
                     }
-                    openProductCombobox(row);
+                    openProductCombobox(row, {
+                        resetSearch: Boolean(settings.resetSearch),
+                        searchTerm: settings.searchTerm
+                    });
                     window.setTimeout(function () {
-                        if (shouldFocusInput && document.activeElement !== input) {
+                        const updatedFocusTarget = getProductComboboxSearchInput(row) || input;
+                        if (shouldFocusInput && document.activeElement !== updatedFocusTarget) {
                             focusProductComboboxInput(shouldSelectText);
                         }
                         updateProductComboboxPanelLayout(row);
@@ -1068,6 +1147,13 @@
                 }
 
                 input.addEventListener('focus', function () {
+                    if (isCompactMobileViewport()) {
+                        activateProductCombobox({
+                            focusInput: true,
+                            resetSearch: true
+                        });
+                        return;
+                    }
                     openProductCombobox(row);
                     if (input.value === (input.dataset.selectedLabel || '')) {
                         renderProductComboboxOptions(row, '');
@@ -1082,12 +1168,16 @@
                 });
 
                 input.addEventListener('input', function () {
-                    openProductCombobox(row);
-                    renderProductComboboxOptions(row, input.value);
+                    if (isCompactMobileViewport()) {
+                        return;
+                    }
+                    openProductCombobox(row, {
+                        searchTerm: input.value
+                    });
                     highlightProductComboboxOption(row, 0);
                 });
 
-                input.addEventListener('keydown', function (event) {
+                function handleComboboxKeydown(event) {
                     const isOpen = !panel.classList.contains('hidden');
                     const options = Array.from(row.querySelectorAll('.product-combobox__option'));
                     const highlightedIndex = parseInt(combobox.dataset.highlightedIndex || '-1', 10);
@@ -1125,6 +1215,39 @@
                         syncProductComboboxFromSelect(row);
                         closeProductCombobox(row);
                     }
+                }
+
+                input.addEventListener('keydown', handleComboboxKeydown);
+
+                sheetSearch.addEventListener('focus', function () {
+                    if (!isCompactMobileViewport()) {
+                        return;
+                    }
+                    openProductCombobox(row, {
+                        searchTerm: sheetSearch.value
+                    });
+                    window.setTimeout(function () {
+                        updateProductComboboxPanelLayout(row);
+                        ensureProductComboboxVisible(row);
+                    }, 180);
+                });
+
+                sheetSearch.addEventListener('input', function () {
+                    openProductCombobox(row, {
+                        searchTerm: sheetSearch.value
+                    });
+                    highlightProductComboboxOption(row, 0);
+                });
+
+                sheetSearch.addEventListener('keydown', handleComboboxKeydown);
+
+                sheetSearch.addEventListener('blur', function () {
+                    window.setTimeout(function () {
+                        if (!row.contains(document.activeElement)) {
+                            syncProductComboboxFromSelect(row);
+                            closeProductCombobox(row);
+                        }
+                    }, 120);
                 });
 
                 input.addEventListener('blur', function () {
@@ -1143,7 +1266,8 @@
                         }
                         activateProductCombobox({
                             focusInput: true,
-                            selectText: input.value === (input.dataset.selectedLabel || '')
+                            selectText: input.value === (input.dataset.selectedLabel || ''),
+                            resetSearch: true
                         });
                     });
                     control.addEventListener('pointerdown', function (event) {
@@ -1153,7 +1277,8 @@
                         event.preventDefault();
                         activateProductCombobox({
                             focusInput: true,
-                            selectText: input.value === (input.dataset.selectedLabel || '')
+                            selectText: input.value === (input.dataset.selectedLabel || ''),
+                            resetSearch: true
                         });
                     });
                     control.addEventListener('touchstart', function (event) {
@@ -1163,7 +1288,8 @@
                         event.preventDefault();
                         activateProductCombobox({
                             focusInput: true,
-                            selectText: input.value === (input.dataset.selectedLabel || '')
+                            selectText: input.value === (input.dataset.selectedLabel || ''),
+                            resetSearch: true
                         });
                     }, {passive: false});
                 }
@@ -1175,7 +1301,8 @@
                     event.preventDefault();
                     activateProductCombobox({
                         focusInput: true,
-                        selectText: input.value === (input.dataset.selectedLabel || '')
+                        selectText: input.value === (input.dataset.selectedLabel || ''),
+                        resetSearch: true
                     });
                 });
 
@@ -1183,7 +1310,8 @@
                     if (panel.classList.contains('hidden')) {
                         activateProductCombobox({
                             focusInput: true,
-                            selectText: input.value === (input.dataset.selectedLabel || '')
+                            selectText: input.value === (input.dataset.selectedLabel || ''),
+                            resetSearch: true
                         });
                         return;
                     }
@@ -1193,7 +1321,7 @@
                 select.addEventListener('change', function () {
                     syncProductComboboxFromSelect(row);
                     if (activeProductCombobox === row) {
-                        renderProductComboboxOptions(row, input.value);
+                        renderProductComboboxOptions(row, getProductComboboxSearchValue(row));
                         highlightProductComboboxOption(row, 0);
                     }
                 });
@@ -1205,10 +1333,10 @@
                         initializeProductCombobox(row);
                     }
                     syncProductComboboxFromSelect(row);
+                    syncProductComboboxInteractionMode(row);
                 });
                 if (activeProductCombobox) {
-                    const activeInput = activeProductCombobox.querySelector('.product-combobox__input');
-                    renderProductComboboxOptions(activeProductCombobox, activeInput ? activeInput.value : '');
+                    renderProductComboboxOptions(activeProductCombobox, getProductComboboxSearchValue(activeProductCombobox));
                     updateProductComboboxPanelLayout(activeProductCombobox);
                     highlightProductComboboxOption(activeProductCombobox, 0);
                 }
@@ -1979,7 +2107,12 @@
             window.addEventListener('resize', function () {
                 body.querySelectorAll('tr').forEach(function (row) {
                     syncProductComboboxPlaceholder(row);
+                    syncProductComboboxInteractionMode(row);
                 });
+                if (activeProductCombobox) {
+                    renderProductComboboxOptions(activeProductCombobox, getProductComboboxSearchValue(activeProductCombobox));
+                    highlightProductComboboxOption(activeProductCombobox, 0);
+                }
             });
             updateTotals();
             if (discountInput) {
@@ -2123,8 +2256,7 @@
                         }
                     });
                     if (activeProductCombobox) {
-                        const activeInput = activeProductCombobox.querySelector('.product-combobox__input');
-                        renderProductComboboxOptions(activeProductCombobox, activeInput ? activeInput.value : '');
+                        renderProductComboboxOptions(activeProductCombobox, getProductComboboxSearchValue(activeProductCombobox));
                         highlightProductComboboxOption(activeProductCombobox, 0);
                     }
                     updateTotals();
