@@ -352,7 +352,7 @@
                 </thead>
                 <tbody id="itemsBody">
                 <tr class="border-t">
-                    <td class="px-3 py-2">
+                    <td class="sale-product-cell px-3 py-2">
                         <select name="productIds"
                                 class="product-select product-select-native w-full border rounded px-3 py-2"
                                 tabindex="-1"
@@ -371,7 +371,7 @@
                                     th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
                             </option>
                         </select>
-                        <div class="product-combobox mt-0">
+                        <div class="product-combobox sale-product-combobox mt-0">
                             <div class="product-combobox__control">
                                 <input type="text"
                                        class="product-combobox__input"
@@ -388,6 +388,11 @@
                                 </button>
                             </div>
                             <div class="product-combobox__panel hidden">
+                                <div class="product-combobox__sheet-head">
+                                    <p class="product-combobox__sheet-kicker">Catalogo</p>
+                                    <p class="product-combobox__sheet-title">Elegi un producto</p>
+                                    <p class="product-combobox__sheet-copy">Vista mobile con imagen, codigo, stock y precio.</p>
+                                </div>
                                 <div class="product-combobox__empty hidden">No se encontraron productos</div>
                                 <div class="product-combobox__options"></div>
                             </div>
@@ -591,7 +596,7 @@
                 const viewportHeight = currentViewportHeight();
                 const rect = input.getBoundingClientRect();
                 const margin = isMobileViewport ? 12 : 16;
-                const mobilePanelHeight = Math.max(220, Math.min(Math.floor(viewportHeight * 0.58), 360));
+                const mobilePanelHeight = Math.max(220, Math.min(Math.floor(viewportHeight * 0.5), 320));
                 const spaceBelow = Math.max(140, Math.floor(viewportHeight - rect.bottom - margin));
                 const spaceAbove = Math.max(140, Math.floor(rect.top - margin));
                 const reservedEmptyHeight = emptyState && !emptyState.classList.contains('hidden') ? 64 : 0;
@@ -603,17 +608,19 @@
 
                 combobox.classList.toggle('product-combobox--dropup', shouldDropUp);
                 if (isMobileViewport) {
-                    panel.style.position = '';
-                    panel.style.left = '';
-                    panel.style.right = '';
-                    panel.style.top = '';
-                    panel.style.bottom = '';
+                    panel.style.position = 'fixed';
+                    panel.style.left = '10px';
+                    panel.style.right = '10px';
+                    panel.style.top = '50%';
+                    panel.style.bottom = 'auto';
+                    panel.style.transform = 'translateY(-50%)';
                 } else {
                     panel.style.position = 'absolute';
                     panel.style.left = '0';
                     panel.style.right = '0';
                     panel.style.top = shouldDropUp ? 'auto' : 'calc(100% + 0.4rem)';
                     panel.style.bottom = shouldDropUp ? 'calc(100% + 0.4rem)' : 'auto';
+                    panel.style.transform = '';
                 }
                 panel.style.maxHeight = (maxHeight + reservedEmptyHeight) + 'px';
                 optionsContainer.style.maxHeight = maxHeight + 'px';
@@ -630,7 +637,7 @@
                 const viewportHeight = currentViewportHeight();
                 const rect = input.getBoundingClientRect();
                 const topSafeArea = 16;
-                const bottomSafeArea = window.matchMedia('(max-width: 640px)').matches ? 150 : 80;
+                const bottomSafeArea = window.matchMedia('(max-width: 640px)').matches ? 220 : 80;
                 if (rect.top >= topSafeArea && rect.bottom <= viewportHeight - bottomSafeArea) {
                     return;
                 }
@@ -684,12 +691,7 @@
                 }
                 const productCode = (option.dataset.productCode || '').trim();
                 const description = (option.dataset.description || '').trim();
-                const stock = (option.dataset.stock || '').trim();
-                let label = productCode && description ? (productCode + ' - ' + description) : (productCode || description || option.textContent.trim());
-                if (stock) {
-                    label += ' (Stock: ' + stock + ')';
-                }
-                return label;
+                return productCode && description ? (productCode + ' - ' + description) : (productCode || description || option.textContent.trim());
             }
 
             function getProductOptionSearchText(option) {
@@ -937,21 +939,29 @@
                     content.className = 'product-combobox__content';
                     const title = document.createElement('span');
                     title.className = 'product-combobox__title';
-                    title.textContent = item.productCode || 'Sin codigo';
+                    title.textContent = item.description || 'Sin descripcion';
+                    const codeLabel = document.createElement('span');
+                    codeLabel.className = 'product-combobox__code';
+                    codeLabel.textContent = item.productCode ? ('Cod. ' + item.productCode) : 'Sin codigo';
                     const descriptionLabel = document.createElement('span');
                     descriptionLabel.className = 'product-combobox__description';
-                    descriptionLabel.textContent = item.description || 'Sin descripcion';
+                    descriptionLabel.textContent = item.stockValue > 0
+                        ? 'Listo para cargar en la venta'
+                        : 'Sin stock disponible';
+                    content.appendChild(codeLabel);
                     content.appendChild(title);
                     content.appendChild(descriptionLabel);
 
                     const meta = document.createElement('span');
                     meta.className = 'product-combobox__meta';
                     const stockLabel = document.createElement('span');
+                    stockLabel.className = 'product-combobox__stock';
                     stockLabel.textContent = 'Stock: ' + item.stock;
                     if (item.stockValue <= 0) {
                         stockLabel.className = 'product-combobox__stock product-combobox__stock--empty';
                     }
                     const retailLabel = document.createElement('span');
+                    retailLabel.className = 'product-combobox__price';
                     retailLabel.textContent = currentPrice;
                     meta.appendChild(stockLabel);
                     meta.appendChild(retailLabel);
