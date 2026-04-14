@@ -379,13 +379,13 @@
                                     th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
                             </option>
                         </select>
-                        <div class="product-combobox mt-0">
+                        <div class="product-combobox sale-product-combobox mt-0">
                             <div class="product-combobox__control">
                                 <input type="text"
                                        class="product-combobox__input"
                                        placeholder="Buscar por codigo o descripcion"
                                        data-placeholder-default="Buscar por codigo o descripcion"
-                                       data-placeholder-mobile="Producto o codigo"
+                                       data-placeholder-mobile="Abrir catalogo de productos"
                                        autocomplete="off"
                                        spellcheck="false"
                                        aria-label="Buscar producto"/>
@@ -396,6 +396,20 @@
                                 </button>
                             </div>
                             <div class="product-combobox__panel hidden">
+                                <div class="product-combobox__sheet-head">
+                                    <p class="product-combobox__sheet-kicker">Catalogo</p>
+                                    <p class="product-combobox__sheet-title">Elegi un producto</p>
+                                    <p class="product-combobox__sheet-copy">Vista mobile con imagen, codigo, stock y precio.</p>
+                                    <div class="product-combobox__sheet-search-wrap">
+                                        <input type="search"
+                                               class="product-combobox__sheet-search"
+                                               placeholder="Buscar por codigo o descripcion"
+                                               autocomplete="off"
+                                               spellcheck="false"
+                                               inputmode="search"
+                                               aria-label="Buscar producto dentro del catalogo"/>
+                                    </div>
+                                </div>
                                 <div class="product-combobox__empty hidden">No se encontraron productos</div>
                                 <div class="product-combobox__options"></div>
                             </div>
@@ -650,6 +664,10 @@
                 return window.visualViewport ? window.visualViewport.height : window.innerHeight;
             }
 
+            function currentViewportOffsetTop() {
+                return window.visualViewport ? window.visualViewport.offsetTop : 0;
+            }
+
             function isCompactMobileViewport() {
                 const visualWidth = window.visualViewport ? window.visualViewport.width : 0;
                 return window.matchMedia('(max-width: 640px)').matches || (visualWidth > 0 && visualWidth <= 640);
@@ -671,16 +689,18 @@
 
                 const isMobileViewport = isCompactMobileViewport();
                 const viewportHeight = currentViewportHeight();
+                const viewportOffsetTop = currentViewportOffsetTop();
                 const fullViewportHeight = window.innerHeight || viewportHeight;
                 const rect = input.getBoundingClientRect();
                 const margin = isMobileViewport ? 12 : 16;
                 const keyboardLikelyOpen = isMobileViewport && (fullViewportHeight - viewportHeight) > 140;
-                const mobileKeyboardTop = keyboardLikelyOpen
-                    ? Math.max(10, Math.min(Math.floor(rect.top - 8), Math.floor(viewportHeight - 220)))
-                    : null;
+                const mobileClosedHeight = Math.max(280, Math.min(Math.floor(viewportHeight * 0.72), 460));
                 const mobilePanelHeight = keyboardLikelyOpen
-                    ? Math.max(200, Math.floor(viewportHeight - mobileKeyboardTop - margin))
-                    : Math.max(260, Math.min(Math.floor(viewportHeight * 0.62), 420));
+                    ? Math.max(240, Math.floor(viewportHeight - 16))
+                    : mobileClosedHeight;
+                const mobilePanelTop = viewportOffsetTop + (keyboardLikelyOpen
+                    ? 8
+                    : Math.max(12, Math.floor((viewportHeight - mobilePanelHeight) / 2)));
                 const spaceBelow = Math.max(140, Math.floor(viewportHeight - rect.bottom - margin));
                 const spaceAbove = Math.max(140, Math.floor(rect.top - margin));
                 const reservedEmptyHeight = emptyState && !emptyState.classList.contains('hidden') ? 64 : 0;
@@ -697,9 +717,9 @@
                     panel.style.position = 'fixed';
                     panel.style.left = horizontalInset + 'px';
                     panel.style.right = horizontalInset + 'px';
-                    panel.style.top = keyboardLikelyOpen ? (mobileKeyboardTop + 'px') : '50%';
+                    panel.style.top = mobilePanelTop + 'px';
                     panel.style.bottom = 'auto';
-                    panel.style.transform = keyboardLikelyOpen ? '' : 'translateY(-50%)';
+                    panel.style.transform = '';
                 } else {
                     panel.style.position = 'absolute';
                     panel.style.left = '0';
@@ -714,6 +734,35 @@
                 const sheetHeadHeight = sheetHead ? sheetHead.offsetHeight : 0;
                 const optionsMaxHeight = Math.max(120, maxHeight - panelPaddingY - sheetHeadHeight - reservedEmptyHeight - (isMobileViewport ? 4 : 0));
                 optionsContainer.style.maxHeight = optionsMaxHeight + 'px';
+            }
+
+            function syncProductComboboxBodyLock() {
+                const shouldLock = isCompactMobileViewport() && Boolean(activeProductCombobox);
+                document.documentElement.classList.toggle('overflow-hidden', shouldLock);
+                document.body.classList.toggle('overflow-hidden', shouldLock);
+            }
+
+            function refreshActiveProductComboboxViewport() {
+                if (!activeProductCombobox) {
+                    syncProductComboboxBodyLock();
+                    return;
+                }
+                updateProductComboboxPanelLayout(activeProductCombobox);
+                ensureProductComboboxVisible(activeProductCombobox);
+            }
+
+            function scheduleProductComboboxViewportRefresh(row) {
+                if (!row) {
+                    return;
+                }
+                [0, 120, 260].forEach(function (delay) {
+                    window.setTimeout(function () {
+                        if (activeProductCombobox !== row) {
+                            return;
+                        }
+                        refreshActiveProductComboboxViewport();
+                    }, delay);
+                });
             }
 
             function ensureProductComboboxVisible(row) {
@@ -916,6 +965,7 @@
                 if (activeProductCombobox === row) {
                     activeProductCombobox = null;
                 }
+                syncProductComboboxBodyLock();
             }
 
             function getProductComboboxSheetSearch(row) {
@@ -1154,6 +1204,7 @@
                 combobox.dataset.open = 'true';
                 input.setAttribute('aria-expanded', 'true');
                 activeProductCombobox = row;
+                syncProductComboboxBodyLock();
                 updateProductComboboxPanelLayout(row);
                 ensureProductComboboxVisible(row);
                 highlightProductComboboxOption(row, 0);
@@ -1220,18 +1271,26 @@
                         resetSearch: Boolean(settings.resetSearch),
                         searchTerm: settings.searchTerm
                     });
+                    if (shouldFocusAfterOpen && document.activeElement === input) {
+                        input.blur();
+                    }
                     window.setTimeout(function () {
                         const updatedFocusTarget = getProductComboboxSearchInput(row) || input;
                         if (shouldFocusInput && document.activeElement !== updatedFocusTarget) {
                             focusProductComboboxInput(shouldSelectText);
                         }
-                        updateProductComboboxPanelLayout(row);
-                        ensureProductComboboxVisible(row);
-                    }, 0);
+                        refreshActiveProductComboboxViewport();
+                        if (shouldFocusAfterOpen) {
+                            scheduleProductComboboxViewportRefresh(row);
+                        }
+                    }, shouldFocusAfterOpen ? 30 : 0);
                 }
 
                 input.addEventListener('focus', function () {
                     if (isCompactMobileViewport()) {
+                        if (document.activeElement === input) {
+                            input.blur();
+                        }
                         activateProductCombobox({
                             focusInput: true,
                             resetSearch: true
@@ -1310,10 +1369,7 @@
                     openProductCombobox(row, {
                         searchTerm: sheetSearch.value
                     });
-                    window.setTimeout(function () {
-                        updateProductComboboxPanelLayout(row);
-                        ensureProductComboboxVisible(row);
-                    }, 180);
+                    scheduleProductComboboxViewportRefresh(row);
                 });
 
                 sheetSearch.addEventListener('input', function () {
@@ -2193,11 +2249,17 @@
                     syncProductComboboxPlaceholder(row);
                     syncProductComboboxInteractionMode(row);
                 });
+                syncProductComboboxBodyLock();
                 if (activeProductCombobox) {
                     renderProductComboboxOptions(activeProductCombobox, getProductComboboxSearchValue(activeProductCombobox));
+                    refreshActiveProductComboboxViewport();
                     highlightProductComboboxOption(activeProductCombobox, 0);
                 }
             });
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', refreshActiveProductComboboxViewport);
+                window.visualViewport.addEventListener('scroll', refreshActiveProductComboboxViewport);
+            }
             updateTotals();
             if (discountInput) {
                 discountInput.addEventListener('input', updateCalculator);
@@ -2791,20 +2853,6 @@
                     saveDraft();
                 });
             }
-            window.addEventListener('resize', function () {
-                if (activeProductCombobox) {
-                    updateProductComboboxPanelLayout(activeProductCombobox);
-                }
-            });
-            if (window.visualViewport) {
-                window.visualViewport.addEventListener('resize', function () {
-                    if (activeProductCombobox) {
-                        updateProductComboboxPanelLayout(activeProductCombobox);
-                        ensureProductComboboxVisible(activeProductCombobox);
-                    }
-                });
-            }
-
             toggleCreditFields();
             toggleQuickClientMode();
             updateCalculator();

@@ -41,12 +41,73 @@
         <a th:href="@{/products}" class="text-sm text-amber-900 hover:underline">Ver todos</a>
     </div>
 
-    <form method="get" th:action="@{/products}" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <form id="productSearchForm" method="get" th:action="@{/products}" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <input type="hidden" name="productId" id="productFocusInput" th:value="${focusProductId}"/>
         <div class="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(180px,1fr)_minmax(220px,1fr)_auto_auto] lg:items-end">
             <div>
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Buscar</label>
-                <input type="text" name="q" th:value="${q}" placeholder="Codigo, barra, descripcion o proveedor"
-                       class="w-full rounded border px-4 py-2"/>
+                <div class="hidden sm:block">
+                    <input type="text" id="productSearchInput" name="q" th:value="${q}" placeholder="Codigo, barra, descripcion o proveedor"
+                           class="w-full rounded border px-4 py-2"/>
+                </div>
+                <div class="sm:hidden">
+                    <select id="mobileProductCatalogSelect"
+                            class="product-select-native"
+                            tabindex="-1"
+                            aria-hidden="true">
+                        <option value="">Seleccionar producto</option>
+                        <option th:each="product : ${products}"
+                                th:value="${product.id}"
+                                th:selected="${focusProductId != null and product.id == focusProductId}"
+                                th:data-retail="${product.priceRetail}"
+                                th:data-barcode="${product.barcode}"
+                                th:data-product-code="${product.productCode}"
+                                th:data-description="${product.description}"
+                                th:data-image="${product.imagePath}"
+                                th:data-stock="${product.stockAvailable}"
+                                th:text="${(product.productCode != null ? product.productCode : 'Sin codigo') + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
+                        </option>
+                    </select>
+                    <div id="mobileProductCatalog" class="product-combobox">
+                        <div class="product-combobox__control">
+                            <input type="text"
+                                   id="mobileProductCatalogInput"
+                                   class="product-combobox__input"
+                                   placeholder="Buscar por codigo o descripcion"
+                                   data-placeholder-default="Buscar por codigo o descripcion"
+                                   data-placeholder-mobile="Abrir catalogo de productos"
+                                   autocomplete="off"
+                                   spellcheck="false"
+                                   aria-label="Buscar producto"/>
+                            <button type="button"
+                                    id="mobileProductCatalogToggle"
+                                    class="product-combobox__toggle"
+                                    aria-label="Mostrar productos">
+                                ?
+                            </button>
+                        </div>
+                        <div id="mobileProductCatalogPanel" class="product-combobox__panel hidden">
+                            <div class="product-combobox__sheet-head">
+                                <p class="product-combobox__sheet-kicker">Catalogo</p>
+                                <p class="product-combobox__sheet-title">Busca un producto</p>
+                                <p class="product-combobox__sheet-copy">Vista mobile con imagen, codigo, stock y precio, igual al catalogo del presupuesto.</p>
+                                <div class="product-combobox__sheet-search-wrap">
+                                    <input type="search"
+                                           id="mobileProductCatalogSheetSearch"
+                                           class="product-combobox__sheet-search"
+                                           placeholder="Buscar por codigo o descripcion"
+                                           autocomplete="off"
+                                           spellcheck="false"
+                                           inputmode="search"
+                                           aria-label="Buscar producto dentro del catalogo"/>
+                                </div>
+                            </div>
+                            <div id="mobileProductCatalogEmpty" class="product-combobox__empty hidden">No se encontraron productos</div>
+                            <div id="mobileProductCatalogOptions" class="product-combobox__options"></div>
+                        </div>
+                    </div>
+                    <p class="mt-2 text-xs text-slate-500">En celular abre un catalogo visual para ubicar el producto sin salir del listado.</p>
+                </div>
             </div>
             <div>
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Proveedor</label>
@@ -466,8 +527,21 @@
             const closeProductImageModal = document.getElementById('closeProductImageModal');
             const productImageModalContent = document.getElementById('productImageModalContent');
             const productImageCaption = document.getElementById('productImageCaption');
+            const productSearchForm = document.getElementById('productSearchForm');
+            const productSearchInput = document.getElementById('productSearchInput');
+            const productFocusInput = document.getElementById('productFocusInput');
+            const mobileProductCatalog = document.getElementById('mobileProductCatalog');
+            const mobileProductCatalogSelect = document.getElementById('mobileProductCatalogSelect');
+            const mobileProductCatalogInput = document.getElementById('mobileProductCatalogInput');
+            const mobileProductCatalogToggle = document.getElementById('mobileProductCatalogToggle');
+            const mobileProductCatalogPanel = document.getElementById('mobileProductCatalogPanel');
+            const mobileProductCatalogSheetSearch = document.getElementById('mobileProductCatalogSheetSearch');
+            const mobileProductCatalogOptions = document.getElementById('mobileProductCatalogOptions');
+            const mobileProductCatalogEmpty = document.getElementById('mobileProductCatalogEmpty');
             let productScanStream = null;
             let productScanInterval = null;
+            let mobileProductCatalogItems = null;
+            let mobileProductCatalogHighlightedIndex = -1;
 
             function parseNumber(value) {
                 if (value === null || value === undefined || value === '') {
@@ -490,6 +564,311 @@
 
             function money(value) {
                 return '$' + parseNumber(value).toFixed(2);
+            }
+
+            function currentViewportHeight() {
+                if (window.visualViewport && Number.isFinite(window.visualViewport.height)) {
+                    return window.visualViewport.height;
+                }
+                return window.innerHeight || document.documentElement.clientHeight || 0;
+            }
+
+            function isCompactMobileViewport() {
+                const visualWidth = window.visualViewport ? window.visualViewport.width : 0;
+                return window.matchMedia('(max-width: 640px)').matches || (visualWidth > 0 && visualWidth <= 640);
+            }
+
+            function normalizeSearchTerm(value) {
+                return String(value || '').trim().toLowerCase();
+            }
+
+            function getMobileProductCatalogLabel(option) {
+                if (!option || !option.value) {
+                    return '';
+                }
+                const productCode = (option.dataset.productCode || '').trim();
+                const description = (option.dataset.description || '').trim();
+                return productCode && description ? (productCode + ' - ' + description) : (productCode || description || option.textContent.trim());
+            }
+
+            function getMobileProductCatalogSearchText(option) {
+                if (!option || !option.value) {
+                    return '';
+                }
+                return [
+                    option.dataset.productCode || '',
+                    option.dataset.description || '',
+                    option.dataset.barcode || '',
+                    option.textContent || ''
+                ].join(' ').toLowerCase();
+            }
+
+            function getMobileProductCatalogInitials(description) {
+                return String(description || '')
+                    .trim()
+                    .split(/\s+/)
+                    .filter(Boolean)
+                    .slice(0, 2)
+                    .map(part => part.charAt(0).toUpperCase())
+                    .join('') || 'PR';
+            }
+
+            function buildMobileProductCatalogItems() {
+                if (mobileProductCatalogItems) {
+                    return mobileProductCatalogItems;
+                }
+                if (!mobileProductCatalogSelect) {
+                    mobileProductCatalogItems = [];
+                    return mobileProductCatalogItems;
+                }
+                mobileProductCatalogItems = Array.from(mobileProductCatalogSelect.options)
+                    .map(option => ({
+                        value: option.value,
+                        label: getMobileProductCatalogLabel(option),
+                        searchText: getMobileProductCatalogSearchText(option),
+                        productCode: (option.dataset.productCode || '').trim(),
+                        description: (option.dataset.description || '').trim(),
+                        imagePath: (option.dataset.image || '').trim(),
+                        stock: option.dataset.stock || '0',
+                        stockValue: Math.max(0, parseNumber(option.dataset.stock)),
+                        retail: option.dataset.retail || '0'
+                    }))
+                    .filter(item => Boolean(item.value));
+                return mobileProductCatalogItems;
+            }
+
+            function syncMobileProductCatalogPlaceholder() {
+                if (!mobileProductCatalogInput) {
+                    return;
+                }
+                const mobilePlaceholder = mobileProductCatalogInput.dataset.placeholderMobile || 'Abrir catalogo de productos';
+                const defaultPlaceholder = mobileProductCatalogInput.dataset.placeholderDefault || 'Buscar por codigo o descripcion';
+                mobileProductCatalogInput.placeholder = isCompactMobileViewport() ? mobilePlaceholder : defaultPlaceholder;
+                if (mobileProductCatalogSheetSearch) {
+                    mobileProductCatalogSheetSearch.placeholder = defaultPlaceholder;
+                }
+            }
+
+            function syncMobileProductCatalogInput() {
+                if (!mobileProductCatalogInput || !mobileProductCatalogSelect) {
+                    return;
+                }
+                const selectedOption = mobileProductCatalogSelect.options[mobileProductCatalogSelect.selectedIndex];
+                const selectedLabel = selectedOption && selectedOption.value ? getMobileProductCatalogLabel(selectedOption) : '';
+                const currentQuery = productSearchInput ? (productSearchInput.value || '').trim() : '';
+                mobileProductCatalogInput.value = selectedLabel || currentQuery;
+                mobileProductCatalogInput.dataset.selectedLabel = selectedLabel;
+                if (mobileProductCatalog) {
+                    mobileProductCatalog.classList.toggle('has-selection', Boolean(selectedLabel));
+                }
+            }
+
+            function clearMobileProductSelection() {
+                if (mobileProductCatalogSelect) {
+                    mobileProductCatalogSelect.value = '';
+                }
+                if (productFocusInput) {
+                    productFocusInput.value = '';
+                }
+                syncMobileProductCatalogInput();
+            }
+
+            function updateMobileProductCatalogPanelLayout() {
+                if (!mobileProductCatalog || !mobileProductCatalogInput || !mobileProductCatalogPanel || !mobileProductCatalogOptions || !isCompactMobileViewport()) {
+                    return;
+                }
+                const viewportHeight = currentViewportHeight();
+                const fullViewportHeight = window.innerHeight || viewportHeight;
+                const triggerRect = mobileProductCatalogInput.getBoundingClientRect();
+                const sheetHead = mobileProductCatalogPanel.querySelector('.product-combobox__sheet-head');
+                const margin = window.matchMedia('(max-width: 480px)').matches ? 8 : 10;
+                const keyboardLikelyOpen = (fullViewportHeight - viewportHeight) > 140;
+                const topInset = keyboardLikelyOpen
+                    ? Math.max(10, Math.min(Math.floor(triggerRect.top - 8), Math.floor(viewportHeight - 220)))
+                    : null;
+                const maxHeight = keyboardLikelyOpen
+                    ? Math.max(200, Math.floor(viewportHeight - topInset - margin))
+                    : Math.max(260, Math.min(Math.floor(viewportHeight * 0.62), 420));
+                const reservedEmptyHeight = mobileProductCatalogEmpty && !mobileProductCatalogEmpty.classList.contains('hidden') ? 64 : 0;
+
+                mobileProductCatalog.classList.toggle('product-combobox--keyboard-open', keyboardLikelyOpen);
+                mobileProductCatalogPanel.style.position = 'fixed';
+                mobileProductCatalogPanel.style.left = margin + 'px';
+                mobileProductCatalogPanel.style.right = margin + 'px';
+                mobileProductCatalogPanel.style.top = keyboardLikelyOpen ? (topInset + 'px') : '50%';
+                mobileProductCatalogPanel.style.bottom = 'auto';
+                mobileProductCatalogPanel.style.transform = keyboardLikelyOpen ? '' : 'translateY(-50%)';
+                mobileProductCatalogPanel.style.maxHeight = (maxHeight + reservedEmptyHeight) + 'px';
+
+                const panelStyles = window.getComputedStyle(mobileProductCatalogPanel);
+                const panelPaddingY = (parseFloat(panelStyles.paddingTop) || 0) + (parseFloat(panelStyles.paddingBottom) || 0);
+                const sheetHeadHeight = sheetHead ? sheetHead.offsetHeight : 0;
+                const optionsMaxHeight = Math.max(120, maxHeight - panelPaddingY - sheetHeadHeight - reservedEmptyHeight - (keyboardLikelyOpen ? 4 : 0));
+                mobileProductCatalogOptions.style.maxHeight = optionsMaxHeight + 'px';
+            }
+
+            function ensureHighlightedMobileProductVisible(button) {
+                if (!mobileProductCatalogOptions || !button) {
+                    return;
+                }
+                const containerTop = mobileProductCatalogOptions.scrollTop;
+                const containerBottom = containerTop + mobileProductCatalogOptions.clientHeight;
+                const buttonTop = button.offsetTop;
+                const buttonBottom = buttonTop + button.offsetHeight;
+                if (buttonTop < containerTop) {
+                    mobileProductCatalogOptions.scrollTop = buttonTop;
+                } else if (buttonBottom > containerBottom) {
+                    mobileProductCatalogOptions.scrollTop = buttonBottom - mobileProductCatalogOptions.clientHeight;
+                }
+            }
+
+            function highlightMobileProductCatalogOption(index) {
+                const buttons = mobileProductCatalogOptions ? Array.from(mobileProductCatalogOptions.querySelectorAll('.product-combobox__option')) : [];
+                if (!buttons.length) {
+                    mobileProductCatalogHighlightedIndex = -1;
+                    if (mobileProductCatalogInput) {
+                        mobileProductCatalogInput.removeAttribute('aria-activedescendant');
+                    }
+                    return;
+                }
+                const boundedIndex = Math.max(0, Math.min(index, buttons.length - 1));
+                mobileProductCatalogHighlightedIndex = boundedIndex;
+                buttons.forEach((button, buttonIndex) => {
+                    button.classList.toggle('is-highlighted', buttonIndex === boundedIndex);
+                });
+                if (mobileProductCatalogInput) {
+                    mobileProductCatalogInput.setAttribute('aria-activedescendant', buttons[boundedIndex].id);
+                }
+                ensureHighlightedMobileProductVisible(buttons[boundedIndex]);
+            }
+
+            function renderMobileProductCatalogOptions(searchTerm) {
+                if (!mobileProductCatalogOptions || !mobileProductCatalogEmpty || !mobileProductCatalogSelect) {
+                    return [];
+                }
+                const normalized = normalizeSearchTerm(searchTerm);
+                const selectedValue = mobileProductCatalogSelect.value;
+                const matchingItems = buildMobileProductCatalogItems().filter(item => !normalized || item.searchText.includes(normalized));
+
+                mobileProductCatalogOptions.innerHTML = '';
+                matchingItems.forEach((item, index) => {
+                    const optionButton = document.createElement('button');
+                    optionButton.type = 'button';
+                    optionButton.className = 'product-combobox__option';
+                    optionButton.id = 'mobile-product-catalog-option-' + item.value + '-' + index;
+                    optionButton.dataset.value = item.value;
+
+                    if (item.value === selectedValue) {
+                        optionButton.classList.add('is-selected');
+                    }
+                    if (item.stockValue <= 0) {
+                        optionButton.classList.add('is-out-of-stock');
+                    }
+
+                    const media = document.createElement('span');
+                    media.className = 'product-combobox__media';
+                    if (item.imagePath) {
+                        const image = document.createElement('img');
+                        image.src = item.imagePath;
+                        image.alt = '';
+                        image.className = 'product-combobox__thumb';
+                        media.appendChild(image);
+                    } else {
+                        const placeholder = document.createElement('span');
+                        placeholder.className = 'product-combobox__thumb product-combobox__thumb--placeholder';
+                        placeholder.textContent = getMobileProductCatalogInitials(item.description);
+                        media.appendChild(placeholder);
+                    }
+
+                    const content = document.createElement('span');
+                    content.className = 'product-combobox__content';
+                    const codeLabel = document.createElement('span');
+                    codeLabel.className = 'product-combobox__code';
+                    codeLabel.textContent = item.productCode ? ('Cod. ' + item.productCode) : 'Sin codigo';
+                    const title = document.createElement('span');
+                    title.className = 'product-combobox__title';
+                    title.textContent = item.description || 'Sin descripcion';
+                    const descriptionLabel = document.createElement('span');
+                    descriptionLabel.className = 'product-combobox__description';
+                    descriptionLabel.textContent = item.stockValue > 0 ? 'Disponible para consulta rapida' : 'Sin stock disponible';
+                    content.appendChild(codeLabel);
+                    content.appendChild(title);
+                    content.appendChild(descriptionLabel);
+
+                    const meta = document.createElement('span');
+                    meta.className = 'product-combobox__meta';
+                    const stockLabel = document.createElement('span');
+                    stockLabel.className = 'product-combobox__stock';
+                    stockLabel.textContent = 'Stock: ' + item.stock;
+                    if (item.stockValue <= 0) {
+                        stockLabel.className = 'product-combobox__stock product-combobox__stock--empty';
+                    }
+                    const retailLabel = document.createElement('span');
+                    retailLabel.className = 'product-combobox__price';
+                    retailLabel.textContent = money(item.retail || 0);
+                    meta.appendChild(stockLabel);
+                    meta.appendChild(retailLabel);
+
+                    optionButton.appendChild(media);
+                    optionButton.appendChild(content);
+                    optionButton.appendChild(meta);
+                    optionButton.addEventListener('click', function () {
+                        mobileProductCatalogSelect.value = item.value;
+                        if (productFocusInput) {
+                            productFocusInput.value = item.value;
+                        }
+                        if (productSearchInput) {
+                            productSearchInput.value = item.productCode || item.description || '';
+                        }
+                        syncMobileProductCatalogInput();
+                        closeMobileProductCatalog();
+                        window.setTimeout(function () {
+                            focusProductRowById(item.value);
+                        }, 40);
+                    });
+                    mobileProductCatalogOptions.appendChild(optionButton);
+                });
+
+                mobileProductCatalogEmpty.classList.toggle('hidden', matchingItems.length > 0);
+                updateMobileProductCatalogPanelLayout();
+                return matchingItems;
+            }
+
+            function openMobileProductCatalog(options) {
+                if (!mobileProductCatalog || !mobileProductCatalogInput || !mobileProductCatalogPanel || !mobileProductCatalogSheetSearch || !isCompactMobileViewport()) {
+                    return;
+                }
+                const settings = options || {};
+                if (settings.resetSearch) {
+                    mobileProductCatalogSheetSearch.value = productSearchInput ? (productSearchInput.value || '') : '';
+                }
+                const searchTerm = settings.searchTerm === undefined ? mobileProductCatalogSheetSearch.value : settings.searchTerm;
+                renderMobileProductCatalogOptions(searchTerm);
+                mobileProductCatalogPanel.classList.remove('hidden');
+                mobileProductCatalogInput.setAttribute('aria-expanded', 'true');
+                updateMobileProductCatalogPanelLayout();
+                highlightMobileProductCatalogOption(0);
+                if (settings.focusSearch !== false) {
+                    window.setTimeout(function () {
+                        try {
+                            mobileProductCatalogSheetSearch.focus({preventScroll: true});
+                        } catch (_) {
+                            mobileProductCatalogSheetSearch.focus();
+                        }
+                    }, 30);
+                }
+            }
+
+            function closeMobileProductCatalog() {
+                if (!mobileProductCatalog || !mobileProductCatalogPanel || !mobileProductCatalogInput) {
+                    return;
+                }
+                mobileProductCatalogPanel.classList.add('hidden');
+                mobileProductCatalog.classList.remove('product-combobox--keyboard-open');
+                mobileProductCatalogInput.setAttribute('aria-expanded', 'false');
+                mobileProductCatalogInput.removeAttribute('aria-activedescendant');
+                mobileProductCatalogHighlightedIndex = -1;
+                syncMobileProductCatalogInput();
             }
 
             function setPanelText(panel, selector, value) {
@@ -638,14 +1017,22 @@
                 }
             }
 
-            function openFinancingRowByProductId(productId) {
+            function focusProductRowById(productId) {
                 const row = document.querySelector('.product-row[data-product-id="' + productId + '"]');
                 if (!row) {
-                    return;
+                    return null;
                 }
                 document.querySelectorAll('.product-row').forEach(item => item.classList.remove('bg-amber-100'));
                 row.classList.add('bg-amber-100');
                 row.scrollIntoView({behavior: 'smooth', block: 'center'});
+                return row;
+            }
+
+            function openFinancingRowByProductId(productId) {
+                const row = focusProductRowById(productId);
+                if (!row) {
+                    return;
+                }
                 const button = row.querySelector('.toggle-financing-btn');
                 const targetId = button ? button.dataset.target : null;
                 const targetRow = targetId ? document.getElementById(targetId) : null;
@@ -789,6 +1176,123 @@
                 });
             });
 
+            if (mobileProductCatalog && mobileProductCatalogInput && mobileProductCatalogToggle && mobileProductCatalogPanel && mobileProductCatalogSheetSearch && mobileProductCatalogOptions && mobileProductCatalogSelect) {
+                mobileProductCatalogInput.readOnly = true;
+                mobileProductCatalogInput.setAttribute('role', 'combobox');
+                mobileProductCatalogInput.setAttribute('aria-autocomplete', 'list');
+                mobileProductCatalogInput.setAttribute('aria-expanded', 'false');
+                mobileProductCatalogInput.setAttribute('inputmode', 'none');
+                mobileProductCatalogInput.classList.add('product-combobox__input--trigger');
+                syncMobileProductCatalogPlaceholder();
+                syncMobileProductCatalogInput();
+
+                mobileProductCatalogInput.addEventListener('focus', function () {
+                    openMobileProductCatalog({
+                        focusSearch: true,
+                        resetSearch: true
+                    });
+                });
+
+                mobileProductCatalogInput.addEventListener('click', function () {
+                    openMobileProductCatalog({
+                        focusSearch: true,
+                        resetSearch: true
+                    });
+                });
+
+                mobileProductCatalogToggle.addEventListener('click', function () {
+                    if (mobileProductCatalogPanel.classList.contains('hidden')) {
+                        openMobileProductCatalog({
+                            focusSearch: true,
+                            resetSearch: true
+                        });
+                        return;
+                    }
+                    closeMobileProductCatalog();
+                });
+
+                mobileProductCatalogSheetSearch.addEventListener('focus', function () {
+                    updateMobileProductCatalogPanelLayout();
+                });
+
+                mobileProductCatalogSheetSearch.addEventListener('input', function () {
+                    if (productSearchInput) {
+                        productSearchInput.value = mobileProductCatalogSheetSearch.value;
+                    }
+                    if (mobileProductCatalogSelect.value) {
+                        clearMobileProductSelection();
+                    }
+                    syncMobileProductCatalogInput();
+                    renderMobileProductCatalogOptions(mobileProductCatalogSheetSearch.value);
+                    highlightMobileProductCatalogOption(0);
+                });
+
+                mobileProductCatalogSheetSearch.addEventListener('keydown', function (event) {
+                    const buttons = Array.from(mobileProductCatalogOptions.querySelectorAll('.product-combobox__option'));
+                    if (event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        highlightMobileProductCatalogOption(mobileProductCatalogHighlightedIndex + 1);
+                        return;
+                    }
+                    if (event.key === 'ArrowUp') {
+                        event.preventDefault();
+                        highlightMobileProductCatalogOption(mobileProductCatalogHighlightedIndex <= 0 ? 0 : mobileProductCatalogHighlightedIndex - 1);
+                        return;
+                    }
+                    if (event.key === 'Enter') {
+                        if (!buttons.length) {
+                            return;
+                        }
+                        event.preventDefault();
+                        const targetIndex = mobileProductCatalogHighlightedIndex >= 0 ? mobileProductCatalogHighlightedIndex : 0;
+                        if (buttons[targetIndex]) {
+                            buttons[targetIndex].click();
+                        }
+                        return;
+                    }
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        closeMobileProductCatalog();
+                        mobileProductCatalogInput.blur();
+                    }
+                });
+
+                document.addEventListener('click', function (event) {
+                    if (!mobileProductCatalog || !mobileProductCatalog.contains(event.target)) {
+                        closeMobileProductCatalog();
+                    }
+                });
+
+                const relayoutMobileProductCatalog = function () {
+                    syncMobileProductCatalogPlaceholder();
+                    if (!mobileProductCatalogPanel.classList.contains('hidden')) {
+                        updateMobileProductCatalogPanelLayout();
+                    }
+                };
+                window.addEventListener('resize', relayoutMobileProductCatalog);
+                if (window.visualViewport) {
+                    window.visualViewport.addEventListener('resize', relayoutMobileProductCatalog);
+                }
+            }
+
+            if (productSearchInput) {
+                productSearchInput.addEventListener('input', function () {
+                    if (!isCompactMobileViewport()) {
+                        clearMobileProductSelection();
+                        return;
+                    }
+                    syncMobileProductCatalogInput();
+                });
+            }
+
+            productSearchForm?.querySelectorAll('select[name="providerId"], select[name="updateAgeFilter"]').forEach(filterSelect => {
+                filterSelect.addEventListener('change', function () {
+                    if (productFocusInput) {
+                        productFocusInput.value = '';
+                    }
+                });
+            });
+
             if (scanProductLookupBtn) {
                 scanProductLookupBtn.addEventListener('click', openProductScanner);
             }
@@ -811,6 +1315,12 @@
                         closeImageModal();
                     }
                 });
+            }
+
+            if (productFocusInput && productFocusInput.value) {
+                window.setTimeout(function () {
+                    focusProductRowById(productFocusInput.value);
+                }, 180);
             }
 
             const openHistoryButton = document.getElementById('open-adjustments-history');
