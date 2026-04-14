@@ -608,8 +608,11 @@
                 const rect = input.getBoundingClientRect();
                 const margin = isMobileViewport ? 12 : 16;
                 const keyboardLikelyOpen = isMobileViewport && (fullViewportHeight - viewportHeight) > 140;
+                const mobileKeyboardTop = keyboardLikelyOpen
+                    ? Math.max(10, Math.min(Math.floor(rect.top - 8), Math.floor(viewportHeight - 220)))
+                    : null;
                 const mobilePanelHeight = keyboardLikelyOpen
-                    ? Math.max(240, Math.floor(viewportHeight - (margin * 2)))
+                    ? Math.max(200, Math.floor(viewportHeight - mobileKeyboardTop - margin))
                     : Math.max(260, Math.min(Math.floor(viewportHeight * 0.62), 420));
                 const spaceBelow = Math.max(140, Math.floor(viewportHeight - rect.bottom - margin));
                 const spaceAbove = Math.max(140, Math.floor(rect.top - margin));
@@ -621,13 +624,13 @@
                     : Math.max(140, Math.min(availableHeight, 320));
 
                 combobox.classList.toggle('product-combobox--dropup', shouldDropUp);
+                combobox.classList.toggle('product-combobox--keyboard-open', keyboardLikelyOpen);
                 if (isMobileViewport) {
                     const horizontalInset = window.matchMedia('(max-width: 480px)').matches ? 8 : 10;
-                    const topInset = keyboardLikelyOpen ? 10 : null;
                     panel.style.position = 'fixed';
                     panel.style.left = horizontalInset + 'px';
                     panel.style.right = horizontalInset + 'px';
-                    panel.style.top = keyboardLikelyOpen ? (topInset + 'px') : '50%';
+                    panel.style.top = keyboardLikelyOpen ? (mobileKeyboardTop + 'px') : '50%';
                     panel.style.bottom = 'auto';
                     panel.style.transform = keyboardLikelyOpen ? '' : 'translateY(-50%)';
                 } else {
