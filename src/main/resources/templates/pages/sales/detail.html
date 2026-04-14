@@ -72,8 +72,14 @@
         </table>
     </div>
 
-    <div class="mt-6">
+    <div class="mt-6 flex gap-4">
         <a th:href="@{/sales}" class="text-gray-600 hover:text-gray-900">Volver a ventas</a>
+        <a sec:authorize="hasAuthority('SALES_CREATE')"
+           th:if="${sale.status.name() != 'VOID'}"
+           th:href="@{/sales/{id}/edit(id=${sale.id})}"
+           class="text-amber-600 hover:underline font-semibold">
+            Editar venta
+        </a>
     </div>
 
 </section>

@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org"
-      th:replace="layout/main :: layout(~{::content}, 'Nueva venta')">
+      th:replace="layout/main :: layout(~{::content}, ${editing} ? 'Editar venta' : 'Nueva venta')">
 
 <section th:fragment="content">
     <div class="mb-6">
-        <h1 class="text-2xl font-bold">Nueva Venta</h1>
+        <h1 class="text-2xl font-bold" th:text="${editing} ? 'Editar venta' : 'Nueva Venta'"></h1>
         <p class="text-gray-500 text-sm">Seleccione cliente, productos y forma de pago</p>
     </div>
 
-    <form id="saleForm" th:action="@{/sales}" method="post" class="bg-white p-8 rounded-lg shadow">
+    <form id="saleForm" th:action="${editing} ? @{/sales/{id}/edit(id=${sale.id})} : @{/sales}" method="post" class="bg-white p-8 rounded-lg shadow">
 
         <div th:if="${formError}"
              data-form-error="true"
@@ -50,6 +50,7 @@
                             th:data-dni="${client.nationalId}"
                             th:data-name="${client.firstName + ' ' + client.lastName}"
                             th:data-address="${client.address}"
+                            th:selected="${editing and sale != null and sale.client != null and client.id == sale.client.id}"
                             th:text="${client.nationalId + ' - ' + client.firstName + ' ' + client.lastName}">
                     </option>
                 </select>
@@ -84,8 +85,8 @@
                 <label class="block text-sm font-semibold mb-1">Forma de pago</label>
                 <select name="paymentType" id="paymentType" required
                         class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="CASH">Contado</option>
-                    <option value="CREDIT">Credito</option>
+                    <option value="CASH" th:selected="${editing and sale != null and sale.paymentType?.name() == 'CASH'}">Contado</option>
+                    <option value="CREDIT" th:selected="${editing and sale != null and sale.paymentType?.name() == 'CREDIT'}">Credito</option>
                 </select>
             </div>
 
@@ -106,6 +107,7 @@
                     <option value="">Mi usuario</option>
                     <option th:each="seller : ${sellers}"
                             th:value="${seller.id}"
+                            th:selected="${editing and sale != null and sale.seller != null and seller.id == sale.seller.id}"
                             th:text="${seller.firstName != null && !seller.firstName.isBlank() ? seller.firstName + ' ' + seller.lastName + ' - ' + seller.email : seller.email}">
                     </option>
                 </select>
@@ -122,7 +124,7 @@
                     </span>
                 </div>
                 <input type="date" name="saleDate"
-                       th:value="${#temporals.format(T(java.time.LocalDate).now(), 'yyyy-MM-dd')}"
+                       th:value="${editing and sale != null and sale.saleDate != null ? #temporals.format(sale.saleDate, 'yyyy-MM-dd') : #temporals.format(T(java.time.LocalDate).now(), 'yyyy-MM-dd')}"
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 <p id="saleNumberHelp" class="mt-2 text-sm font-semibold text-gray-800"></p>
             </div>
@@ -130,6 +132,7 @@
             <div class="credit-field">
                 <label class="block text-sm font-semibold mb-1">Fecha primer vencimiento</label>
                 <input type="date" name="firstDueDate"
+                       th:value="${editing and sale != null and sale.firstDueDate != null ? #temporals.format(sale.firstDueDate, 'yyyy-MM-dd') : ''}"
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
 
@@ -139,10 +142,12 @@
             <div th:if="${isAdmin}">
                 <!-- SOLO ADMIN DESCUENTO -->
                 <label class="block text-sm font-semibold mb-1">Descuento (monto)</label>
-                <input type="number" step="0.01" name="discountAmount" value="0"
+                <input type="number" step="0.01" name="discountAmount"
+                       th:value="${editing and sale != null and sale.discountAmount != null ? sale.discountAmount : 0}"
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
-            <input th:unless="${isAdmin}" type="hidden" name="discountAmount" value="0"/>
+            <input th:unless="${isAdmin}" type="hidden" name="discountAmount"
+                   th:value="${editing and sale != null and sale.discountAmount != null ? sale.discountAmount : 0}"/>
 
             <div class="credit-field">
                 <!-- REMOVER CONFLICTO FRECUENCIA -->
@@ -351,6 +356,68 @@
                 </tr>
                 </thead>
                 <tbody id="itemsBody">
+                <tr th:if="${editing and existingItems != null and !existingItems.isEmpty()}"
+                    th:each="item : ${existingItems}"
+                    class="border-t">
+                    <td class="px-3 py-2">
+                        <select name="productIds"
+                                class="product-select product-select-native w-full border rounded px-3 py-2"
+                                tabindex="-1"
+                                aria-hidden="true">
+                            <option value="">Seleccionar producto</option>
+                            <option th:each="product : ${products}"
+                                    th:value="${product.id}"
+                                    th:data-retail="${product.priceRetail}"
+                                    th:data-wholesale="${product.priceWholesale}"
+                                    th:data-cost-vat="${product.cost * (100 + product.vatRate) / 100}"
+                                    th:data-barcode="${product.barcode}"
+                                    th:data-product-code="${product.productCode}"
+                                    th:data-description="${product.description}"
+                                    th:data-image="${product.imagePath}"
+                                    th:data-stock="${product.stockAvailable}"
+                                    th:selected="${product.id == item.product.id}"
+                                    th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
+                            </option>
+                        </select>
+                        <div class="product-combobox mt-0">
+                            <div class="product-combobox__control">
+                                <input type="text"
+                                       class="product-combobox__input"
+                                       placeholder="Buscar por codigo o descripcion"
+                                       data-placeholder-default="Buscar por codigo o descripcion"
+                                       data-placeholder-mobile="Producto o codigo"
+                                       autocomplete="off"
+                                       spellcheck="false"
+                                       aria-label="Buscar producto"/>
+                                <button type="button"
+                                        class="product-combobox__toggle"
+                                        aria-label="Mostrar productos">
+                                    ▼
+                                </button>
+                            </div>
+                            <div class="product-combobox__panel hidden">
+                                <div class="product-combobox__empty hidden">No se encontraron productos</div>
+                                <div class="product-combobox__options"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-3 py-2">
+                        <input type="number" name="quantities"
+                               th:value="${item.quantity}" min="1"
+                               class="w-full border rounded px-3 py-2"/>
+                    </td>
+                    <td class="px-3 py-2">
+                        <input type="number" step="0.01" name="unitPrices"
+                               th:value="${item.unitPrice}"
+                               class="unit-price w-full border rounded px-3 py-2"/>
+                    </td>
+                    <td class="px-3 py-2">
+                        <span class="line-total" th:text="${item.lineTotal}">0.00</span>
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                        <button type="button" class="remove-row text-red-600">Quitar</button>
+                    </td>
+                </tr>
                 <tr class="border-t">
                     <td class="sale-product-cell px-3 py-2">
                         <select name="productIds"
@@ -447,8 +514,8 @@
                    class="px-5 py-2 rounded border border-gray-300 hover:bg-gray-100">
                     Cancelar
                 </a>
-                <button type="submit" id="saveSaleBtn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow">
-                    Guardar Venta
+                <button type="submit" id="saveSaleBtn" class="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 shadow"
+                        th:text="${editing} ? 'Actualizar Venta' : 'Guardar Venta'">
                 </button>
             </div>
         </div>
