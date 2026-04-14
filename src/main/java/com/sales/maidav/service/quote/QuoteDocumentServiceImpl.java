@@ -23,10 +23,15 @@ import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.repository.product.ProductRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -39,10 +44,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import javax.imageio.ImageIO;
 
 @Service
 @RequiredArgsConstructor
 public class QuoteDocumentServiceImpl implements QuoteDocumentService {
+
+    private static final Logger log = LoggerFactory.getLogger(QuoteDocumentServiceImpl.class);
+    private static final int PDF_IMAGE_CANVAS_SIZE = 320;
 
     private static final Color INK = new Color(20, 44, 68);
     private static final Color BRAND = new Color(15, 94, 118);
@@ -254,18 +263,18 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
         document.add(title);
 
         for (QuotePdfItem item : items) {
-            PdfPTable table = new PdfPTable(new float[]{0.55f, 1.65f, 0.8f});
+            PdfPTable table = new PdfPTable(new float[]{0.75f, 1.45f, 0.8f});
             table.setWidthPercentage(100);
             table.setSpacingAfter(10);
 
             PdfPCell imageCell = new PdfPCell();
             imageCell.setBackgroundColor(PAPER);
             imageCell.setBorderColor(SOFT);
-            imageCell.setPadding(10);
+            imageCell.setPadding(8);
             imageCell.setHorizontalAlignment(Element.ALIGN_CENTER);
             imageCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-            imageCell.setFixedHeight(90);
-            Image image = loadImage(item.imagePath(), 68, 68);
+            imageCell.setFixedHeight(108);
+            Image image = loadImage(item.imagePath(), 86, 86);
             if (image != null) {
                 image.setAlignment(Element.ALIGN_CENTER);
                 imageCell.addElement(image);
@@ -341,12 +350,52 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
 
     private Image loadImage(String publicPath, float maxWidth, float maxHeight) throws BadElementException, IOException {
         Path file = resolvePublicAsset(publicPath);
-        if (file == null || !Files.exists(file)) {
+        if (file == null || !Files.isRegularFile(file)) {
             return null;
         }
-        Image image = Image.getInstance(Files.readAllBytes(file));
-        image.scaleToFit(maxWidth, maxHeight);
-        return image;
+        try {
+            Image image = Image.getInstance(prepareImageBytes(file));
+            image.scaleToFit(maxWidth, maxHeight);
+            return image;
+        } catch (BadElementException | IOException ex) {
+            log.warn("Skipping unsupported quote image {}: {}", publicPath, ex.getMessage());
+            return null;
+        }
+    }
+
+    private byte[] prepareImageBytes(Path file) throws IOException {
+        BufferedImage source = ImageIO.read(file.toFile());
+        if (source == null) {
+            return Files.readAllBytes(file);
+        }
+
+        BufferedImage canvas = new BufferedImage(PDF_IMAGE_CANVAS_SIZE, PDF_IMAGE_CANVAS_SIZE, BufferedImage.TYPE_INT_RGB);
+        Graphics2D graphics = canvas.createGraphics();
+        try {
+            graphics.setColor(PAPER);
+            graphics.fillRect(0, 0, PDF_IMAGE_CANVAS_SIZE, PDF_IMAGE_CANVAS_SIZE);
+            graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+            graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+            graphics.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+            double scale = Math.min(
+                    (double) PDF_IMAGE_CANVAS_SIZE / source.getWidth(),
+                    (double) PDF_IMAGE_CANVAS_SIZE / source.getHeight()
+            );
+            int drawWidth = Math.max(1, (int) Math.round(source.getWidth() * scale));
+            int drawHeight = Math.max(1, (int) Math.round(source.getHeight() * scale));
+            int x = (PDF_IMAGE_CANVAS_SIZE - drawWidth) / 2;
+            int y = (PDF_IMAGE_CANVAS_SIZE - drawHeight) / 2;
+            graphics.drawImage(source, x, y, drawWidth, drawHeight, null);
+        } finally {
+            graphics.dispose();
+        }
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        if (!ImageIO.write(canvas, "png", output)) {
+            throw new IOException("No PNG writer available for PDF image conversion");
+        }
+        return output.toByteArray();
     }
 
     private Path resolvePublicAsset(String publicPath) {
@@ -358,7 +407,9 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
             return null;
         }
         String relative = normalized.substring("/uploads/".length());
-        return Paths.get(uploadDir).toAbsolutePath().normalize().resolve(relative).normalize();
+        Path root = Paths.get(uploadDir).toAbsolutePath().normalize();
+        Path candidate = root.resolve(relative).normalize();
+        return candidate.startsWith(root) ? candidate : null;
     }
 
     private String money(BigDecimal amount) {

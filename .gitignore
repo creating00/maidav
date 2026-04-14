@@ -4,6 +4,7 @@ HELP.md
 .codex-temp/
 target/
 uploads/
+
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
