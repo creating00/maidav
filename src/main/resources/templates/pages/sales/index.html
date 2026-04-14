@@ -78,6 +78,12 @@
                        class="text-slate-700 hover:underline">
                         Ver detalle
                     </a>
+                    <a sec:authorize="hasAuthority('SALES_CREATE')"
+                       th:if="${sale.status.name() != 'VOID'}"
+                       th:href="@{/sales/{id}/edit(id=${sale.id})}"
+                       class="text-amber-600 hover:underline">
+                        Editar
+                    </a>
                     <a sec:authorize="hasAuthority('ARREARS_READ')"
                        th:if="${sale.paymentType.name() == 'CREDIT'}"
                        th:href="@{/accounts/by-sale/{id}(id=${sale.id})}"

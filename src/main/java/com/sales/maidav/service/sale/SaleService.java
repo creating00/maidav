@@ -23,6 +23,17 @@ public interface SaleService {
                     BigDecimal discountAmount,
                     Integer weeksCount,
                     List<SaleItemInput> items);
+    Sale updateSale(Long saleId,
+                    Client client,
+                    User seller,
+                    PaymentType paymentType,
+                    LocalDate saleDate,
+                    LocalDate firstDueDate,
+                    PaymentFrequency paymentFrequency,
+                    List<String> dueDays,
+                    BigDecimal discountAmount,
+                    Integer weeksCount,
+                    List<SaleItemInput> items);
     void voidSale(Long id);
     long countActive();
     long countToday();

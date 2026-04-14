@@ -7,6 +7,7 @@ import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.product.ProductRepository;
 import com.sales.maidav.repository.sale.*;
 import com.sales.maidav.repository.user.UserRepository;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -35,7 +36,9 @@ public class SaleServiceImpl implements SaleService {
     private final ProductRepository productRepository;
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
+    private final CreditPaymentRepository creditPaymentRepository;
     private final UserRepository userRepository;
+    private final EntityManager entityManager;
 
     @Override
     public List<Sale> findAll() {
@@ -166,6 +169,134 @@ public class SaleServiceImpl implements SaleService {
     }
 
     @Override
+    public Sale updateSale(Long saleId,
+                           Client client,
+                           User seller,
+                           PaymentType paymentType,
+                           LocalDate saleDate,
+                           LocalDate firstDueDate,
+                           PaymentFrequency paymentFrequency,
+                           List<String> dueDays,
+                           BigDecimal discountAmount,
+                           Integer weeksCount,
+                           List<SaleItemInput> items) {
+
+        Sale sale = findById(saleId);
+        if (sale.getStatus() == SaleStatus.VOID) {
+            throw new InvalidSaleException("No se puede editar una venta anulada");
+        }
+
+        // Validate inputs
+        if (client == null) {
+            throw new InvalidSaleException("Debe seleccionar un cliente");
+        }
+        if (seller == null) {
+            throw new InvalidSaleException("Debe asignar un vendedor");
+        }
+        if (paymentType == null) {
+            throw new InvalidSaleException("Debe seleccionar la forma de pago");
+        }
+        if (items == null || items.isEmpty()) {
+            throw new InvalidSaleException("Debe agregar al menos un producto");
+        }
+        if (paymentType == PaymentType.CREDIT) {
+            if (firstDueDate == null) {
+                throw new InvalidSaleException("Debe seleccionar la fecha de primer vencimiento");
+            }
+            if (paymentFrequency == null) {
+                throw new InvalidSaleException("Debe seleccionar la frecuencia de pago");
+            }
+            if (dueDays == null || dueDays.isEmpty()) {
+                throw new InvalidSaleException("Debe seleccionar el dia de vencimiento");
+            }
+        }
+
+        BigDecimal discount = discountAmount == null ? BigDecimal.ZERO : discountAmount;
+        if (discount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidSaleException("El descuento no puede ser negativo");
+        }
+
+        // Restore stock from old items
+        List<SaleItem> oldItems = saleItemRepository.findBySale_IdOrderByIdAsc(saleId);
+        for (SaleItem oldItem : oldItems) {
+            Product product = oldItem.getProduct();
+            product.setStockAvailable(product.getStockAvailable() + oldItem.getQuantity());
+            productRepository.save(product);
+        }
+
+        // Delete old items
+        saleItemRepository.deleteAll(oldItems);
+
+        // If it was a credit sale, delete the associated credit account and installments
+        if (sale.getPaymentType() == PaymentType.CREDIT) {
+            deleteCreditAccountForSale(sale);
+        }
+
+        // Build new items
+        List<SaleItem> saleItems = new ArrayList<>();
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (SaleItemInput input : items) {
+            if (input.getProductId() == null || input.getQuantity() == null || input.getUnitPrice() == null) {
+                throw new InvalidSaleException("Producto, cantidad y precio son obligatorios");
+            }
+            if (input.getQuantity() <= 0) {
+                throw new InvalidSaleException("Cantidad invalida");
+            }
+
+            Product product = productRepository.findById(input.getProductId())
+                    .orElseThrow(() -> new InvalidSaleException("Producto no encontrado"));
+
+            if (product.getStockAvailable() < input.getQuantity()) {
+                throw new InvalidSaleException("Stock insuficiente para " + product.getDescription());
+            }
+
+            BigDecimal lineTotal = input.getUnitPrice()
+                    .multiply(BigDecimal.valueOf(input.getQuantity()))
+                    .setScale(2, RoundingMode.HALF_UP);
+
+            SaleItem item = new SaleItem();
+            item.setProduct(product);
+            item.setQuantity(input.getQuantity());
+            item.setUnitPrice(input.getUnitPrice());
+            item.setLineTotal(lineTotal);
+            saleItems.add(item);
+            total = total.add(lineTotal);
+        }
+
+        total = total.subtract(discount);
+        if (total.compareTo(BigDecimal.ZERO) < 0) {
+            throw new InvalidSaleException("El total no puede ser negativo");
+        }
+
+        // Update sale fields
+        sale.setClient(client);
+        sale.setSeller(seller);
+        sale.setPaymentType(paymentType);
+        sale.setDiscountAmount(discount.setScale(2, RoundingMode.HALF_UP));
+        sale.setTotalAmount(total.setScale(2, RoundingMode.HALF_UP));
+        sale.setSaleDate(saleDate == null ? LocalDateTime.now() : saleDate.atStartOfDay());
+        sale.setFirstDueDate(firstDueDate);
+        saleRepository.save(sale);
+
+        // Save new items and deduct stock
+        for (SaleItem item : saleItems) {
+            item.setSale(sale);
+            saleItemRepository.save(item);
+            Product product = item.getProduct();
+            product.setStockAvailable(product.getStockAvailable() - item.getQuantity());
+            productRepository.save(product);
+        }
+
+        // Create credit account if needed
+        if (paymentType == PaymentType.CREDIT) {
+            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount);
+        }
+
+        return sale;
+    }
+
+    @Override
     public void voidSale(Long id) {
         Sale sale = findById(id);
         if (sale.getStatus() == SaleStatus.VOID) {
@@ -206,6 +337,30 @@ public class SaleServiceImpl implements SaleService {
                 installment.setVoidReason("Venta anulada");
             }
         }
+    }
+
+    private void deleteCreditAccountForSale(Sale sale) {
+        if (sale == null || sale.getId() == null || sale.getPaymentType() != PaymentType.CREDIT) {
+            return;
+        }
+        CreditAccount account = creditAccountRepository.findBySale_Id(sale.getId()).orElse(null);
+        if (account == null) {
+            return;
+        }
+
+        // Delete payments first (FK -> credit_accounts)
+        List<CreditPayment> payments = creditPaymentRepository.findByAccount_IdOrderByPaidAtDescIdDesc(account.getId());
+        creditPaymentRepository.deleteAll(payments);
+
+        // Then installments (FK -> credit_accounts)
+        List<CreditInstallment> installments =
+                creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId());
+        creditInstallmentRepository.deleteAll(installments);
+
+        creditAccountRepository.delete(account);
+
+        // Force flush so DELETEs execute before the new INSERT
+        entityManager.flush();
     }
 
     @Override
