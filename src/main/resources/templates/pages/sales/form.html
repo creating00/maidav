@@ -623,9 +623,7 @@
                 combobox.classList.toggle('product-combobox--dropup', shouldDropUp);
                 if (isMobileViewport) {
                     const horizontalInset = window.matchMedia('(max-width: 480px)').matches ? 8 : 10;
-                    const topInset = keyboardLikelyOpen
-                        ? Math.max(10, (window.visualViewport ? window.visualViewport.offsetTop : 0) + 10)
-                        : null;
+                    const topInset = keyboardLikelyOpen ? 10 : null;
                     panel.style.position = 'fixed';
                     panel.style.left = horizontalInset + 'px';
                     panel.style.right = horizontalInset + 'px';
@@ -650,6 +648,9 @@
 
             function ensureProductComboboxVisible(row) {
                 if (!row) {
+                    return;
+                }
+                if (isCompactMobileViewport()) {
                     return;
                 }
                 const input = row.querySelector('.product-combobox__input');
