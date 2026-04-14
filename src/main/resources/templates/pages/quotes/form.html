@@ -103,11 +103,36 @@
                 </button>
 
                 <div id="catalogPanel" class="mt-4 hidden rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                    <input type="search" id="catalogSearch" placeholder="Buscar por codigo o descripcion"
-                           class="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm">
+                    <div class="flex flex-col gap-3 md:flex-row">
+                        <input type="search" id="catalogSearch" placeholder="Buscar por codigo o descripcion"
+                               class="min-w-0 flex-1 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm">
+                        <div class="flex gap-3 md:w-auto">
+                            <button type="button" id="catalogScannerStartBtn"
+                                    class="flex-1 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-800 hover:bg-sky-100 md:flex-none">
+                                Escanear con camara
+                            </button>
+                            <button type="button" id="catalogScannerStopBtn"
+                                    class="hidden flex-1 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 md:flex-none">
+                                Detener
+                            </button>
+                        </div>
+                    </div>
+                    <div id="catalogScannerPanel" class="mt-3 hidden rounded-[1.6rem] border border-sky-200 bg-sky-50/80 p-4">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <p class="quote-mono text-[11px] uppercase tracking-[0.22em] text-sky-700">Escaner</p>
+                                <p id="catalogScannerStatus" class="mt-2 text-sm text-sky-800">
+                                    Preparando camara...
+                                </p>
+                            </div>
+                        </div>
+                        <video id="catalogScannerVideo"
+                               class="mt-3 hidden aspect-video w-full rounded-[1.35rem] border border-sky-200 bg-slate-950 object-cover"
+                               autoplay playsinline muted></video>
+                    </div>
                     <div id="catalogList" class="mt-4 grid gap-3 md:grid-cols-2">
                         <button type="button" th:each="product : ${products}" class="catalog-item quote-product-card flex w-full items-center gap-4 rounded-[1.6rem] p-3 text-left"
-                                th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + product.description}">
+                                th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-barcode=${product.barcode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + (product.barcode != null ? product.barcode : '') + ' ' + product.description}">
                             <span class="quote-image-frame flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.35rem]">
                                 <img th:if="${product.imagePath}" th:src="${product.imagePath}" alt="Producto" class="h-full w-full object-cover"/>
                                 <span th:if="${product.imagePath == null}" class="quote-title text-xl font-bold text-[var(--quote-copper)]">+</span>
@@ -217,6 +242,19 @@
             const round50 = value => value > 0 ? Math.ceil(value / 50) * 50 : 0;
             const csrfHeader = quoteStudio?.dataset.csrfHeader;
             const csrfToken = quoteStudio?.dataset.csrfToken;
+            const catalogPanel = $('catalogPanel');
+            const catalogSearch = $('catalogSearch');
+            const catalogScannerPanel = $('catalogScannerPanel');
+            const catalogScannerVideo = $('catalogScannerVideo');
+            const catalogScannerStatus = $('catalogScannerStatus');
+            const catalogScannerStartBtn = $('catalogScannerStartBtn');
+            const catalogScannerStopBtn = $('catalogScannerStopBtn');
+            let catalogScannerStream = null;
+            let catalogScannerFrame = null;
+            let catalogBarcodeDetector = null;
+            let catalogScannerActive = false;
+            let lastCatalogScan = '';
+            let lastCatalogScanAt = 0;
 
             function escapeXml(value) {
                 return String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -253,6 +291,19 @@
                 if (!el) return;
                 el.textContent = message || '';
                 el.className = 'min-h-5 text-center text-sm ' + (tone === 'error' ? 'text-rose-600' : tone === 'success' ? 'text-emerald-700' : 'text-slate-500');
+            }
+
+            function normalizeTerm(value) {
+                return String(value || '').trim().toLowerCase();
+            }
+
+            function setCatalogScannerStatus(message, isError) {
+                if (!catalogScannerStatus) {
+                    return;
+                }
+                catalogScannerStatus.textContent = message || '';
+                catalogScannerStatus.classList.toggle('text-rose-600', Boolean(isError));
+                catalogScannerStatus.classList.toggle('text-sky-800', !isError);
             }
 
             function initials(value) {
@@ -370,6 +421,179 @@
                     box.classList.remove('hidden');
                 } else {
                     status(message, 'error');
+                }
+            }
+
+            function applyCatalogFilter(term) {
+                const normalized = normalizeTerm(term);
+                catalogItems.forEach(button => {
+                    const searchText = normalizeTerm(button.dataset.search);
+                    button.classList.toggle('hidden', Boolean(normalized) && !searchText.includes(normalized));
+                });
+            }
+
+            function findCatalogExactMatch(term) {
+                const normalized = normalizeTerm(term);
+                if (!normalized) {
+                    return null;
+                }
+                return catalogItems.find(button =>
+                    normalizeTerm(button.dataset.barcode) === normalized ||
+                    normalizeTerm(button.dataset.code) === normalized
+                ) || null;
+            }
+
+            function addCatalogProduct(productId, options) {
+                const settings = options || {};
+                const normalizedId = String(productId || '');
+                if (!catalog.has(normalizedId)) {
+                    return false;
+                }
+                const existing = cart.find(item => item.productId === normalizedId);
+                existing ? existing.quantity += 1 : cart.push({productId: normalizedId, quantity: 1});
+                renderCart();
+                if (settings.closeCatalog && catalogPanel) {
+                    catalogPanel.classList.add('hidden');
+                }
+                status(settings.statusMessage || 'Producto agregado al presupuesto.', 'success');
+                return true;
+            }
+
+            function stopCatalogScanner(options) {
+                const settings = options || {};
+                catalogScannerActive = false;
+                if (catalogScannerFrame) {
+                    cancelAnimationFrame(catalogScannerFrame);
+                    catalogScannerFrame = null;
+                }
+                if (catalogScannerVideo) {
+                    catalogScannerVideo.pause();
+                    catalogScannerVideo.classList.add('hidden');
+                    catalogScannerVideo.srcObject = null;
+                }
+                if (catalogScannerStream) {
+                    catalogScannerStream.getTracks().forEach(track => track.stop());
+                    catalogScannerStream = null;
+                }
+                if (!settings.keepPanel && catalogScannerPanel) {
+                    catalogScannerPanel.classList.add('hidden');
+                }
+                if (catalogScannerStartBtn) {
+                    catalogScannerStartBtn.classList.remove('hidden');
+                }
+                if (catalogScannerStopBtn) {
+                    catalogScannerStopBtn.classList.add('hidden');
+                }
+                if (!settings.preserveStatus) {
+                    setCatalogScannerStatus('Preparando camara...', false);
+                }
+            }
+
+            function handleCatalogScan(rawValue) {
+                const scannedValue = String(rawValue || '').trim();
+                if (!scannedValue) {
+                    return;
+                }
+                if (catalogSearch) {
+                    catalogSearch.value = scannedValue;
+                }
+                applyCatalogFilter(scannedValue);
+                const matchedButton = findCatalogExactMatch(scannedValue);
+                if (!matchedButton) {
+                    if (catalogScannerPanel) {
+                        catalogScannerPanel.classList.remove('hidden');
+                    }
+                    setCatalogScannerStatus('Codigo leido. No hubo coincidencia exacta. Revise los resultados del catalogo.', true);
+                    status('Codigo escaneado. Revise los resultados del catalogo.', null);
+                    return;
+                }
+                stopCatalogScanner();
+                addCatalogProduct(matchedButton.dataset.productId, {
+                    closeCatalog: false,
+                    statusMessage: 'Producto agregado al presupuesto desde camara.'
+                });
+            }
+
+            function scanCatalogFrame() {
+                if (!catalogScannerActive || !catalogBarcodeDetector || !catalogScannerVideo) {
+                    return;
+                }
+                catalogBarcodeDetector.detect(catalogScannerVideo)
+                    .then(codes => {
+                        if (!catalogScannerActive || !Array.isArray(codes) || !codes.length) {
+                            return;
+                        }
+                        const rawValue = String(codes[0].rawValue || '').trim();
+                        if (!rawValue) {
+                            return;
+                        }
+                        const now = Date.now();
+                        if (rawValue === lastCatalogScan && (now - lastCatalogScanAt) < 2500) {
+                            return;
+                        }
+                        lastCatalogScan = rawValue;
+                        lastCatalogScanAt = now;
+                        handleCatalogScan(rawValue);
+                    })
+                    .catch(() => {
+                        setCatalogScannerStatus('No se pudo leer el codigo. Acerque mas la camara.', true);
+                    })
+                    .finally(() => {
+                        if (catalogScannerActive) {
+                            catalogScannerFrame = requestAnimationFrame(scanCatalogFrame);
+                        }
+                    });
+            }
+
+            async function startCatalogScanner() {
+                if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.BarcodeDetector) {
+                    if (catalogScannerPanel) {
+                        catalogScannerPanel.classList.remove('hidden');
+                    }
+                    setCatalogScannerStatus('La camara no esta disponible en este navegador o contexto.', true);
+                    status('La camara no esta disponible en este navegador o contexto.', 'error');
+                    return;
+                }
+
+                try {
+                    if (!catalogBarcodeDetector) {
+                        catalogBarcodeDetector = new window.BarcodeDetector({
+                            formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e']
+                        });
+                    }
+                    catalogScannerStream = await navigator.mediaDevices.getUserMedia({
+                        video: {
+                            facingMode: {ideal: 'environment'}
+                        },
+                        audio: false
+                    });
+                    if (catalogScannerPanel) {
+                        catalogScannerPanel.classList.remove('hidden');
+                    }
+                    if (catalogScannerVideo) {
+                        catalogScannerVideo.srcObject = catalogScannerStream;
+                        catalogScannerVideo.classList.remove('hidden');
+                        await catalogScannerVideo.play();
+                    }
+                    catalogScannerActive = true;
+                    lastCatalogScan = '';
+                    lastCatalogScanAt = 0;
+                    if (catalogScannerStartBtn) {
+                        catalogScannerStartBtn.classList.add('hidden');
+                    }
+                    if (catalogScannerStopBtn) {
+                        catalogScannerStopBtn.classList.remove('hidden');
+                    }
+                    setCatalogScannerStatus('Apunte la camara al codigo del producto para buscarlo en el catalogo.', false);
+                    status('Escaner listo para buscar productos en el catalogo.', null);
+                    scanCatalogFrame();
+                } catch (_) {
+                    stopCatalogScanner({preserveStatus: true});
+                    if (catalogScannerPanel) {
+                        catalogScannerPanel.classList.remove('hidden');
+                    }
+                    setCatalogScannerStatus('No se pudo abrir la camara. Revise permisos del navegador.', true);
+                    status('No se pudo abrir la camara. Revise permisos del navegador.', 'error');
                 }
             }
 
@@ -657,24 +881,53 @@
                     productId: id,
                     description: button.dataset.description || '',
                     code: button.dataset.code || '',
+                    barcode: button.dataset.barcode || '',
                     image: button.dataset.image || '',
                     retail: parse(button.dataset.retail),
                     wholesale: parse(button.dataset.wholesale),
                     stock: button.dataset.stock || '0'
                 });
                 button.addEventListener('click', () => {
-                    const existing = cart.find(item => item.productId === id);
-                    existing ? existing.quantity += 1 : cart.push({productId: id, quantity: 1});
-                    renderCart();
-                    $('catalogPanel').classList.add('hidden');
-                    status('Producto agregado al presupuesto.', 'success');
+                    addCatalogProduct(id, {closeCatalog: true});
+                    stopCatalogScanner();
                 });
             });
 
-            $('toggleCatalogBtn')?.addEventListener('click', () => $('catalogPanel').classList.toggle('hidden'));
-            $('catalogSearch')?.addEventListener('input', e => {
-                const term = e.target.value.trim().toLowerCase();
-                catalogItems.forEach(button => button.classList.toggle('hidden', !!term && !(button.dataset.search || '').toLowerCase().includes(term)));
+            $('toggleCatalogBtn')?.addEventListener('click', () => {
+                catalogPanel?.classList.toggle('hidden');
+                if (catalogPanel?.classList.contains('hidden')) {
+                    stopCatalogScanner();
+                    return;
+                }
+                if (catalogSearch) {
+                    catalogSearch.focus();
+                }
+            });
+            catalogSearch?.addEventListener('input', e => {
+                applyCatalogFilter(e.target.value);
+            });
+            catalogSearch?.addEventListener('keydown', event => {
+                if (event.key !== 'Enter') {
+                    return;
+                }
+                event.preventDefault();
+                const matchedButton = findCatalogExactMatch(event.target.value);
+                if (!matchedButton) {
+                    status('No hubo coincidencia exacta por codigo o barcode.', 'error');
+                    return;
+                }
+                addCatalogProduct(matchedButton.dataset.productId, {closeCatalog: true});
+                stopCatalogScanner();
+            });
+            catalogScannerStartBtn?.addEventListener('click', () => {
+                if (catalogPanel?.classList.contains('hidden')) {
+                    catalogPanel.classList.remove('hidden');
+                }
+                startCatalogScanner();
+            });
+            catalogScannerStopBtn?.addEventListener('click', () => {
+                stopCatalogScanner();
+                status('Escaner detenido.', null);
             });
             $('priceMode')?.addEventListener('change', renderCart);
             $('shareQuoteBtn')?.addEventListener('click', () => shareQuote().catch(error => {
@@ -692,6 +945,7 @@
                     showError(error);
                     return;
                 }
+                stopCatalogScanner();
                 syncHiddenInputs();
             });
 
