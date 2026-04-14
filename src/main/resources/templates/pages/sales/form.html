@@ -595,6 +595,7 @@
                 const combobox = row.querySelector('.product-combobox');
                 const input = row.querySelector('.product-combobox__input');
                 const panel = row.querySelector('.product-combobox__panel');
+                const sheetHead = row.querySelector('.product-combobox__sheet-head');
                 const optionsContainer = row.querySelector('.product-combobox__options');
                 const emptyState = row.querySelector('.product-combobox__empty');
                 if (!combobox || !input || !panel || !optionsContainer) {
@@ -603,9 +604,13 @@
 
                 const isMobileViewport = isCompactMobileViewport();
                 const viewportHeight = currentViewportHeight();
+                const fullViewportHeight = window.innerHeight || viewportHeight;
                 const rect = input.getBoundingClientRect();
                 const margin = isMobileViewport ? 12 : 16;
-                const mobilePanelHeight = Math.max(220, Math.min(Math.floor(viewportHeight * 0.5), 320));
+                const keyboardLikelyOpen = isMobileViewport && (fullViewportHeight - viewportHeight) > 140;
+                const mobilePanelHeight = keyboardLikelyOpen
+                    ? Math.max(240, Math.floor(viewportHeight - (margin * 2)))
+                    : Math.max(260, Math.min(Math.floor(viewportHeight * 0.62), 420));
                 const spaceBelow = Math.max(140, Math.floor(viewportHeight - rect.bottom - margin));
                 const spaceAbove = Math.max(140, Math.floor(rect.top - margin));
                 const reservedEmptyHeight = emptyState && !emptyState.classList.contains('hidden') ? 64 : 0;
@@ -617,12 +622,16 @@
 
                 combobox.classList.toggle('product-combobox--dropup', shouldDropUp);
                 if (isMobileViewport) {
+                    const horizontalInset = window.matchMedia('(max-width: 480px)').matches ? 8 : 10;
+                    const topInset = keyboardLikelyOpen
+                        ? Math.max(10, (window.visualViewport ? window.visualViewport.offsetTop : 0) + 10)
+                        : null;
                     panel.style.position = 'fixed';
-                    panel.style.left = '10px';
-                    panel.style.right = '10px';
-                    panel.style.top = '50%';
+                    panel.style.left = horizontalInset + 'px';
+                    panel.style.right = horizontalInset + 'px';
+                    panel.style.top = keyboardLikelyOpen ? (topInset + 'px') : '50%';
                     panel.style.bottom = 'auto';
-                    panel.style.transform = 'translateY(-50%)';
+                    panel.style.transform = keyboardLikelyOpen ? '' : 'translateY(-50%)';
                 } else {
                     panel.style.position = 'absolute';
                     panel.style.left = '0';
@@ -632,7 +641,11 @@
                     panel.style.transform = '';
                 }
                 panel.style.maxHeight = (maxHeight + reservedEmptyHeight) + 'px';
-                optionsContainer.style.maxHeight = maxHeight + 'px';
+                const panelStyles = window.getComputedStyle(panel);
+                const panelPaddingY = (parseFloat(panelStyles.paddingTop) || 0) + (parseFloat(panelStyles.paddingBottom) || 0);
+                const sheetHeadHeight = sheetHead ? sheetHead.offsetHeight : 0;
+                const optionsMaxHeight = Math.max(120, maxHeight - panelPaddingY - sheetHeadHeight - reservedEmptyHeight - (isMobileViewport ? 4 : 0));
+                optionsContainer.style.maxHeight = optionsMaxHeight + 'px';
             }
 
             function ensureProductComboboxVisible(row) {
