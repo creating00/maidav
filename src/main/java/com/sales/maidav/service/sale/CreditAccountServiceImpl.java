@@ -352,13 +352,13 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         }
 
         List<CreditInstallment> activeInstallments = installments.stream()
-                .filter(installment -> !installment.isVoided() && installment.getStatus() != InstallmentStatus.VOID)
+                .filter(this::isActiveInstallment)
                 .toList();
         for (CreditPayment payment : payments) {
             if (payment.isReversal()) {
                 // FIX ANULACION CUOTA
                 // REVERSION IMPACTO ECONOMICO
-                applyReversalToInstallments(activeInstallments, payment);
+                applyReversalToInstallments(activeInstallments, installments, payment);
                 if (payment.getAllocationSummary() == null || payment.getAllocationSummary().isBlank()) {
                     payment.setAllocationSummary("Reversion de anulacion");
                 }
@@ -412,13 +412,22 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         List<CreditInstallment> replayInstallments = creditInstallmentRepository
                 .findByAccount_IdOrderByInstallmentNumber(account.getId())
                 .stream()
-                .filter(installment -> !installment.isVoided() && installment.getStatus() != InstallmentStatus.VOID)
                 .map(this::copyInstallmentForReplay)
                 .toList();
         List<CreditPayment> payments = creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(account.getId());
         List<PaymentAllocation> allocations = new ArrayList<>();
+        List<CreditInstallment> activeReplayInstallments = replayInstallments.stream()
+                .filter(this::isActiveInstallment)
+                .toList();
 
         for (CreditInstallment installment : replayInstallments) {
+            if (installment.isVoided() || installment.getStatus() == InstallmentStatus.VOID) {
+                installment.setVoided(true);
+                installment.setStatus(InstallmentStatus.VOID);
+                installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                installment.setPaidAt(null);
+                continue;
+            }
             installment.setPaidAmount(BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
             installment.setStatus(InstallmentStatus.PENDING);
             installment.setPaidAt(null);
@@ -426,12 +435,17 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
         for (CreditPayment payment : payments) {
             if (payment.isReversal()) {
-                applyReversalToInstallments(replayInstallments, payment);
+                CreditInstallment reversalTarget = applyReversalToInstallments(
+                        activeReplayInstallments,
+                        replayInstallments,
+                        payment
+                );
+                applyReversalToAllocations(allocations, payment, reversalTarget);
                 continue;
             }
             applyPaymentToInstallments(
                     account,
-                    replayInstallments,
+                    activeReplayInstallments,
                     payment.getAmount(),
                     payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod(),
                     payment.getPaidAt(),
@@ -474,15 +488,18 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         return reversalPayments;
     }
 
-    private void applyReversalToInstallments(List<CreditInstallment> installments, CreditPayment payment) {
+    private CreditInstallment applyReversalToInstallments(List<CreditInstallment> activeInstallments,
+                                                          List<CreditInstallment> allInstallments,
+                                                          CreditPayment payment) {
         Long targetInstallmentId = payment.getTargetInstallmentId();
         if (targetInstallmentId == null) {
             throw new InvalidSaleException("La reversa no tiene cuota de destino");
         }
-        CreditInstallment targetInstallment = installments.stream()
-                .filter(installment -> targetInstallmentId.equals(installment.getId()))
-                .findFirst()
-                .orElseThrow(() -> new InvalidSaleException("No se encontro la cuota restaurada para recalcular la anulacion"));
+        CreditInstallment targetInstallment = resolveReversalTargetInstallment(
+                activeInstallments,
+                allInstallments,
+                targetInstallmentId
+        );
 
         BigDecimal currentPaid = targetInstallment.getPaidAmount() == null
                 ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
@@ -505,6 +522,115 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             targetInstallment.setStatus(InstallmentStatus.PARTIAL);
             targetInstallment.setPaidAt(null);
         }
+        return targetInstallment;
+    }
+
+    private CreditInstallment resolveReversalTargetInstallment(List<CreditInstallment> activeInstallments,
+                                                               List<CreditInstallment> allInstallments,
+                                                               Long targetInstallmentId) {
+        for (CreditInstallment installment : activeInstallments) {
+            if (targetInstallmentId.equals(installment.getId())) {
+                return installment;
+            }
+        }
+
+        Map<Long, List<CreditInstallment>> restoredChildrenByInstallmentId = new HashMap<>();
+        for (CreditInstallment installment : allInstallments) {
+            Long restoredFromInstallmentId = installment.getRestoredFromInstallmentId();
+            if (restoredFromInstallmentId == null) {
+                continue;
+            }
+            restoredChildrenByInstallmentId
+                    .computeIfAbsent(restoredFromInstallmentId, key -> new ArrayList<>())
+                    .add(installment);
+        }
+
+        Long currentInstallmentId = targetInstallmentId;
+        while (currentInstallmentId != null) {
+            List<CreditInstallment> restoredChildren = restoredChildrenByInstallmentId.get(currentInstallmentId);
+            if (restoredChildren == null || restoredChildren.isEmpty()) {
+                break;
+            }
+
+            CreditInstallment latestChild = null;
+            for (CreditInstallment restoredChild : restoredChildren) {
+                if (isActiveInstallment(restoredChild)) {
+                    for (CreditInstallment activeInstallment : activeInstallments) {
+                        if (restoredChild.getId().equals(activeInstallment.getId())) {
+                            return activeInstallment;
+                        }
+                    }
+                }
+                if (latestChild == null || compareInstallmentIds(restoredChild.getId(), latestChild.getId()) > 0) {
+                    latestChild = restoredChild;
+                }
+            }
+
+            currentInstallmentId = latestChild != null ? latestChild.getId() : null;
+        }
+
+        throw new InvalidSaleException("No se encontro la cuota restaurada para recalcular la anulacion");
+    }
+
+    private void applyReversalToAllocations(List<PaymentAllocation> allocations,
+                                            CreditPayment payment,
+                                            CreditInstallment targetInstallment) {
+        Long reversalOfPaymentId = payment.getReversalOfPaymentId();
+        if (reversalOfPaymentId == null || targetInstallment == null) {
+            return;
+        }
+
+        BigDecimal remainingCollected = payment.getAmount() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : payment.getAmount().abs().setScale(2, RoundingMode.HALF_UP);
+        BigDecimal remainingImpact = payment.getImpactAmount() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : payment.getImpactAmount().abs().setScale(2, RoundingMode.HALF_UP);
+
+        for (int index = 0; index < allocations.size(); index++) {
+            PaymentAllocation allocation = allocations.get(index);
+            if (!reversalOfPaymentId.equals(allocation.paymentId())
+                    || !targetInstallment.getId().equals(allocation.installmentId())) {
+                continue;
+            }
+            if (remainingCollected.compareTo(BigDecimal.ZERO) <= 0
+                    && remainingImpact.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+
+            BigDecimal collectedToReverse = allocation.collectedAmount().min(remainingCollected).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal impactToReverse = allocation.impactAmount().min(remainingImpact).setScale(2, RoundingMode.HALF_UP);
+            allocations.set(
+                    index,
+                    new PaymentAllocation(
+                            allocation.paymentId(),
+                            allocation.installmentId(),
+                            allocation.installmentNumber(),
+                            allocation.paymentMethod(),
+                            allocation.collectedAmount().subtract(collectedToReverse).setScale(2, RoundingMode.HALF_UP),
+                            allocation.impactAmount().subtract(impactToReverse).setScale(2, RoundingMode.HALF_UP)
+                    )
+            );
+            remainingCollected = remainingCollected.subtract(collectedToReverse).setScale(2, RoundingMode.HALF_UP);
+            remainingImpact = remainingImpact.subtract(impactToReverse).setScale(2, RoundingMode.HALF_UP);
+        }
+    }
+
+    private int compareInstallmentIds(Long leftId, Long rightId) {
+        if (leftId == null && rightId == null) {
+            return 0;
+        }
+        if (leftId == null) {
+            return -1;
+        }
+        if (rightId == null) {
+            return 1;
+        }
+        return leftId.compareTo(rightId);
+    }
+
+    private boolean isActiveInstallment(CreditInstallment installment) {
+        return !installment.isVoided() && installment.getStatus() != InstallmentStatus.VOID;
     }
 
     private CreditInstallment copyInstallmentForReplay(CreditInstallment source) {

@@ -26,8 +26,11 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -182,6 +185,48 @@ class CreditAccountServiceImplTest {
         assertThat(payment.getAllocationSummary()).contains("valor financiado");
     }
 
+    @Test
+    void voidingRestoredInstallmentKeepsUsingTheLatestActiveRestoration() {
+        CreditAccount account = account(5L, PaymentFrequency.WEEKLY, "200.00");
+        CreditInstallment originalInstallment = installment(account, 51L, 1, "100.00", LocalDate.now());
+        CreditInstallment secondInstallment = installment(account, 52L, 2, "100.00", LocalDate.now().plusWeeks(1));
+        List<CreditInstallment> installments = new ArrayList<>(List.of(originalInstallment, secondInstallment));
+        List<CreditPayment> payments = new ArrayList<>();
+
+        mockStatefulAccount(account, installments, payments, new BigDecimal("1.20"));
+
+        service.registerPayment(
+                5L,
+                new BigDecimal("100.00"),
+                List.of(51L),
+                "tester",
+                PaymentCollectionMethod.BANK,
+                null
+        );
+
+        service.voidInstallment(5L, 51L, "tester", "primera anulacion");
+
+        CreditInstallment firstRestoredInstallment = installments.stream()
+                .filter(installment -> Long.valueOf(51L).equals(installment.getRestoredFromInstallmentId()))
+                .filter(installment -> !installment.isVoided())
+                .findFirst()
+                .orElseThrow();
+
+        service.voidInstallment(5L, firstRestoredInstallment.getId(), "tester", "segunda anulacion");
+
+        CreditInstallment latestRestoredInstallment = installments.stream()
+                .filter(installment -> firstRestoredInstallment.getId().equals(installment.getRestoredFromInstallmentId()))
+                .filter(installment -> !installment.isVoided())
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(latestRestoredInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
+        assertThat(latestRestoredInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
+        assertThat(account.getTotalAmount()).isEqualByComparingTo("200.00");
+        assertThat(account.getBalance()).isEqualByComparingTo("200.00");
+        assertThat(payments).filteredOn(CreditPayment::isReversal).hasSize(1);
+    }
+
     private void mockAccount(CreditAccount account, List<CreditInstallment> installments, BigDecimal recargo) {
         CompanySettings settings = new CompanySettings();
         settings.setCalcRecargo(recargo);
@@ -190,6 +235,61 @@ class CreditAccountServiceImplTest {
         when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId())).thenReturn(installments);
         when(companySettingsService.getSettings()).thenReturn(settings);
         when(creditPaymentRepository.save(any(CreditPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    private void mockStatefulAccount(CreditAccount account,
+                                     List<CreditInstallment> installments,
+                                     List<CreditPayment> payments,
+                                     BigDecimal recargo) {
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcRecargo(recargo);
+
+        AtomicLong nextInstallmentId = new AtomicLong(
+                installments.stream()
+                        .map(CreditInstallment::getId)
+                        .filter(id -> id != null)
+                        .max(Long::compareTo)
+                        .orElse(0L) + 1
+        );
+        AtomicLong nextPaymentId = new AtomicLong(1L);
+
+        when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
+        when(creditInstallmentRepository.findById(any(Long.class))).thenAnswer(invocation -> installments.stream()
+                .filter(installment -> invocation.getArgument(0).equals(installment.getId()))
+                .findFirst());
+        when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId())).thenAnswer(invocation -> installments.stream()
+                .sorted(Comparator.comparing(CreditInstallment::getInstallmentNumber)
+                        .thenComparing(CreditInstallment::getId, Comparator.nullsLast(Long::compareTo)))
+                .toList());
+        when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> {
+            CreditInstallment installment = invocation.getArgument(0);
+            if (installment.getId() == null) {
+                installment.setId(nextInstallmentId.getAndIncrement());
+            }
+            boolean alreadyPresent = installments.stream()
+                    .anyMatch(existing -> installment.getId().equals(existing.getId()));
+            if (!alreadyPresent) {
+                installments.add(installment);
+            }
+            return installment;
+        });
+        when(creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(account.getId())).thenAnswer(invocation -> payments.stream()
+                .sorted(Comparator.comparing(CreditPayment::getPaidAt)
+                        .thenComparing(CreditPayment::getId, Comparator.nullsLast(Long::compareTo)))
+                .toList());
+        when(creditPaymentRepository.save(any(CreditPayment.class))).thenAnswer(invocation -> {
+            CreditPayment payment = invocation.getArgument(0);
+            if (payment.getId() == null) {
+                payment.setId(nextPaymentId.getAndIncrement());
+            }
+            boolean alreadyPresent = payments.stream()
+                    .anyMatch(existing -> payment.getId().equals(existing.getId()));
+            if (!alreadyPresent) {
+                payments.add(payment);
+            }
+            return payment;
+        });
+        when(companySettingsService.getSettings()).thenReturn(settings);
     }
 
     private CreditAccount account(Long id, PaymentFrequency paymentFrequency, String totalAmount) {
