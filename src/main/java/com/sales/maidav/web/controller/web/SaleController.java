@@ -6,6 +6,7 @@ import com.sales.maidav.model.sale.PaymentFrequency;
 import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
+import com.sales.maidav.model.sale.SaleStatus;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
@@ -133,6 +134,104 @@ public class SaleController {
         return "pages/sales/detail";
     }
 
+    @GetMapping("/{id}/edit")
+    @PreAuthorize("hasAuthority('SALES_CREATE')")
+    public String editForm(@PathVariable Long id, Authentication authentication, Model model) {
+        Sale sale = saleService.findById(id);
+        if (sale.getStatus() == SaleStatus.VOID) {
+            model.addAttribute("formError", "No se puede editar una venta anulada");
+            return "redirect:/sales/" + id;
+        }
+        List<SaleItem> items = saleItemRepository.findBySale_IdOrderByIdAsc(id);
+        model.addAttribute("sale", sale);
+        model.addAttribute("existingItems", items);
+        model.addAttribute("clients", clientService.findAll());
+        model.addAttribute("products", productService.findAll());
+        model.addAttribute("calculatorConfig", buildCalculatorConfig());
+        boolean admin = isAdmin(authentication);
+        model.addAttribute("isAdmin", admin);
+        model.addAttribute("sellers", userService.findAll());
+        model.addAttribute("editing", true);
+
+        // Pre-compute form values for the template
+        model.addAttribute("formSaleDate", sale.getSaleDate() != null
+                ? sale.getSaleDate().toLocalDate().toString()
+                : LocalDate.now().toString());
+        model.addAttribute("formFirstDueDate", sale.getFirstDueDate() != null
+                ? sale.getFirstDueDate().toString()
+                : "");
+        model.addAttribute("formDiscountAmount", sale.getDiscountAmount() != null
+                ? sale.getDiscountAmount()
+                : BigDecimal.ZERO);
+        model.addAttribute("formPaymentType", sale.getPaymentType());
+        model.addAttribute("formSellerId", sale.getSeller() != null ? sale.getSeller().getId() : null);
+        model.addAttribute("formClientId", sale.getClient() != null ? sale.getClient().getId() : null);
+
+        return "pages/sales/form";
+    }
+
+    @PostMapping("/{id}/edit")
+    @PreAuthorize("hasAuthority('SALES_CREATE')")
+    public String update(@PathVariable Long id,
+                         @RequestParam(required = false) Long clientId,
+                         @RequestParam PaymentType paymentType,
+                         @RequestParam(required = false) LocalDate saleDate,
+                         @RequestParam(required = false) LocalDate firstDueDate,
+                         @RequestParam(required = false) PaymentFrequency paymentFrequency,
+                         @RequestParam(required = false) BigDecimal discountAmount,
+                         @RequestParam(required = false) Integer weeksCount,
+                         @RequestParam(required = false) Long sellerId,
+                         @RequestParam(name = "productIds") List<Long> productIds,
+                         @RequestParam(name = "quantities") List<Integer> quantities,
+                         @RequestParam(name = "unitPrices") List<BigDecimal> unitPrices,
+                         @RequestParam(required = false) String quickClientNationalId,
+                         @RequestParam(required = false) String quickClientFirstName,
+                         @RequestParam(required = false) String quickClientLastName,
+                         @RequestParam(required = false) String quickClientPhone,
+                         @RequestParam(required = false) String quickClientAddress,
+                         @RequestParam(required = false) String draftState,
+                         Authentication authentication,
+                         Model model,
+                         RedirectAttributes redirectAttributes) {
+
+        try {
+            User loggedUser = userService.findByEmail(authentication.getName());
+            boolean admin = isAdmin(authentication);
+            User seller = resolveSeller(loggedUser, sellerId, admin);
+            Client client = resolveClient(clientId, seller, quickClientNationalId, quickClientFirstName,
+                    quickClientLastName, quickClientPhone, quickClientAddress);
+            List<SaleItemInput> items = buildItems(productIds, quantities, unitPrices);
+            BigDecimal effectiveDiscount = admin ? discountAmount : BigDecimal.ZERO;
+            List<String> dueDays = resolveDueDays(paymentFrequency, firstDueDate);
+
+            Sale sale = saleService.updateSale(id, client, seller, paymentType, saleDate, firstDueDate,
+                    paymentFrequency, dueDays, effectiveDiscount, weeksCount, items);
+            redirectAttributes.addFlashAttribute("saleNumber", sale.getSaleNumber());
+            if (paymentType == PaymentType.CREDIT) {
+                CreditAccount account = creditAccountService.findBySaleId(sale.getId());
+                redirectAttributes.addFlashAttribute("creditAccountId", account.getId());
+                redirectAttributes.addFlashAttribute("accountNumber", account.getAccountNumber());
+                redirectAttributes.addFlashAttribute(
+                        "successMessage",
+                        "Venta actualizada correctamente. ID de credito: " + account.getId() +
+                                (account.getAccountNumber() != null ? " | Numero de cuenta: " + account.getAccountNumber() : "")
+                );
+            } else {
+                redirectAttributes.addFlashAttribute("successMessage", "Venta actualizada correctamente");
+            }
+            return "redirect:/sales/" + id;
+        } catch (InvalidSaleException | DuplicateNationalIdException | InvalidNationalIdException ex) {
+            Sale failedSale = saleService.findById(id);
+            model.addAttribute("formError", ex.getMessage());
+            model.addAttribute("draftState", draftState);
+            model.addAttribute("sale", failedSale);
+            model.addAttribute("existingItems", saleItemRepository.findBySale_IdOrderByIdAsc(id));
+            model.addAttribute("editing", true);
+            addCreateFormAttributes(model, authentication);
+            return "pages/sales/form";
+        }
+    }
+
     @PostMapping
     @PreAuthorize("hasAuthority('SALES_CREATE')")
     public String create(@RequestParam(required = false) Long clientId,
@@ -204,6 +303,9 @@ public class SaleController {
     }
 
     private void addCreateFormAttributes(Model model, Authentication authentication) {
+        if (!model.containsAttribute("editing")) {
+            model.addAttribute("editing", false);
+        }
         model.addAttribute("clients", clientService.findAll());
         model.addAttribute("products", productService.findAll());
         model.addAttribute("calculatorConfig", buildCalculatorConfig());
