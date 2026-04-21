@@ -48,7 +48,8 @@
                     <div class="grid gap-3 sm:grid-cols-3">
                         <div class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
                             <p class="text-xs uppercase tracking-wide text-slate-300">Saldo total</p>
-                            <p class="text-lg font-bold text-white" th:text="${group.totalBalance}"></p>
+                            <p class="text-lg font-bold text-white"
+                               th:text="${'$ ' + #numbers.formatDecimal(group.totalBalance, 1, 'POINT', 2, 'COMMA')}"></p>
                         </div>
                         <div class="rounded-xl border border-slate-700 bg-slate-800 px-4 py-3">
                             <p class="text-xs uppercase tracking-wide text-slate-300">Creditos activos</p>
@@ -89,7 +90,7 @@
                             <div>
                                 <p class="text-xs uppercase tracking-wide text-slate-500">Cuota actual</p>
                                 <p class="text-sm font-semibold text-slate-900"
-                                   th:text="${account.currentInstallment != null ? account.currentInstallment : '-'}"></p>
+                                   th:text="${account.currentInstallment != null ? '$ ' + #numbers.formatDecimal(account.currentInstallment, 1, 'POINT', 2, 'COMMA') : '-'}"></p>
                             </div>
                             <div>
                                 <p class="text-xs uppercase tracking-wide text-slate-500">Frecuencia</p>
@@ -97,7 +98,8 @@
                             </div>
                             <div>
                                 <p class="text-xs uppercase tracking-wide text-slate-500">Saldo</p>
-                                <p class="text-sm font-semibold text-slate-900" th:text="${account.balance}"></p>
+                                <p class="text-sm font-semibold text-slate-900"
+                                   th:text="${'$ ' + #numbers.formatDecimal(account.balance, 1, 'POINT', 2, 'COMMA')}"></p>
                             </div>
                             <div>
                                 <p class="text-xs uppercase tracking-wide text-slate-500">Vencimientos</p>
@@ -143,7 +145,7 @@
                                     <p class="text-sm text-slate-700"
                                        th:text="${'x' + product.quantity}"></p>
                                     <p class="text-sm font-semibold text-slate-900"
-                                       th:text="${product.lineTotal}"></p>
+                                       th:text="${'$ ' + #numbers.formatDecimal(product.lineTotal, 1, 'POINT', 2, 'COMMA')}"></p>
                                 </div>
                             </div>
                         </div>
