@@ -7,6 +7,8 @@ import com.sales.maidav.model.sale.CreditPayment;
 import com.sales.maidav.model.sale.InstallmentStatus;
 import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import com.sales.maidav.model.sale.PaymentFrequency;
+import com.sales.maidav.model.sale.Sale;
+import com.sales.maidav.model.sale.SaleStatus;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
@@ -33,6 +35,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -225,6 +228,74 @@ class CreditAccountServiceImplTest {
         assertThat(account.getTotalAmount()).isEqualByComparingTo("200.00");
         assertThat(account.getBalance()).isEqualByComparingTo("200.00");
         assertThat(payments).filteredOn(CreditPayment::isReversal).hasSize(1);
+    }
+
+    @Test
+    void findBySaleIdRejectsAccountsFromVoidedSales() {
+        Sale sale = new Sale();
+        sale.setId(88L);
+        sale.setStatus(SaleStatus.VOID);
+
+        CreditAccount account = account(6L, PaymentFrequency.WEEKLY, "500.00");
+        account.setSale(sale);
+
+        when(creditAccountRepository.findBySale_Id(88L)).thenReturn(Optional.of(account));
+
+        assertThatThrownBy(() -> service.findBySaleId(88L))
+                .isInstanceOf(InvalidSaleException.class)
+                .hasMessageContaining("venta anulada");
+    }
+
+    @Test
+    void findAllSkipsAccountsFromVoidedSales() {
+        CreditAccount activeAccount = account(7L, PaymentFrequency.WEEKLY, "500.00");
+        Sale activeSale = new Sale();
+        activeSale.setId(91L);
+        activeSale.setStatus(SaleStatus.ACTIVE);
+        activeAccount.setSale(activeSale);
+
+        CreditAccount hiddenAccount = account(8L, PaymentFrequency.WEEKLY, "500.00");
+        Sale voidedSale = new Sale();
+        voidedSale.setId(92L);
+        voidedSale.setStatus(SaleStatus.VOID);
+        hiddenAccount.setSale(voidedSale);
+
+        when(creditAccountRepository.findAll()).thenReturn(List.of(activeAccount, hiddenAccount));
+
+        List<CreditAccount> accounts = service.findAll();
+
+        assertThat(accounts).containsExactly(activeAccount);
+    }
+
+    @Test
+    void countMoroseClientsIgnoresAccountsFromVoidedSales() {
+        CreditAccount visibleAccount = account(9L, PaymentFrequency.WEEKLY, "500.00");
+        Sale activeSale = new Sale();
+        activeSale.setId(101L);
+        activeSale.setStatus(SaleStatus.ACTIVE);
+        visibleAccount.setSale(activeSale);
+        visibleAccount.setClient(new com.sales.maidav.model.client.Client());
+        visibleAccount.getClient().setId(201L);
+
+        CreditAccount hiddenAccount = account(10L, PaymentFrequency.WEEKLY, "500.00");
+        Sale voidedSale = new Sale();
+        voidedSale.setId(102L);
+        voidedSale.setStatus(SaleStatus.VOID);
+        hiddenAccount.setSale(voidedSale);
+        hiddenAccount.setClient(new com.sales.maidav.model.client.Client());
+        hiddenAccount.getClient().setId(202L);
+
+        CreditInstallment visibleInstallment = installment(visibleAccount, 401L, 1, "100.00", LocalDate.now().minusDays(1));
+        CreditInstallment hiddenInstallment = installment(hiddenAccount, 402L, 1, "100.00", LocalDate.now().minusDays(1));
+
+        when(creditInstallmentRepository.findByStatusInAndDueDateBefore(
+                List.of(InstallmentStatus.PENDING, InstallmentStatus.PARTIAL),
+                LocalDate.now()
+        )).thenReturn(List.of(visibleInstallment, hiddenInstallment));
+
+        long moroseClients = service.countMoroseClients();
+
+        assertThat(moroseClients).isEqualTo(1);
     }
 
     private void mockAccount(CreditAccount account, List<CreditInstallment> installments, BigDecimal recargo) {

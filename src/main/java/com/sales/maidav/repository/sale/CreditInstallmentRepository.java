@@ -31,6 +31,7 @@ public interface CreditInstallmentRepository extends JpaRepository<CreditInstall
             where installment.dueDate <= :cutoffDate
               and installment.status <> com.sales.maidav.model.sale.InstallmentStatus.VOID
               and installment.account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and installment.account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
               and (:sellerId is null or installment.account.sale.seller.id = :sellerId)
               and (:zoneId is null or installment.account.client.zone.id = :zoneId)
             """)
@@ -50,6 +51,7 @@ public interface CreditInstallmentRepository extends JpaRepository<CreditInstall
             where installment.dueDate < :cutoffDate
               and installment.status in :pendingStatuses
               and installment.account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and installment.account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
               and (:sellerId is null or installment.account.sale.seller.id = :sellerId)
               and (:zoneId is null or installment.account.client.zone.id = :zoneId)
             """)

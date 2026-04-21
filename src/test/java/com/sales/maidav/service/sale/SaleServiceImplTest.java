@@ -186,6 +186,45 @@ class SaleServiceImplTest {
     }
 
     @Test
+    void voidSaleAlsoVoidsRelatedCreditAccountWhenLegacySaleHasNoPaymentType() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "admin@maidav.com",
+                        "secret",
+                        List.of(() -> "ROLE_ADMIN")
+                )
+        );
+
+        Sale sale = new Sale();
+        sale.setId(23L);
+        sale.setStatus(SaleStatus.ACTIVE);
+
+        CreditAccount account = new CreditAccount();
+        account.setId(41L);
+        account.setStatus(AccountStatus.OPEN);
+        account.setBalance(new java.math.BigDecimal("900.00"));
+
+        CreditInstallment installment = new CreditInstallment();
+        installment.setId(301L);
+        installment.setStatus(InstallmentStatus.PARTIAL);
+        installment.setPaidAmount(new java.math.BigDecimal("120.00"));
+
+        when(saleRepository.findById(23L)).thenReturn(Optional.of(sale));
+        when(creditAccountRepository.findBySale_Id(23L)).thenReturn(Optional.of(account));
+        when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(41L))
+                .thenReturn(List.of(installment));
+        when(saleItemRepository.findBySale_IdOrderByIdAsc(23L)).thenReturn(List.of());
+
+        saleService.voidSale(23L);
+
+        assertThat(sale.getStatus()).isEqualTo(SaleStatus.VOID);
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.VOID);
+        assertThat(account.getBalance()).isEqualByComparingTo("0.00");
+        assertThat(installment.getStatus()).isEqualTo(InstallmentStatus.VOID);
+        assertThat(installment.isVoided()).isTrue();
+    }
+
+    @Test
     void voidSaleDoesNothingWhenSaleIsAlreadyVoid() {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(

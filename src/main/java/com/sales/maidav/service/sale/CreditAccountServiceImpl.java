@@ -40,35 +40,39 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     public List<CreditAccount> findAll() {
         if (isCurrentUserAdmin()) {
             return creditAccountRepository.findAll().stream()
-                    .filter(account -> account.getStatus() != AccountStatus.VOID)
+                    .filter(this::isVisibleAccount)
                     .toList();
         }
         Long sellerId = currentUserId();
         return sellerId == null ? List.of() : creditAccountRepository.findBySale_Seller_Id(sellerId).stream()
-                .filter(account -> account.getStatus() != AccountStatus.VOID)
+                .filter(this::isVisibleAccount)
                 .toList();
     }
 
     @Override
     public CreditAccount findById(Long id) {
         if (isCurrentUserAdmin()) {
-            return creditAccountRepository.findById(id)
+            CreditAccount account = creditAccountRepository.findById(id)
                     .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
+            return requireVisibleAccount(account);
         }
         Long sellerId = currentUserId();
-        return creditAccountRepository.findByIdAndSale_Seller_Id(id, sellerId == null ? -1L : sellerId)
+        CreditAccount account = creditAccountRepository.findByIdAndSale_Seller_Id(id, sellerId == null ? -1L : sellerId)
                 .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
+        return requireVisibleAccount(account);
     }
 
     @Override
     public CreditAccount findBySaleId(Long saleId) {
         if (isCurrentUserAdmin()) {
-            return creditAccountRepository.findBySale_Id(saleId)
+            CreditAccount account = creditAccountRepository.findBySale_Id(saleId)
                     .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
+            return requireVisibleAccount(account);
         }
         Long sellerId = currentUserId();
-        return creditAccountRepository.findBySale_IdAndSale_Seller_Id(saleId, sellerId == null ? -1L : sellerId)
+        CreditAccount account = creditAccountRepository.findBySale_IdAndSale_Seller_Id(saleId, sellerId == null ? -1L : sellerId)
                 .orElseThrow(() -> new RuntimeException("Cuenta no encontrada"));
+        return requireVisibleAccount(account);
     }
 
     @Override
@@ -659,6 +663,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                         LocalDate.now()
                 )
                 .stream()
+                .filter(inst -> isVisibleAccount(inst.getAccount()))
                 .map(inst -> inst.getAccount().getClient().getId())
                 .distinct()
                 .count();
@@ -677,10 +682,10 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         Long sellerId = admin ? normalizeFilterId(requestedSellerId) : currentUserId();
         List<CreditAccount> accounts = admin
                 ? creditAccountRepository.findAll().stream()
-                    .filter(account -> account.getStatus() != AccountStatus.VOID)
+                    .filter(this::isVisibleAccount)
                     .toList()
                 : sellerId == null ? List.of() : creditAccountRepository.findBySale_Seller_Id(sellerId).stream()
-                    .filter(account -> account.getStatus() != AccountStatus.VOID)
+                    .filter(this::isVisibleAccount)
                     .toList();
         if (admin && sellerId != null) {
             accounts = accounts.stream()
@@ -702,6 +707,9 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                         today
                 )
                 .forEach(installment -> {
+                    if (!isVisibleAccount(installment.getAccount())) {
+                        return;
+                    }
                     if (!admin) {
                         Long installmentSellerId = installment.getAccount().getSale() == null
                                 || installment.getAccount().getSale().getSeller() == null
@@ -747,6 +755,19 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     private Long normalizeFilterId(Long value) {
         return value == null || value <= 0 ? null : value;
+    }
+
+    private CreditAccount requireVisibleAccount(CreditAccount account) {
+        if (!isVisibleAccount(account)) {
+            throw new InvalidSaleException("La cuenta vinculada a una venta anulada ya no esta disponible");
+        }
+        return account;
+    }
+
+    private boolean isVisibleAccount(CreditAccount account) {
+        return account != null
+                && account.getStatus() != AccountStatus.VOID
+                && (account.getSale() == null || account.getSale().getStatus() != SaleStatus.VOID);
     }
 
     private boolean isCurrentUserAdmin() {

@@ -85,7 +85,7 @@
                         Editar
                     </a>
                     <a sec:authorize="hasAuthority('ARREARS_READ')"
-                       th:if="${sale.paymentType.name() == 'CREDIT'}"
+                       th:if="${sale.paymentType.name() == 'CREDIT' and sale.status.name() != 'VOID'}"
                        th:href="@{/accounts/by-sale/{id}(id=${sale.id})}"
                        class="text-blue-600 hover:underline">
                         Ver cuenta

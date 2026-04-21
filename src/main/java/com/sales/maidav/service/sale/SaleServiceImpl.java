@@ -314,7 +314,7 @@ public class SaleServiceImpl implements SaleService {
     }
 
     private void voidCreditAccountForSale(Sale sale) {
-        if (sale == null || sale.getId() == null || sale.getPaymentType() != PaymentType.CREDIT) {
+        if (sale == null || sale.getId() == null) {
             return;
         }
         CreditAccount account = creditAccountRepository.findBySale_Id(sale.getId()).orElse(null);

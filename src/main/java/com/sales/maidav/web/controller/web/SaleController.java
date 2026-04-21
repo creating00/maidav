@@ -397,7 +397,12 @@ public class SaleController {
         Map<Long, String> accountNumberBySaleId = new HashMap<>();
         if (!creditSaleIds.isEmpty()) {
             for (CreditAccount account : creditAccountRepository.findBySale_IdIn(creditSaleIds)) {
-                if (account.getSale() != null && account.getSale().getId() != null) {
+                if (account.getStatus() == com.sales.maidav.model.sale.AccountStatus.VOID) {
+                    continue;
+                }
+                if (account.getSale() != null
+                        && account.getSale().getStatus() != SaleStatus.VOID
+                        && account.getSale().getId() != null) {
                     accountNumberBySaleId.put(account.getSale().getId(), account.getAccountNumber());
                 }
             }

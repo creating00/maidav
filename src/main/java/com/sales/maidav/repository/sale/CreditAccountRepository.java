@@ -34,6 +34,8 @@ public interface CreditAccountRepository extends JpaRepository<CreditAccount, Lo
 
     @EntityGraph(attributePaths = {"client", "sale", "sale.seller"})
     Optional<CreditAccount> findBySale_IdAndSale_Seller_Id(Long saleId, Long sellerId);
+
+    @EntityGraph(attributePaths = {"client", "sale", "sale.seller"})
     List<CreditAccount> findByClient_IdAndStatus(Long clientId, AccountStatus status);
 
     @Query("""
@@ -42,6 +44,7 @@ public interface CreditAccountRepository extends JpaRepository<CreditAccount, Lo
             where (:sellerId is null or account.sale.seller.id = :sellerId)
               and (:zoneId is null or account.client.zone.id = :zoneId)
               and account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
             """)
     java.math.BigDecimal sumTotalAmountByFilters(@Param("sellerId") Long sellerId,
                                                  @Param("zoneId") Long zoneId);
@@ -52,6 +55,7 @@ public interface CreditAccountRepository extends JpaRepository<CreditAccount, Lo
             where (:sellerId is null or account.sale.seller.id = :sellerId)
               and (:zoneId is null or account.client.zone.id = :zoneId)
               and account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
             """)
     java.math.BigDecimal sumBalanceByFilters(@Param("sellerId") Long sellerId,
                                              @Param("zoneId") Long zoneId);
@@ -62,6 +66,7 @@ public interface CreditAccountRepository extends JpaRepository<CreditAccount, Lo
             where (:sellerId is null or account.sale.seller.id = :sellerId)
               and (:zoneId is null or account.client.zone.id = :zoneId)
               and account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
             """)
     long countByFilters(@Param("sellerId") Long sellerId,
                         @Param("zoneId") Long zoneId);
@@ -72,6 +77,7 @@ public interface CreditAccountRepository extends JpaRepository<CreditAccount, Lo
             join account.sale sale
             join sale.seller seller
             where account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
             order by seller.firstName, seller.lastName, seller.email
             """)
     List<User> findDistinctSellersWithCredits();
@@ -82,6 +88,7 @@ public interface CreditAccountRepository extends JpaRepository<CreditAccount, Lo
             join account.client client
             join client.zone zone
             where account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
             order by zone.address, zone.number
             """)
     List<Zone> findDistinctZonesWithCredits();

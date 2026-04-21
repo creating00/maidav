@@ -5,6 +5,7 @@ import com.sales.maidav.model.sale.AccountStatus;
 import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.model.sale.CreditInstallment;
 import com.sales.maidav.model.sale.InstallmentStatus;
+import com.sales.maidav.model.sale.SaleStatus;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.service.client.ClientService;
@@ -73,7 +74,9 @@ public class ClientController {
     @PreAuthorize("hasAuthority('CLIENT_READ')")
     public String detail(@PathVariable Long id, Model model) {
         Client client = clientService.findById(id);
-        List<CreditAccount> accounts = creditAccountRepository.findByClient_IdAndStatus(id, AccountStatus.OPEN);
+        List<CreditAccount> accounts = creditAccountRepository.findByClient_IdAndStatus(id, AccountStatus.OPEN).stream()
+                .filter(account -> account.getSale() == null || account.getSale().getStatus() != SaleStatus.VOID)
+                .toList();
         Map<Long, List<CreditInstallment>> installmentsByAccount = new HashMap<>();
         Map<Long, BigDecimal> currentInstallments = new HashMap<>();
 

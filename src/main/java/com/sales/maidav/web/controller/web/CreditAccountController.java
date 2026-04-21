@@ -101,8 +101,14 @@ public class CreditAccountController {
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('ARREARS_READ')")
-    public String detail(@PathVariable Long id, Model model) {
-        CreditAccount account = creditAccountService.findById(id);
+    public String detail(@PathVariable Long id, Model model, RedirectAttributes redirectAttributes) {
+        CreditAccount account;
+        try {
+            account = creditAccountService.findById(id);
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/accounts";
+        }
         List<CreditInstallment> installments =
                 creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(id);
         List<CreditInstallment> activeInstallments = installments.stream()
@@ -187,9 +193,14 @@ public class CreditAccountController {
 
     @GetMapping("/by-sale/{saleId}")
     @PreAuthorize("hasAuthority('ARREARS_READ')")
-    public String detailBySale(@PathVariable Long saleId, Model model) {
-        Long accountId = creditAccountService.findBySaleId(saleId).getId();
-        return "redirect:/accounts/" + accountId;
+    public String detailBySale(@PathVariable Long saleId, RedirectAttributes redirectAttributes) {
+        try {
+            Long accountId = creditAccountService.findBySaleId(saleId).getId();
+            return "redirect:/accounts/" + accountId;
+        } catch (RuntimeException ex) {
+            redirectAttributes.addFlashAttribute("errorMessage", ex.getMessage());
+            return "redirect:/sales";
+        }
     }
 
     @PostMapping("/{id}/pay")

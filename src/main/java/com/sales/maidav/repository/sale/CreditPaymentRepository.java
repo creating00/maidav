@@ -21,6 +21,7 @@ public interface CreditPaymentRepository extends JpaRepository<CreditPayment, Lo
             from CreditPayment payment
             where payment.paidAt <= :cutoffDate
               and payment.account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and payment.account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
               and (:sellerId is null or payment.account.sale.seller.id = :sellerId)
               and (:zoneId is null or payment.account.client.zone.id = :zoneId)
             """)
