@@ -27,15 +27,36 @@ public final class CreditPaymentPricingSupport {
                                                        PaymentFrequency frequency,
                                                        LocalDate dueDate,
                                                        LocalDate paymentDate) {
+        return resolveCollectedAmountDue(
+                financedRemaining,
+                financedRemaining,
+                BigDecimal.ZERO,
+                cashRecargo,
+                frequency,
+                dueDate,
+                paymentDate
+        );
+    }
+
+    public static BigDecimal resolveCollectedAmountDue(BigDecimal financedAmount,
+                                                       BigDecimal financedRemaining,
+                                                       BigDecimal collectedAlreadyApplied,
+                                                       BigDecimal cashRecargo,
+                                                       PaymentFrequency frequency,
+                                                       LocalDate dueDate,
+                                                       LocalDate paymentDate) {
         BigDecimal normalizedRemaining = normalize(financedRemaining);
         if (normalizedRemaining.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
         if (usesCashValue(frequency, dueDate, paymentDate)) {
-            // PAGO EN FECHA COMO CONTADO
-            return roundUpToFifty(
-                    normalizedRemaining.divide(normalizeRecargo(cashRecargo), 2, RoundingMode.HALF_UP)
-            );
+            BigDecimal originalCashValue = resolveInstallmentCashValue(financedAmount, cashRecargo, frequency);
+            BigDecimal normalizedCollected = normalize(collectedAlreadyApplied);
+            BigDecimal remainingCollected = originalCashValue.subtract(normalizedCollected).setScale(2, RoundingMode.HALF_UP);
+            if (remainingCollected.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+            }
+            return remainingCollected;
         }
         // PAGO FUERA DE FECHA COMO FINANCIADO
         return normalizedRemaining;
@@ -60,6 +81,26 @@ public final class CreditPaymentPricingSupport {
                                                  PaymentFrequency frequency,
                                                  LocalDate dueDate,
                                                  LocalDate paymentDate) {
+        return resolveImpactAmount(
+                financedRemaining,
+                financedRemaining,
+                BigDecimal.ZERO,
+                collectedAmount,
+                cashRecargo,
+                frequency,
+                dueDate,
+                paymentDate
+        );
+    }
+
+    public static BigDecimal resolveImpactAmount(BigDecimal financedAmount,
+                                                 BigDecimal financedRemaining,
+                                                 BigDecimal collectedAlreadyApplied,
+                                                 BigDecimal collectedAmount,
+                                                 BigDecimal cashRecargo,
+                                                 PaymentFrequency frequency,
+                                                 LocalDate dueDate,
+                                                 LocalDate paymentDate) {
         BigDecimal normalizedRemaining = normalize(financedRemaining);
         BigDecimal normalizedCollected = normalize(collectedAmount);
         if (normalizedRemaining.compareTo(BigDecimal.ZERO) <= 0 || normalizedCollected.compareTo(BigDecimal.ZERO) <= 0) {
@@ -73,7 +114,9 @@ public final class CreditPaymentPricingSupport {
 
         // PAGO EN FECHA COMO CONTADO
         BigDecimal collectedNeeded = resolveCollectedAmountDue(
+                financedAmount,
                 normalizedRemaining,
+                collectedAlreadyApplied,
                 cashRecargo,
                 frequency,
                 dueDate,
