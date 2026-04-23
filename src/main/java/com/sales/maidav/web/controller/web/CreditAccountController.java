@@ -81,7 +81,7 @@ public class CreditAccountController {
                     .filter(installment -> installment.getStatus() != InstallmentStatus.VOID)
                     .filter(installment -> !installment.isVoided())
                     .findFirst()
-                    .map(installment -> chargeAmount(account, installment))
+                    .map(installment -> remainingAmount(installment.getAmount(), installment.getPaidAmount()))
                     .orElse(null);
             currentInstallments.put(account.getId(), currentAmount);
             dueSchedules.put(account.getId(), formatDueSchedule(account));
@@ -118,17 +118,16 @@ public class CreditAccountController {
         List<CreditInstallment> voidedInstallments = installments.stream()
                 .filter(installment -> installment.getStatus() == InstallmentStatus.VOID || installment.isVoided())
                 .toList();
+        Map<Long, BigDecimal> carryForwardAmounts = creditAccountService.getAppliedCarryForwardAmounts(id);
         BigDecimal currentInstallment = null;
         Integer currentInstallmentNumber = null;
-        BigDecimal currentInstallmentBaseAmount = null;
-        BigDecimal currentInstallmentAppliedCredit = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal currentInstallmentCashAmount = null;
+        BigDecimal currentInstallmentCarryForwardAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal currentInstallmentExpiredCash = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         Boolean currentInstallmentCashPricing = null;
         Map<Long, BigDecimal> chargeAmounts = new HashMap<>();
-        Map<Long, BigDecimal> baseChargeAmounts = new HashMap<>();
         Map<Long, BigDecimal> financedAmounts = new HashMap<>();
         Map<Long, Boolean> cashPricingAvailable = new HashMap<>();
-        Map<Long, BigDecimal> appliedCreditAmounts = new HashMap<>();
         Map<Long, BigDecimal> expiredCashAmounts = new HashMap<>();
         BigDecimal cashRecargo = resolveCashRecargo();
         for (CreditInstallment installment : activeInstallments) {
@@ -143,15 +142,6 @@ public class CreditAccountController {
                     LocalDate.now()
             );
             cashPricingAvailable.put(installment.getId(), usesCashValue);
-            BigDecimal appliedCreditAmount = usesCashValue
-                    ? normalizeAmount(fullCashAmount.subtract(chargeAmount))
-                    : normalizeAmount(installment.getAmount().subtract(remaining));
-            if (appliedCreditAmount.compareTo(BigDecimal.ZERO) < 0) {
-                appliedCreditAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            }
-            BigDecimal baseChargeAmount = normalizeAmount(chargeAmount.add(appliedCreditAmount));
-            baseChargeAmounts.put(installment.getId(), baseChargeAmount);
-            appliedCreditAmounts.put(installment.getId(), appliedCreditAmount);
             BigDecimal expiredCashAmount = !usesCashValue && fullCashAmount.compareTo(BigDecimal.ZERO) > 0
                     ? fullCashAmount
                     : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
@@ -160,10 +150,13 @@ public class CreditAccountController {
                     && installment.getStatus() != InstallmentStatus.PAID
                     && installment.getStatus() != InstallmentStatus.VOID
                     && !installment.isVoided()) {
-                currentInstallment = chargeAmount;
+                currentInstallment = remaining;
                 currentInstallmentNumber = installment.getInstallmentNumber();
-                currentInstallmentBaseAmount = baseChargeAmount;
-                currentInstallmentAppliedCredit = appliedCreditAmount;
+                currentInstallmentCashAmount = chargeAmount;
+                currentInstallmentCarryForwardAmount = carryForwardAmounts.getOrDefault(
+                        installment.getId(),
+                        BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                );
                 currentInstallmentExpiredCash = expiredCashAmount;
                 currentInstallmentCashPricing = usesCashValue;
             }
@@ -174,16 +167,15 @@ public class CreditAccountController {
         model.addAttribute("voidedInstallments", voidedInstallments);
         model.addAttribute("currentInstallmentAmount", currentInstallment);
         model.addAttribute("currentInstallmentNumber", currentInstallmentNumber);
-        model.addAttribute("currentInstallmentBaseAmount", currentInstallmentBaseAmount);
-        model.addAttribute("currentInstallmentAppliedCredit", currentInstallmentAppliedCredit);
+        model.addAttribute("currentInstallmentCashAmount", currentInstallmentCashAmount);
+        model.addAttribute("currentInstallmentCarryForwardAmount", currentInstallmentCarryForwardAmount);
         model.addAttribute("currentInstallmentExpiredCash", currentInstallmentExpiredCash);
         model.addAttribute("currentInstallmentCashPricing", currentInstallmentCashPricing);
         model.addAttribute("paymentFrequencyLabel", paymentFrequencyLabel(account));
         model.addAttribute("chargeAmounts", chargeAmounts);
-        model.addAttribute("baseChargeAmounts", baseChargeAmounts);
         model.addAttribute("financedAmounts", financedAmounts);
+        model.addAttribute("carryForwardAmounts", carryForwardAmounts);
         model.addAttribute("cashPricingAvailable", cashPricingAvailable);
-        model.addAttribute("appliedCreditAmounts", appliedCreditAmounts);
         model.addAttribute("expiredCashAmounts", expiredCashAmounts);
         model.addAttribute("payments", creditPaymentRepository.findByAccount_IdOrderByPaidAtDescIdDesc(id));
         model.addAttribute("paymentMethods", PaymentCollectionMethod.values());

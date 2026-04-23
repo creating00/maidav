@@ -7,6 +7,7 @@ import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public interface CreditAccountService {
     List<CreditAccount> findAll();
@@ -21,6 +22,7 @@ public interface CreditAccountService {
     void updatePayment(Long accountId, Long paymentId, BigDecimal amount, LocalDate paidAt,
                        PaymentCollectionMethod paymentMethod);
     void voidInstallment(Long accountId, Long installmentId, String voidedBy, String reason);
+    Map<Long, BigDecimal> getAppliedCarryForwardAmounts(Long accountId);
     long countMoroseClients();
     java.util.List<MorositySummary> getMorosity(MorosityLevel levelFilter);
     java.util.List<MorositySummary> getMorosity(MorosityLevel levelFilter, Long requestedSellerId);

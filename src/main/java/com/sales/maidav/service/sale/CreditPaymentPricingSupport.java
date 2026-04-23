@@ -1,5 +1,6 @@
 package com.sales.maidav.service.sale;
 
+import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import com.sales.maidav.model.sale.PaymentFrequency;
 
 import java.math.BigDecimal;
@@ -22,8 +23,34 @@ public final class CreditPaymentPricingSupport {
         return !paymentDate.isAfter(dueDate);
     }
 
+    public static boolean usesCashValue(PaymentCollectionMethod paymentMethod,
+                                        PaymentFrequency frequency,
+                                        LocalDate dueDate,
+                                        LocalDate paymentDate) {
+        if (paymentMethod != PaymentCollectionMethod.CASH) {
+            return false;
+        }
+        return usesCashValue(frequency, dueDate, paymentDate);
+    }
+
     public static BigDecimal resolveCollectedAmountDue(BigDecimal financedRemaining,
                                                        BigDecimal cashRecargo,
+                                                       PaymentFrequency frequency,
+                                                       LocalDate dueDate,
+                                                       LocalDate paymentDate) {
+        return resolveCollectedAmountDue(
+                financedRemaining,
+                cashRecargo,
+                PaymentCollectionMethod.CASH,
+                frequency,
+                dueDate,
+                paymentDate
+        );
+    }
+
+    public static BigDecimal resolveCollectedAmountDue(BigDecimal financedRemaining,
+                                                       BigDecimal cashRecargo,
+                                                       PaymentCollectionMethod paymentMethod,
                                                        PaymentFrequency frequency,
                                                        LocalDate dueDate,
                                                        LocalDate paymentDate) {
@@ -31,7 +58,7 @@ public final class CreditPaymentPricingSupport {
         if (normalizedRemaining.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-        if (usesCashValue(frequency, dueDate, paymentDate)) {
+        if (usesCashValue(paymentMethod, frequency, dueDate, paymentDate)) {
             // PAGO EN FECHA COMO CONTADO
             return roundUpToFifty(
                     normalizedRemaining.divide(normalizeRecargo(cashRecargo), 2, RoundingMode.HALF_UP)
@@ -60,13 +87,31 @@ public final class CreditPaymentPricingSupport {
                                                  PaymentFrequency frequency,
                                                  LocalDate dueDate,
                                                  LocalDate paymentDate) {
+        return resolveImpactAmount(
+                financedRemaining,
+                collectedAmount,
+                cashRecargo,
+                PaymentCollectionMethod.CASH,
+                frequency,
+                dueDate,
+                paymentDate
+        );
+    }
+
+    public static BigDecimal resolveImpactAmount(BigDecimal financedRemaining,
+                                                 BigDecimal collectedAmount,
+                                                 BigDecimal cashRecargo,
+                                                 PaymentCollectionMethod paymentMethod,
+                                                 PaymentFrequency frequency,
+                                                 LocalDate dueDate,
+                                                 LocalDate paymentDate) {
         BigDecimal normalizedRemaining = normalize(financedRemaining);
         BigDecimal normalizedCollected = normalize(collectedAmount);
         if (normalizedRemaining.compareTo(BigDecimal.ZERO) <= 0 || normalizedCollected.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
 
-        if (!usesCashValue(frequency, dueDate, paymentDate)) {
+        if (!usesCashValue(paymentMethod, frequency, dueDate, paymentDate)) {
             // PAGO FUERA DE FECHA COMO FINANCIADO
             return normalizedCollected.min(normalizedRemaining).setScale(2, RoundingMode.HALF_UP);
         }
@@ -75,6 +120,7 @@ public final class CreditPaymentPricingSupport {
         BigDecimal collectedNeeded = resolveCollectedAmountDue(
                 normalizedRemaining,
                 cashRecargo,
+                paymentMethod,
                 frequency,
                 dueDate,
                 paymentDate
