@@ -31,6 +31,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -88,8 +89,8 @@ class CreditAccountServiceImplTest {
         assertThat(firstInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
         assertThat(firstInstallment.getPaidAmount()).isEqualByComparingTo("1200.00");
         assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PARTIAL);
-        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("500.00");
-        assertThat(account.getBalance()).isEqualByComparingTo("700.00");
+        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("600.00");
+        assertThat(account.getBalance()).isEqualByComparingTo("600.00");
         assertThat(account.getStatus()).isEqualTo(AccountStatus.OPEN);
 
         service.registerPayment(1L, new BigDecimal("500.00"), null, "tester", PaymentCollectionMethod.CASH);
@@ -104,37 +105,12 @@ class CreditAccountServiceImplTest {
         List<CreditPayment> savedPayments = paymentCaptor.getAllValues();
 
         assertThat(savedPayments.get(0).getAmount()).isEqualByComparingTo("1500.00");
-        assertThat(savedPayments.get(0).getImpactAmount()).isEqualByComparingTo("1700.00");
-        assertThat(savedPayments.get(0).getAllocationSummary()).contains("valor contado");
+        assertThat(savedPayments.get(0).getImpactAmount()).isEqualByComparingTo("1800.00");
+        assertThat(savedPayments.get(0).getAllocationSummary()).contains("Cuota #1: se aplican $ 1.000,00 y queda saldada");
+        assertThat(savedPayments.get(0).getAllocationSummary()).contains("Cuota #2: recibe $ 500,00 por saldo a favor y quedan $ 600,00 pendientes");
         assertThat(savedPayments.get(1).getAmount()).isEqualByComparingTo("500.00");
-        assertThat(savedPayments.get(1).getImpactAmount()).isEqualByComparingTo("700.00");
-        assertThat(savedPayments.get(1).getAllocationSummary()).contains("valor contado");
-    }
-
-    @Test
-    void carryForwardPartialCreditUsesRealMoneyInsteadOfProportionalImpact() {
-        CreditAccount account = account(12L, PaymentFrequency.WEEKLY, "11100.00");
-        CreditInstallment firstInstallment = installment(account, 121L, 1, "5550.00", LocalDate.now());
-        CreditInstallment secondInstallment = installment(account, 122L, 2, "5550.00", LocalDate.now().plusWeeks(1));
-        List<CreditInstallment> installments = List.of(firstInstallment, secondInstallment);
-
-        mockAccount(account, installments, new BigDecimal("1.26"));
-
-        CreditPayment payment = service.registerPayment(
-                12L,
-                new BigDecimal("4500.00"),
-                null,
-                "tester",
-                PaymentCollectionMethod.CASH,
-                null
-        );
-
-        assertThat(firstInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
-        assertThat(firstInstallment.getPaidAmount()).isEqualByComparingTo("5550.00");
-        assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PARTIAL);
-        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("50.00");
-        assertThat(account.getBalance()).isEqualByComparingTo("5500.00");
-        assertThat(payment.getImpactAmount()).isEqualByComparingTo("5600.00");
+        assertThat(savedPayments.get(1).getImpactAmount()).isEqualByComparingTo("600.00");
+        assertThat(savedPayments.get(1).getAllocationSummary()).contains("Cuota #2: recibe $ 500,00 por saldo a favor y queda saldada");
     }
 
     @Test
@@ -158,7 +134,31 @@ class CreditAccountServiceImplTest {
         assertThat(installment.getPaidAmount()).isEqualByComparingTo("1000.00");
         assertThat(account.getBalance()).isEqualByComparingTo("200.00");
         assertThat(payment.getImpactAmount()).isEqualByComparingTo("1000.00");
-        assertThat(payment.getAllocationSummary()).contains("valor financiado");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #1: se aplican $ 1.000,00 y quedan $ 200,00 pendientes (valor financiado)");
+    }
+
+    @Test
+    void paymentInDateWithBankUsesFinancedValue() {
+        CreditAccount account = account(22L, PaymentFrequency.WEEKLY, "1200.00");
+        CreditInstallment installment = installment(account, 221L, 1, "1200.00", LocalDate.now());
+        List<CreditInstallment> installments = List.of(installment);
+
+        mockAccount(account, installments, new BigDecimal("1.20"));
+
+        CreditPayment payment = service.registerPayment(
+                22L,
+                new BigDecimal("1000.00"),
+                null,
+                "tester",
+                PaymentCollectionMethod.BANK,
+                null
+        );
+
+        assertThat(installment.getStatus()).isEqualTo(InstallmentStatus.PARTIAL);
+        assertThat(installment.getPaidAmount()).isEqualByComparingTo("1000.00");
+        assertThat(account.getBalance()).isEqualByComparingTo("200.00");
+        assertThat(payment.getImpactAmount()).isEqualByComparingTo("1000.00");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #1: se aplican $ 1.000,00 y quedan $ 200,00 pendientes (valor financiado)");
     }
 
     @Test
@@ -211,31 +211,49 @@ class CreditAccountServiceImplTest {
         assertThat(installment.getPaidAmount()).isEqualByComparingTo("1000.00");
         assertThat(account.getBalance()).isEqualByComparingTo("200.00");
         assertThat(payment.getImpactAmount()).isEqualByComparingTo("1000.00");
-        assertThat(payment.getAllocationSummary()).contains("valor financiado");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #1: se aplican $ 1.000,00 y quedan $ 200,00 pendientes (valor financiado)");
     }
 
     @Test
-    void partialPaymentOnSameInstallmentKeepsCashProportionalImpact() {
-        CreditAccount account = account(13L, PaymentFrequency.WEEKLY, "1200.00");
-        CreditInstallment installment = installment(account, 131L, 1, "1200.00", LocalDate.now());
-        List<CreditInstallment> installments = List.of(installment);
+    void carryForwardAmountsOnlyIncludeAmountsTransferredToNextInstallment() {
+        CreditAccount account = account(33L, PaymentFrequency.WEEKLY, "200.00");
+        CreditInstallment firstInstallment = installment(account, 331L, 1, "100.00", LocalDate.now());
+        CreditInstallment secondInstallment = installment(account, 332L, 2, "100.00", LocalDate.now().plusWeeks(1));
+        List<CreditInstallment> installments = List.of(firstInstallment, secondInstallment);
+        List<CreditPayment> payments = new ArrayList<>();
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcRecargo(new BigDecimal("1.20"));
 
-        mockAccount(account, installments, new BigDecimal("1.20"));
+        AtomicLong nextPaymentId = new AtomicLong(1L);
+        when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
+        when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId())).thenReturn(installments);
+        when(creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(account.getId())).thenAnswer(invocation -> payments.stream()
+                .sorted(Comparator.comparing(CreditPayment::getPaidAt)
+                        .thenComparing(CreditPayment::getId, Comparator.nullsLast(Long::compareTo)))
+                .toList());
+        when(creditPaymentRepository.save(any(CreditPayment.class))).thenAnswer(invocation -> {
+            CreditPayment payment = invocation.getArgument(0);
+            if (payment.getId() == null) {
+                payment.setId(nextPaymentId.getAndIncrement());
+            }
+            payments.add(payment);
+            return payment;
+        });
+        when(companySettingsService.getSettings()).thenReturn(settings);
 
-        CreditPayment payment = service.registerPayment(
-                13L,
-                new BigDecimal("500.00"),
+        service.registerPayment(
+                33L,
+                new BigDecimal("150.00"),
                 null,
                 "tester",
-                PaymentCollectionMethod.CASH,
+                PaymentCollectionMethod.BANK,
                 null
         );
 
-        assertThat(installment.getStatus()).isEqualTo(InstallmentStatus.PARTIAL);
-        assertThat(installment.getPaidAmount()).isEqualByComparingTo("600.00");
-        assertThat(account.getBalance()).isEqualByComparingTo("600.00");
-        assertThat(payment.getImpactAmount()).isEqualByComparingTo("600.00");
-        assertThat(payment.getAllocationSummary()).contains("valor contado");
+        Map<Long, BigDecimal> carryForwardAmounts = service.getAppliedCarryForwardAmounts(33L);
+
+        assertThat(carryForwardAmounts).containsEntry(332L, new BigDecimal("50.00"));
+        assertThat(carryForwardAmounts).doesNotContainKey(331L);
     }
 
     @Test
@@ -351,23 +369,11 @@ class CreditAccountServiceImplTest {
     private void mockAccount(CreditAccount account, List<CreditInstallment> installments, BigDecimal recargo) {
         CompanySettings settings = new CompanySettings();
         settings.setCalcRecargo(recargo);
-        List<CreditPayment> payments = new ArrayList<>();
 
         when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
         when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId())).thenReturn(installments);
         when(companySettingsService.getSettings()).thenReturn(settings);
-        when(creditPaymentRepository.save(any(CreditPayment.class))).thenAnswer(invocation -> {
-            CreditPayment payment = invocation.getArgument(0);
-            if (payment.getId() == null) {
-                payment.setId((long) payments.size() + 1);
-            }
-            payments.add(payment);
-            return payment;
-        });
-        when(creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(account.getId())).thenAnswer(invocation -> payments.stream()
-                .sorted(Comparator.comparing(CreditPayment::getPaidAt)
-                        .thenComparing(CreditPayment::getId, Comparator.nullsLast(Long::compareTo)))
-                .toList());
+        when(creditPaymentRepository.save(any(CreditPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private void mockStatefulAccount(CreditAccount account,
