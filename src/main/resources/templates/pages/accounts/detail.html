@@ -184,6 +184,7 @@
                 <td class="px-4 py-3 text-right">
                     <!-- SOLO ADMIN PUEDE ANULAR -->
                     <form sec:authorize="hasRole('ADMIN')"
+                          th:if="${inst.paidAmount != null and inst.paidAmount.compareTo(T(java.math.BigDecimal).ZERO) > 0}"
                           th:action="@{/accounts/{id}/installments/{installmentId}/void(id=${account.id},installmentId=${inst.id})}"
                           method="post"
                           class="inline-flex items-center gap-2">
@@ -192,6 +193,11 @@
                                class="border rounded px-2 py-1 text-xs w-36"/>
                         <button class="text-red-600 hover:underline text-xs">Anular cuota</button>
                     </form>
+                    <span sec:authorize="hasRole('ADMIN')"
+                          th:if="${inst.paidAmount == null or inst.paidAmount.compareTo(T(java.math.BigDecimal).ZERO) <= 0}"
+                          class="text-xs text-gray-500">
+                        Solo cuotas con pago
+                    </span>
                     <span sec:authorize="!hasRole('ADMIN')" class="text-xs text-gray-500">
                         Sin permiso para anular
                     </span>
