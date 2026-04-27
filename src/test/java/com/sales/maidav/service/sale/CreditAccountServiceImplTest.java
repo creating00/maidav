@@ -290,7 +290,7 @@ class CreditAccountServiceImplTest {
     }
 
     @Test
-    void voidingInstallmentAlsoReversesCarryForwardImpactOnNextInstallment() {
+    void voidingInstallmentOnlyReversesSelectedInstallmentImpact() {
         CreditAccount account = account(45L, PaymentFrequency.WEEKLY, "200.00");
         CreditInstallment firstInstallment = installment(account, 451L, 1, "100.00", LocalDate.now());
         CreditInstallment secondInstallment = installment(account, 452L, 2, "100.00", LocalDate.now().plusWeeks(1));
@@ -318,10 +318,45 @@ class CreditAccountServiceImplTest {
 
         assertThat(restoredFirstInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
         assertThat(restoredFirstInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
-        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
-        assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
-        assertThat(account.getBalance()).isEqualByComparingTo("200.00");
-        assertThat(payments).filteredOn(CreditPayment::isReversal).hasSize(2);
+        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("50.00");
+        assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PARTIAL);
+        assertThat(account.getBalance()).isEqualByComparingTo("150.00");
+        assertThat(payments).filteredOn(CreditPayment::isReversal).hasSize(1);
+    }
+
+    @Test
+    void voidingSecondInstallmentDoesNotUndoPreviousInstallmentPayment() {
+        CreditAccount account = account(46L, PaymentFrequency.WEEKLY, "200.00");
+        CreditInstallment firstInstallment = installment(account, 461L, 1, "100.00", LocalDate.now());
+        CreditInstallment secondInstallment = installment(account, 462L, 2, "100.00", LocalDate.now().plusWeeks(1));
+        List<CreditInstallment> installments = new ArrayList<>(List.of(firstInstallment, secondInstallment));
+        List<CreditPayment> payments = new ArrayList<>();
+
+        mockStatefulAccount(account, installments, payments, new BigDecimal("1.20"));
+
+        service.registerPayment(
+                46L,
+                new BigDecimal("150.00"),
+                null,
+                "tester",
+                PaymentCollectionMethod.BANK,
+                null
+        );
+
+        service.voidInstallment(46L, 462L, "tester", "anulacion cuota 2");
+
+        CreditInstallment restoredSecondInstallment = installments.stream()
+                .filter(installment -> Long.valueOf(462L).equals(installment.getRestoredFromInstallmentId()))
+                .filter(installment -> !installment.isVoided())
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(firstInstallment.getPaidAmount()).isEqualByComparingTo("100.00");
+        assertThat(firstInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(restoredSecondInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
+        assertThat(restoredSecondInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
+        assertThat(account.getBalance()).isEqualByComparingTo("100.00");
+        assertThat(payments).filteredOn(CreditPayment::isReversal).hasSize(1);
     }
 
     @Test

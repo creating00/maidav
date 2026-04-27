@@ -215,11 +215,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         if (!hasCurrentPaymentImpact(installmentAllocations)) {
             throw new InvalidSaleException("Solo se pueden anular cuotas con pagos aplicados");
         }
-        List<PaymentAllocation> impactedAllocations = resolveImpactedAllocationsForVoid(
-                installment,
-                currentAllocations,
-                installmentAllocations
-        );
+        List<PaymentAllocation> impactedAllocations = resolveImpactedAllocationsForVoid(installmentAllocations);
 
         // FIX ANULACION CUOTA
         // AUDITORIA ANULACION
@@ -700,23 +696,12 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         );
     }
 
-    private List<PaymentAllocation> resolveImpactedAllocationsForVoid(CreditInstallment installment,
-                                                                      List<PaymentAllocation> currentAllocations,
-                                                                      List<PaymentAllocation> installmentAllocations) {
-        if (currentAllocations == null || currentAllocations.isEmpty()
-                || installmentAllocations == null || installmentAllocations.isEmpty()) {
+    private List<PaymentAllocation> resolveImpactedAllocationsForVoid(List<PaymentAllocation> installmentAllocations) {
+        if (installmentAllocations == null || installmentAllocations.isEmpty()) {
             return List.of();
         }
-        Set<Long> paymentIdsToReverse = installmentAllocations.stream()
-                .map(PaymentAllocation::paymentId)
-                .filter(paymentId -> paymentId != null)
-                .collect(java.util.stream.Collectors.toSet());
-        int selectedInstallmentNumber = installment.getInstallmentNumber() == null ? Integer.MIN_VALUE : installment.getInstallmentNumber();
-        return currentAllocations.stream()
-                .filter(allocation -> paymentIdsToReverse.contains(allocation.paymentId()))
+        return installmentAllocations.stream()
                 .filter(allocation -> allocation.installmentId() != null)
-                .filter(allocation -> installment.getId().equals(allocation.installmentId())
-                        || (allocation.installmentNumber() != null && allocation.installmentNumber() > selectedInstallmentNumber))
                 .toList();
     }
 
