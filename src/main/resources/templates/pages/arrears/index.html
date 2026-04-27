@@ -45,6 +45,7 @@
                 <th class="px-4 py-3">Nivel</th>
                 <th class="px-4 py-3">Días de atraso</th>
                 <th class="px-4 py-3">Monto adeudado</th>
+                <th class="px-4 py-3 text-right">Acciones</th>
             </tr>
             </thead>
             <tbody>
@@ -68,10 +69,16 @@
                 </td>
                 <td class="px-4 py-3" th:text="${row.daysOverdue}"></td>
                 <td class="px-4 py-3" th:text="${row.amountDue}"></td>
+                <td class="px-4 py-3 text-right">
+                    <a th:href="@{/accounts(q=${row.client.nationalId})}"
+                       class="inline-flex rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                        Ver cuenta
+                    </a>
+                </td>
             </tr>
 
             <tr th:if="${#lists.isEmpty(rows)}">
-                <td colspan="4" class="px-4 py-6 text-center text-gray-500">
+                <td colspan="5" class="px-4 py-6 text-center text-gray-500">
                     No hay datos de morosidad
                 </td>
             </tr>
