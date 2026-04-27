@@ -177,10 +177,18 @@ public class CreditAccountController {
         model.addAttribute("carryForwardAmounts", carryForwardAmounts);
         model.addAttribute("cashPricingAvailable", cashPricingAvailable);
         model.addAttribute("expiredCashAmounts", expiredCashAmounts);
+        List<com.sales.maidav.model.sale.CreditPayment> accountPayments =
+                creditPaymentRepository.findByAccount_IdOrderByPaidAtDescIdDesc(id);
         model.addAttribute(
                 "payments",
-                creditPaymentRepository.findByAccount_IdOrderByPaidAtDescIdDesc(id).stream()
+                accountPayments.stream()
                         .filter(payment -> !payment.isReversal())
+                        .toList()
+        );
+        model.addAttribute(
+                "paymentAdjustments",
+                accountPayments.stream()
+                        .filter(com.sales.maidav.model.sale.CreditPayment::isReversal)
                         .toList()
         );
         model.addAttribute("paymentMethods", PaymentCollectionMethod.values());
