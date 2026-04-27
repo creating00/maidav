@@ -177,7 +177,12 @@ public class CreditAccountController {
         model.addAttribute("carryForwardAmounts", carryForwardAmounts);
         model.addAttribute("cashPricingAvailable", cashPricingAvailable);
         model.addAttribute("expiredCashAmounts", expiredCashAmounts);
-        model.addAttribute("payments", creditPaymentRepository.findByAccount_IdOrderByPaidAtDescIdDesc(id));
+        model.addAttribute(
+                "payments",
+                creditPaymentRepository.findByAccount_IdOrderByPaidAtDescIdDesc(id).stream()
+                        .filter(payment -> !payment.isReversal())
+                        .toList()
+        );
         model.addAttribute("paymentMethods", PaymentCollectionMethod.values());
         model.addAttribute("cashRecargo", cashRecargo);
         return "pages/accounts/detail";
