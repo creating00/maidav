@@ -255,6 +255,11 @@
         <p class="px-4 pb-2 text-xs text-gray-600">
             Cada pago muestra lo que entrego el cliente y como se repartio entre las cuotas.
         </p>
+        <div class="hidden" aria-hidden="true">
+            <span th:each="pay : ${paymentAdjustments}"
+                  data-payment-adjustment="true"
+                  th:attr="data-amount=${pay.amount},data-method=${pay.paymentMethod != null ? pay.paymentMethod.name() : 'BANK'}"></span>
+        </div>
         <div class="max-h-[24rem] overflow-auto">
         <table class="min-w-full text-sm">
             <thead class="bg-gray-100 text-left">
@@ -380,6 +385,7 @@
             const paymentProcessingState = document.getElementById('paymentProcessingState');
             const checkboxes = document.querySelectorAll('input[name="installmentIds"]');
             const paymentRows = document.querySelectorAll('[data-payment-row="true"]');
+            const paymentAdjustments = document.querySelectorAll('[data-payment-adjustment="true"]');
             const totalCashEl = document.getElementById('total-cash');
             const totalBankEl = document.getElementById('total-bank');
             const totalGeneralEl = document.getElementById('total-general');
@@ -439,6 +445,14 @@
                 let totalCash = 0;
                 let totalBank = 0;
                 paymentRows.forEach(row => {
+                    const amount = getRowAmount(row);
+                    if (getRowMethod(row) === 'CASH') {
+                        totalCash += amount;
+                    } else {
+                        totalBank += amount;
+                    }
+                });
+                paymentAdjustments.forEach(row => {
                     const amount = getRowAmount(row);
                     if (getRowMethod(row) === 'CASH') {
                         totalCash += amount;
