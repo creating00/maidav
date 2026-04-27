@@ -239,7 +239,8 @@
                   data-int-mes-largo=${calculatorConfig.intMesLargo}"
          class="hidden"></div>
 
-    <div class="bg-white rounded shadow overflow-x-auto">
+    <div class="bg-white rounded shadow overflow-hidden">
+        <div class="max-h-[38rem] overflow-auto">
         <table class="min-w-full text-sm">
             <thead class="bg-gray-100 text-left">
             <tr>
@@ -415,6 +416,22 @@
             </tr>
             </tbody>
         </table>
+        </div>
+        <div class="border-t border-slate-200 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span id="products-page-info" class="text-sm text-slate-600">Pagina 1</span>
+            <div class="flex items-center gap-2">
+                <button type="button"
+                        id="products-prev-page"
+                        class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                    Anterior
+                </button>
+                <button type="button"
+                        id="products-next-page"
+                        class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                    Siguiente
+                </button>
+            </div>
+        </div>
     </div>
 
     <div id="productImageModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 px-4">
@@ -462,10 +479,15 @@
             const productScanStatus = document.getElementById('productScanStatus');
             const scanLookupResult = document.getElementById('scanLookupResult');
             const productRows = Array.from(document.querySelectorAll('.product-row'));
+            const productsPrevPageButton = document.getElementById('products-prev-page');
+            const productsNextPageButton = document.getElementById('products-next-page');
+            const productsPageInfo = document.getElementById('products-page-info');
             const productImageModal = document.getElementById('productImageModal');
             const closeProductImageModal = document.getElementById('closeProductImageModal');
             const productImageModalContent = document.getElementById('productImageModalContent');
             const productImageCaption = document.getElementById('productImageCaption');
+            const productsPageSize = 15;
+            let productsCurrentPage = 1;
             let productScanStream = null;
             let productScanInterval = null;
 
@@ -490,6 +512,53 @@
 
             function money(value) {
                 return '$' + parseNumber(value).toFixed(2);
+            }
+
+            function getFinancingRow(productRow) {
+                const nextRow = productRow ? productRow.nextElementSibling : null;
+                return nextRow && nextRow.classList.contains('financing-row') ? nextRow : null;
+            }
+
+            function renderProductsPage() {
+                const totalProducts = productRows.length;
+                const totalPages = Math.max(1, Math.ceil(totalProducts / productsPageSize));
+                productsCurrentPage = Math.min(Math.max(productsCurrentPage, 1), totalPages);
+                const start = (productsCurrentPage - 1) * productsPageSize;
+                const end = start + productsPageSize;
+
+                productRows.forEach((row, index) => {
+                    const inPage = index >= start && index < end;
+                    row.classList.toggle('hidden', !inPage);
+                    const financingRow = getFinancingRow(row);
+                    if (!inPage && financingRow) {
+                        financingRow.classList.add('hidden');
+                    }
+                });
+
+                if (productsPageInfo) {
+                    productsPageInfo.textContent = totalProducts === 0
+                        ? 'Sin productos'
+                        : ('Pagina ' + productsCurrentPage + ' de ' + totalPages + ' · Mostrando hasta 15 productos');
+                }
+                if (productsPrevPageButton) {
+                    productsPrevPageButton.disabled = productsCurrentPage <= 1 || totalProducts === 0;
+                    productsPrevPageButton.classList.toggle('opacity-50', productsPrevPageButton.disabled);
+                    productsPrevPageButton.classList.toggle('cursor-not-allowed', productsPrevPageButton.disabled);
+                }
+                if (productsNextPageButton) {
+                    productsNextPageButton.disabled = productsCurrentPage >= totalPages || totalProducts === 0;
+                    productsNextPageButton.classList.toggle('opacity-50', productsNextPageButton.disabled);
+                    productsNextPageButton.classList.toggle('cursor-not-allowed', productsNextPageButton.disabled);
+                }
+            }
+
+            function showProductPageForRow(productRow) {
+                const productIndex = productRows.indexOf(productRow);
+                if (productIndex < 0) {
+                    return;
+                }
+                productsCurrentPage = Math.floor(productIndex / productsPageSize) + 1;
+                renderProductsPage();
             }
 
             function setPanelText(panel, selector, value) {
@@ -643,7 +712,11 @@
                 if (!row) {
                     return;
                 }
-                document.querySelectorAll('.product-row').forEach(item => item.classList.remove('bg-amber-100'));
+                showProductPageForRow(row);
+                document.querySelectorAll('.product-row').forEach(item => {
+                    item.classList.remove('bg-amber-50');
+                    item.classList.remove('bg-amber-100');
+                });
                 row.classList.add('bg-amber-100');
                 row.scrollIntoView({behavior: 'smooth', block: 'center'});
                 const button = row.querySelector('.toggle-financing-btn');
@@ -759,6 +832,24 @@
                     }
                 });
             });
+
+            if (productsPrevPageButton) {
+                productsPrevPageButton.addEventListener('click', function () {
+                    if (productsCurrentPage > 1) {
+                        productsCurrentPage -= 1;
+                        renderProductsPage();
+                    }
+                });
+            }
+            if (productsNextPageButton) {
+                productsNextPageButton.addEventListener('click', function () {
+                    const totalPages = Math.max(1, Math.ceil(productRows.length / productsPageSize));
+                    if (productsCurrentPage < totalPages) {
+                        productsCurrentPage += 1;
+                        renderProductsPage();
+                    }
+                });
+            }
 
             document.querySelectorAll('.product-image-trigger').forEach(button => {
                 button.addEventListener('click', function () {
@@ -916,6 +1007,12 @@
                     closeImageModal();
                 }
             });
+            const focusedProductRow = document.querySelector('.product-row.bg-amber-50');
+            if (focusedProductRow) {
+                showProductPageForRow(focusedProductRow);
+            } else {
+                renderProductsPage();
+            }
             renderHistoryRows();
         })();
     </script>
