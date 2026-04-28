@@ -4,6 +4,8 @@ import com.sales.maidav.model.product.Product;
 import com.sales.maidav.model.product.ProductPriceAdjustment;
 import com.sales.maidav.model.product.PriceAdjustmentScope;
 import com.sales.maidav.model.product.PriceAdjustmentType;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -18,6 +20,7 @@ public interface ProductService {
     long count();
     long countLowStock();
     List<Product> findLowStock();
+    Page<Product> findPageForListing(boolean lowStock, String q, Long providerId, String updateAgeFilter, Pageable pageable);
     long bulkAdjustPrices(BigDecimal percentage, Long providerId, PriceAdjustmentType adjustmentType, PriceAdjustmentScope scope);
     List<ProductPriceAdjustment> findRecentAdjustments();
     Map<Long, String> findAdjustmentProductCodes(List<Long> adjustmentIds);

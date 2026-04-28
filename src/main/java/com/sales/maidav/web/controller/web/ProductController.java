@@ -12,6 +12,9 @@ import com.sales.maidav.service.product.ProviderService;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -28,10 +31,8 @@ import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 
@@ -39,6 +40,8 @@ import java.util.UUID;
 @RequestMapping("/products")
 @RequiredArgsConstructor
 public class ProductController {
+
+    private static final int PRODUCT_PAGE_SIZE = 15;
 
     @InitBinder
     public void initBinder(WebDataBinder binder) {
@@ -110,34 +113,32 @@ public class ProductController {
                        @RequestParam(required = false) String q,
                        @RequestParam(required = false) Long providerId,
                        @RequestParam(required = false) String updateAgeFilter,
+                       @RequestParam(defaultValue = "0") Integer page,
                        @RequestParam(required = false) Long productId,
                        Model model) {
-        List<Product> products;
+        int safePage = page == null || page < 0 ? 0 : page;
+        Page<Product> productsPage = productService.findPageForListing(
+                Boolean.TRUE.equals(lowStock),
+                q,
+                providerId,
+                updateAgeFilter,
+                PageRequest.of(
+                        safePage,
+                        PRODUCT_PAGE_SIZE,
+                        Sort.by(Sort.Order.asc("id"))
+                )
+        );
         if (Boolean.TRUE.equals(lowStock)) {
-            products = productService.findLowStock();
             model.addAttribute("lowStockOnly", true);
-        } else {
-            products = productService.findAll();
         }
-        if (providerId != null) {
-            products = products.stream()
-                    .filter(p -> p.getProvider() != null && providerId.equals(p.getProvider().getId()))
-                    .toList();
-        }
-        if (q != null && !q.isBlank()) {
-            String term = q.trim().toLowerCase(Locale.ROOT);
-            products = products.stream()
-                    .filter(p -> contains(p.getProductCode(), term)
-                            || contains(p.getBarcode(), term)
-                            || contains(p.getDescription(), term)
-                            || (p.getProvider() != null && contains(p.getProvider().getName(), term)))
-                    .toList();
-        }
-        products = filterByUpdateAge(products, updateAgeFilter);
         model.addAttribute("q", q);
         model.addAttribute("providerId", providerId);
         model.addAttribute("updateAgeFilter", updateAgeFilter);
-        model.addAttribute("products", products);
+        model.addAttribute("products", productsPage.getContent());
+        model.addAttribute("productPage", productsPage);
+        model.addAttribute("currentPage", productsPage.getNumber());
+        model.addAttribute("totalPages", productsPage.getTotalPages());
+        model.addAttribute("pageSize", PRODUCT_PAGE_SIZE);
         model.addAttribute("providers", providerService.findAll());
         model.addAttribute("adjustmentTypes", PriceAdjustmentType.values());
         List<ProductPriceAdjustment> adjustments = productService.findRecentAdjustments();
@@ -148,39 +149,6 @@ public class ProductController {
         model.addAttribute("focusProductId", productId);
         model.addAttribute("calculatorConfig", buildCalculatorConfig());
         return "pages/products/index";
-    }
-
-    private List<Product> filterByUpdateAge(List<Product> products, String updateAgeFilter) {
-        if (products == null || products.isEmpty() || updateAgeFilter == null || updateAgeFilter.isBlank()) {
-            return products;
-        }
-        LocalDateTime now = LocalDateTime.now();
-        return switch (updateAgeFilter.trim().toUpperCase(Locale.ROOT)) {
-            case "RECENT_15" -> products.stream()
-                    .filter(product -> lastUpdatedAt(product).isAfter(now.minusDays(15)))
-                    .toList();
-            case "RECENT_30" -> products.stream()
-                    .filter(product -> lastUpdatedAt(product).isAfter(now.minusDays(30)))
-                    .toList();
-            case "STALE_30" -> products.stream()
-                    .filter(product -> !lastUpdatedAt(product).isAfter(now.minusDays(30)))
-                    .toList();
-            case "STALE_60" -> products.stream()
-                    .filter(product -> !lastUpdatedAt(product).isAfter(now.minusDays(60)))
-                    .toList();
-            default -> products;
-        };
-    }
-
-    private LocalDateTime lastUpdatedAt(Product product) {
-        if (product == null) {
-            return LocalDateTime.MIN;
-        }
-        return product.getUpdatedAt() != null ? product.getUpdatedAt() : product.getCreatedAt();
-    }
-
-    private boolean contains(String value, String term) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(term);
     }
 
     private Map<String, Object> buildCalculatorConfig() {

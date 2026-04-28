@@ -269,9 +269,11 @@
                                 th:attr="data-image=${product.imagePath},data-description=${product.description}">
                             <img th:src="${product.imagePath}"
                                  alt="Imagen"
+                                 onerror="this.closest('button').classList.add('hidden'); this.closest('td').querySelector('.product-image-missing')?.classList.remove('hidden');"
                                  class="h-16 w-16 object-cover"/>
                         </button>
-                        <span th:if="${product.imagePath == null}" class="text-xs text-gray-500">Sin imagen</span>
+                        <span class="product-image-missing text-xs text-gray-500"
+                              th:classappend="${product.imagePath != null} ? ' hidden' : ''">Sin imagen</span>
                     </td>
                     <td class="px-4 py-3 align-top">
                         <div class="max-w-sm">
@@ -418,18 +420,29 @@
         </table>
         </div>
         <div class="border-t border-slate-200 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <span id="products-page-info" class="text-sm text-slate-600">Pagina 1</span>
+            <span class="text-sm text-slate-600"
+                  th:text="${totalPages > 0 ? 'Pagina ' + (currentPage + 1) + ' de ' + totalPages + ' · Mostrando hasta ' + pageSize + ' productos' : 'Sin productos'}">
+                Pagina 1
+            </span>
             <div class="flex items-center gap-2">
-                <button type="button"
-                        id="products-prev-page"
-                        class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                <a th:if="${currentPage > 0}"
+                   th:href="@{/products(page=${currentPage - 1},lowStock=${lowStockOnly},q=${q},providerId=${providerId},updateAgeFilter=${updateAgeFilter},productId=${focusProductId})}"
+                   class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
                     Anterior
-                </button>
-                <button type="button"
-                        id="products-next-page"
-                        class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                </a>
+                <span th:if="${currentPage == 0}"
+                      class="rounded border border-slate-200 px-3 py-1.5 text-sm text-slate-400">
+                    Anterior
+                </span>
+                <a th:if="${currentPage + 1 < totalPages}"
+                   th:href="@{/products(page=${currentPage + 1},lowStock=${lowStockOnly},q=${q},providerId=${providerId},updateAgeFilter=${updateAgeFilter},productId=${focusProductId})}"
+                   class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
                     Siguiente
-                </button>
+                </a>
+                <span th:if="${currentPage + 1 >= totalPages}"
+                      class="rounded border border-slate-200 px-3 py-1.5 text-sm text-slate-400">
+                    Siguiente
+                </span>
             </div>
         </div>
     </div>
@@ -479,15 +492,10 @@
             const productScanStatus = document.getElementById('productScanStatus');
             const scanLookupResult = document.getElementById('scanLookupResult');
             const productRows = Array.from(document.querySelectorAll('.product-row'));
-            const productsPrevPageButton = document.getElementById('products-prev-page');
-            const productsNextPageButton = document.getElementById('products-next-page');
-            const productsPageInfo = document.getElementById('products-page-info');
             const productImageModal = document.getElementById('productImageModal');
             const closeProductImageModal = document.getElementById('closeProductImageModal');
             const productImageModalContent = document.getElementById('productImageModalContent');
             const productImageCaption = document.getElementById('productImageCaption');
-            const productsPageSize = 15;
-            let productsCurrentPage = 1;
             let productScanStream = null;
             let productScanInterval = null;
 
@@ -512,53 +520,6 @@
 
             function money(value) {
                 return '$' + parseNumber(value).toFixed(2);
-            }
-
-            function getFinancingRow(productRow) {
-                const nextRow = productRow ? productRow.nextElementSibling : null;
-                return nextRow && nextRow.classList.contains('financing-row') ? nextRow : null;
-            }
-
-            function renderProductsPage() {
-                const totalProducts = productRows.length;
-                const totalPages = Math.max(1, Math.ceil(totalProducts / productsPageSize));
-                productsCurrentPage = Math.min(Math.max(productsCurrentPage, 1), totalPages);
-                const start = (productsCurrentPage - 1) * productsPageSize;
-                const end = start + productsPageSize;
-
-                productRows.forEach((row, index) => {
-                    const inPage = index >= start && index < end;
-                    row.classList.toggle('hidden', !inPage);
-                    const financingRow = getFinancingRow(row);
-                    if (!inPage && financingRow) {
-                        financingRow.classList.add('hidden');
-                    }
-                });
-
-                if (productsPageInfo) {
-                    productsPageInfo.textContent = totalProducts === 0
-                        ? 'Sin productos'
-                        : ('Pagina ' + productsCurrentPage + ' de ' + totalPages + ' · Mostrando hasta 15 productos');
-                }
-                if (productsPrevPageButton) {
-                    productsPrevPageButton.disabled = productsCurrentPage <= 1 || totalProducts === 0;
-                    productsPrevPageButton.classList.toggle('opacity-50', productsPrevPageButton.disabled);
-                    productsPrevPageButton.classList.toggle('cursor-not-allowed', productsPrevPageButton.disabled);
-                }
-                if (productsNextPageButton) {
-                    productsNextPageButton.disabled = productsCurrentPage >= totalPages || totalProducts === 0;
-                    productsNextPageButton.classList.toggle('opacity-50', productsNextPageButton.disabled);
-                    productsNextPageButton.classList.toggle('cursor-not-allowed', productsNextPageButton.disabled);
-                }
-            }
-
-            function showProductPageForRow(productRow) {
-                const productIndex = productRows.indexOf(productRow);
-                if (productIndex < 0) {
-                    return;
-                }
-                productsCurrentPage = Math.floor(productIndex / productsPageSize) + 1;
-                renderProductsPage();
             }
 
             function setPanelText(panel, selector, value) {
@@ -712,7 +673,6 @@
                 if (!row) {
                     return;
                 }
-                showProductPageForRow(row);
                 document.querySelectorAll('.product-row').forEach(item => {
                     item.classList.remove('bg-amber-50');
                     item.classList.remove('bg-amber-100');
@@ -832,24 +792,6 @@
                     }
                 });
             });
-
-            if (productsPrevPageButton) {
-                productsPrevPageButton.addEventListener('click', function () {
-                    if (productsCurrentPage > 1) {
-                        productsCurrentPage -= 1;
-                        renderProductsPage();
-                    }
-                });
-            }
-            if (productsNextPageButton) {
-                productsNextPageButton.addEventListener('click', function () {
-                    const totalPages = Math.max(1, Math.ceil(productRows.length / productsPageSize));
-                    if (productsCurrentPage < totalPages) {
-                        productsCurrentPage += 1;
-                        renderProductsPage();
-                    }
-                });
-            }
 
             document.querySelectorAll('.product-image-trigger').forEach(button => {
                 button.addEventListener('click', function () {
@@ -1007,12 +949,6 @@
                     closeImageModal();
                 }
             });
-            const focusedProductRow = document.querySelector('.product-row.bg-amber-50');
-            if (focusedProductRow) {
-                showProductPageForRow(focusedProductRow);
-            } else {
-                renderProductsPage();
-            }
             renderHistoryRows();
         })();
     </script>
