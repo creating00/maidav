@@ -10,6 +10,8 @@ import com.sales.maidav.repository.product.ProductPriceAdjustmentRepository;
 import com.sales.maidav.repository.product.ProductRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -103,6 +105,40 @@ public class ProductServiceImpl implements ProductService {
     @Override
     public List<Product> findLowStock() {
         return productRepository.findLowStock();
+    }
+
+    @Override
+    public Page<Product> findPageForListing(boolean lowStock, String q, Long providerId, String updateAgeFilter, Pageable pageable) {
+        String normalizedTerm = (q == null || q.isBlank())
+                ? null
+                : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+        LocalDateTime updatedAfter = null;
+        LocalDateTime updatedBefore = null;
+        LocalDateTime now = LocalDateTime.now();
+        if (updateAgeFilter != null && !updateAgeFilter.isBlank()) {
+            switch (updateAgeFilter.trim().toUpperCase(Locale.ROOT)) {
+                case "RECENT_15" -> updatedAfter = now.minusDays(15);
+                case "RECENT_30" -> updatedAfter = now.minusDays(30);
+                case "STALE_30" -> updatedBefore = now.minusDays(30);
+                case "STALE_60" -> updatedBefore = now.minusDays(60);
+                default -> {
+                    updatedAfter = null;
+                    updatedBefore = null;
+                }
+            }
+        }
+        boolean applyUpdatedAfter = updatedAfter != null;
+        boolean applyUpdatedBefore = updatedBefore != null;
+        return productRepository.findPageForListing(
+                lowStock,
+                providerId,
+                normalizedTerm,
+                applyUpdatedAfter,
+                applyUpdatedAfter ? updatedAfter : now,
+                applyUpdatedBefore,
+                applyUpdatedBefore ? updatedBefore : now,
+                pageable
+        );
     }
 
     @Override
