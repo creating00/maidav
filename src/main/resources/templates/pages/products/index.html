@@ -477,11 +477,13 @@
             </div>
             <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-black">
                 <video id="productScanVideo" autoplay playsinline class="h-72 w-full object-cover"></video>
+                <div id="productScanReader" class="hidden h-72 w-full"></div>
             </div>
             <p id="productScanStatus" class="mt-3 text-sm text-slate-600">Preparando camara...</p>
         </div>
     </div>
 
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script>
         (function () {
             const calcConfigEl = document.getElementById('calcConfig');
@@ -489,6 +491,7 @@
             const productScanModal = document.getElementById('productScanModal');
             const closeProductScanBtn = document.getElementById('closeProductScanBtn');
             const productScanVideo = document.getElementById('productScanVideo');
+            const productScanReader = document.getElementById('productScanReader');
             const productScanStatus = document.getElementById('productScanStatus');
             const scanLookupResult = document.getElementById('scanLookupResult');
             const productRows = Array.from(document.querySelectorAll('.product-row'));
@@ -497,7 +500,13 @@
             const productImageModalContent = document.getElementById('productImageModalContent');
             const productImageCaption = document.getElementById('productImageCaption');
             let productScanStream = null;
-            let productScanInterval = null;
+            let productScanFrame = null;
+            let productScanActive = false;
+            let productBarcodeDetector = null;
+            let lastProductScan = '';
+            let lastProductScanAt = 0;
+            let productHtml5QrCode = null;
+            let productScannerMode = null;
 
             function parseNumber(value) {
                 if (value === null || value === undefined || value === '') {
@@ -706,68 +715,210 @@
                 scanLookupResult.classList.toggle('text-slate-700', !isError);
             }
 
-            async function openProductScanner() {
-                if (!window.BarcodeDetector) {
-                    showLookupResult('Este navegador no soporta escaneo nativo. Probï¿½ con Chrome en Android.', true);
-                    return;
-                }
-                try {
-                    productScanStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: { ideal: 'environment' } },
-                        audio: false
-                    });
-                    if (productScanVideo) {
-                        productScanVideo.srcObject = productScanStream;
-                    }
-                    if (productScanStatus) {
-                        productScanStatus.textContent = 'Escaneando...';
-                    }
-                    if (productScanModal) {
-                        productScanModal.classList.remove('hidden');
-                        productScanModal.classList.add('flex');
-                    }
-
-                    const detector = new BarcodeDetector({
-                        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
-                    });
-                    productScanInterval = window.setInterval(async function () {
-                        if (!productScanVideo || productScanVideo.readyState < 2) {
-                            return;
-                        }
-                        const barcodes = await detector.detect(productScanVideo);
-                        if (!barcodes.length) {
-                            return;
-                        }
-                        const code = barcodes[0].rawValue || '';
-                        const row = resolveProductByBarcode(code);
-                        closeProductScanner();
-                        if (!row) {
-                            showLookupResult('No se encontrï¿½ un producto con el codigo ' + code + '.', true);
-                            return;
-                        }
-                        showLookupResult('Producto encontrado: ' + (row.dataset.description || code), false);
-                        openFinancingRowByProductId(row.dataset.productId);
-                    }, 500);
-                } catch (error) {
-                    showLookupResult('No se pudo acceder a la camara.', true);
+            function showProductScanModal() {
+                if (productScanModal) {
+                    productScanModal.classList.remove('hidden');
+                    productScanModal.classList.add('flex');
                 }
             }
 
+            function useNativeScannerUI() {
+                if (productScanVideo) {
+                    productScanVideo.classList.remove('hidden');
+                }
+                if (productScanReader) {
+                    productScanReader.classList.add('hidden');
+                    productScanReader.innerHTML = '';
+                }
+            }
+
+            function useFallbackScannerUI() {
+                if (productScanVideo) {
+                    productScanVideo.classList.add('hidden');
+                }
+                if (productScanReader) {
+                    productScanReader.classList.remove('hidden');
+                    productScanReader.innerHTML = '';
+                }
+            }
+
+            function handleDetectedProductCode(rawValue) {
+                const code = String(rawValue || '').trim();
+                if (!code) {
+                    return false;
+                }
+                const now = Date.now();
+                if (code === lastProductScan && (now - lastProductScanAt) < 2500) {
+                    return true;
+                }
+                lastProductScan = code;
+                lastProductScanAt = now;
+                const row = resolveProductByBarcode(code);
+                closeProductScanner();
+                if (!row) {
+                    showLookupResult('No se encontro un producto con el codigo ' + code + '.', true);
+                    return true;
+                }
+                showLookupResult('Producto encontrado: ' + (row.dataset.description || code), false);
+                openFinancingRowByProductId(row.dataset.productId);
+                return true;
+            }
+
+            async function openProductScanner() {
+                if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    showLookupResult('La camara no esta disponible en este navegador o contexto. Abra la pagina por HTTPS y revise permisos.', true);
+                    return;
+                }
+
+                try {
+                    closeProductScanner();
+                    showProductScanModal();
+                    if (productScanStatus) {
+                        productScanStatus.textContent = 'Preparando camara...';
+                    }
+                    lastProductScan = '';
+                    lastProductScanAt = 0;
+
+                    if (window.BarcodeDetector) {
+                        useNativeScannerUI();
+                        if (!productBarcodeDetector) {
+                            productBarcodeDetector = new window.BarcodeDetector({
+                                formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128']
+                            });
+                        }
+                        productScanStream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: { ideal: 'environment' } },
+                            audio: false
+                        });
+                        if (productScanVideo) {
+                            productScanVideo.srcObject = productScanStream;
+                            await productScanVideo.play();
+                        }
+                        if (productScanStatus) {
+                            productScanStatus.textContent = 'Apunte la camara al codigo del producto.';
+                        }
+                        productScannerMode = 'native';
+                        productScanActive = true;
+                        scanProductFrame();
+                        return;
+                    }
+
+                    if (!window.Html5Qrcode || !window.Html5QrcodeSupportedFormats || !productScanReader) {
+                        throw new Error('fallback-unavailable');
+                    }
+
+                    useFallbackScannerUI();
+                    productHtml5QrCode = new window.Html5Qrcode('productScanReader', {
+                        formatsToSupport: [
+                            window.Html5QrcodeSupportedFormats.EAN_13,
+                            window.Html5QrcodeSupportedFormats.EAN_8,
+                            window.Html5QrcodeSupportedFormats.UPC_A,
+                            window.Html5QrcodeSupportedFormats.UPC_E,
+                            window.Html5QrcodeSupportedFormats.CODE_128
+                        ]
+                    });
+                    productScannerMode = 'fallback';
+                    productScanActive = true;
+                    await productHtml5QrCode.start(
+                        {facingMode: 'environment'},
+                        {
+                            fps: 10,
+                            qrbox: {width: 280, height: 180},
+                            aspectRatio: 1.777778
+                        },
+                        function (decodedText) {
+                            handleDetectedProductCode(decodedText);
+                        },
+                        function () {
+                        }
+                    );
+                    if (productScanStatus) {
+                        productScanStatus.textContent = 'Apunte la camara al codigo del producto.';
+                    }
+                } catch (_) {
+                    if (productScannerMode === 'fallback' && productHtml5QrCode) {
+                        productHtml5QrCode.stop()
+                            .catch(() => {
+                            })
+                            .finally(() => {
+                                productHtml5QrCode.clear().catch(() => {
+                                });
+                            });
+                        productHtml5QrCode = null;
+                    }
+                    productScannerMode = null;
+                    productScanActive = false;
+                    showLookupResult('No se pudo abrir la camara. Revise permisos del navegador.', true);
+                    if (productScanStatus) {
+                        productScanStatus.textContent = 'No se pudo abrir la camara. Revise permisos del navegador.';
+                    }
+                }
+            }
+
+            function scanProductFrame() {
+                if (!productScanActive || !productBarcodeDetector || !productScanVideo) {
+                    return;
+                }
+                if (productScanVideo.readyState < 2) {
+                    productScanFrame = window.requestAnimationFrame(scanProductFrame);
+                    return;
+                }
+                productBarcodeDetector.detect(productScanVideo)
+                    .then(barcodes => {
+                        if (!productScanActive || !Array.isArray(barcodes) || !barcodes.length) {
+                            return;
+                        }
+                        handleDetectedProductCode(barcodes[0].rawValue || '');
+                    })
+                    .catch(() => {
+                        if (productScanStatus) {
+                            productScanStatus.textContent = 'No se pudo leer el codigo. Acerque mas la camara.';
+                        }
+                    })
+                    .finally(() => {
+                        if (productScanActive) {
+                            productScanFrame = window.requestAnimationFrame(scanProductFrame);
+                        }
+                    });
+            }
+
             function closeProductScanner() {
-                if (productScanInterval) {
-                    window.clearInterval(productScanInterval);
-                    productScanInterval = null;
+                productScanActive = false;
+                productScannerMode = null;
+                if (productScanFrame) {
+                    window.cancelAnimationFrame(productScanFrame);
+                    productScanFrame = null;
                 }
                 if (productScanStream) {
                     productScanStream.getTracks().forEach(track => track.stop());
                     productScanStream = null;
                 }
                 if (productScanVideo) {
+                    productScanVideo.pause();
                     productScanVideo.srcObject = null;
+                    productScanVideo.classList.remove('hidden');
+                }
+                if (productHtml5QrCode) {
+                    const html5QrCode = productHtml5QrCode;
+                    productHtml5QrCode = null;
+                    html5QrCode.stop()
+                        .catch(() => {
+                        })
+                        .finally(() => {
+                            html5QrCode.clear().catch(() => {
+                            });
+                        });
+                }
+                if (productScanReader) {
+                    productScanReader.classList.add('hidden');
+                    productScanReader.innerHTML = '';
                 }
                 if (productScanModal) {
                     productScanModal.classList.add('hidden');
                     productScanModal.classList.remove('flex');
+                }
+                if (productScanStatus) {
+                    productScanStatus.textContent = 'Preparando camara...';
                 }
             }
 
