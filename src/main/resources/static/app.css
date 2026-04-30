@@ -2523,16 +2523,17 @@ body.auth-shell::before {
     .app-sidebar__frame {
         height: 100%;
         min-height: 100%;
-        padding: 14px 12px;
+        padding: 0;
+        background: #fffaf2;
     }
 
     .app-sidebar__panel {
         border-right: 0;
         min-height: 100%;
         border-radius: 26px;
-        background: rgba(255, 255, 255, 0.92);
-        box-shadow: var(--shadow-strong);
-        padding: 12px;
+        background: #fffaf2;
+        box-shadow: none;
+        padding: 14px 12px 18px;
     }
 
     .app-main {
@@ -2564,6 +2565,15 @@ body.auth-shell::before {
     .stock-pill__label,
     .user-email {
         display: none;
+    }
+
+    .nav-link {
+        background: transparent;
+    }
+
+    .nav-link--active {
+        background: #ffffff;
+        box-shadow: 0 20px 32px -28px rgba(23, 34, 43, 0.35);
     }
 
     .auth-shell--login {
@@ -2747,5 +2757,10 @@ body.auth-shell::before {
 
     .header-brand__name {
         font-size: 0.95rem;
+    }
+
+    .app-sidebar__panel {
+        border-radius: 0 0 28px 0;
+        padding-right: 10px;
     }
 }
