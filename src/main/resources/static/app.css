@@ -2488,6 +2488,7 @@ body.auth-shell::before {
 
     .app-header__inner {
         gap: 12px;
+        align-items: center;
     }
 
     .header-brand__page,
@@ -2521,11 +2522,13 @@ body.auth-shell::before {
 
     .app-sidebar__frame {
         height: 100%;
+        min-height: 100%;
         padding: 14px 12px;
     }
 
     .app-sidebar__panel {
         border-right: 0;
+        min-height: 100%;
         border-radius: 26px;
         background: rgba(255, 255, 255, 0.92);
         box-shadow: var(--shadow-strong);
@@ -2719,7 +2722,7 @@ body.auth-shell::before {
     }
 
     .app-header__inner {
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
     }
 
     .app-header__inner > * {
@@ -2727,13 +2730,22 @@ body.auth-shell::before {
     }
 
     .header-actions {
-        width: 100%;
-        justify-content: space-between;
+        flex: 0 0 auto;
+        width: auto;
+        justify-content: flex-end;
     }
 
     .stock-pill,
     .user-button {
-        flex: 1 1 0;
+        flex: 0 1 auto;
         justify-content: center;
+    }
+
+    .header-brand {
+        gap: 10px;
+    }
+
+    .header-brand__name {
+        font-size: 0.95rem;
     }
 }
