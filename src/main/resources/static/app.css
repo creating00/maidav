@@ -2567,8 +2567,14 @@ body.auth-shell::before {
         display: none;
     }
 
+    .nav-section {
+        padding: 10px;
+        border-radius: 24px;
+        background: #fffaf2;
+    }
+
     .nav-link {
-        background: transparent;
+        background: #fffaf2;
     }
 
     .nav-link--active {
