@@ -1,6 +1,8 @@
 package com.sales.maidav.service.sale;
 
 import com.sales.maidav.model.sale.*;
+import com.sales.maidav.model.settings.CompanySettings;
+import com.sales.maidav.model.settings.MoraNotificationTiming;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
@@ -19,6 +21,7 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -36,6 +39,7 @@ import java.util.Set;
 public class CreditAccountServiceImpl implements CreditAccountService {
 
     private static final int ALLOCATION_SUMMARY_MAX_LENGTH = 255;
+    private static final DateTimeFormatter MORA_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
@@ -259,6 +263,58 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         return carryForwardAmounts;
     }
 
+    @Override
+    public MoraWarningInfo getMoraWarning(Long accountId) {
+        CreditAccount account = findById(accountId);
+        CompanySettings settings = companySettingsService.getSettings();
+        if (!isMoraWarningConfigured(settings)) {
+            return MoraWarningInfo.notConfigured("Configura el aviso de mora en Configuracion para habilitar este boton");
+        }
+
+        LocalDate today = LocalDate.now();
+        List<CreditInstallment> pendingInstallments = creditInstallmentRepository
+                .findByAccount_IdOrderByInstallmentNumber(accountId)
+                .stream()
+                .filter(this::isPendingInstallment)
+                .filter(installment -> installment.getDueDate() != null)
+                .sorted(Comparator.comparing(CreditInstallment::getDueDate)
+                        .thenComparing(CreditInstallment::getInstallmentNumber, Comparator.nullsLast(Integer::compareTo)))
+                .toList();
+
+        if (pendingInstallments.isEmpty()) {
+            return MoraWarningInfo.empty(true, "No hay cuotas pendientes dentro de esta cuenta");
+        }
+
+        CreditInstallment highlightedInstallment = pendingInstallments.stream()
+                .filter(installment -> isWithinMoraWarningRange(installment, today, settings))
+                .findFirst()
+                .orElse(null);
+
+        CreditInstallment messageInstallment = highlightedInstallment != null
+                ? highlightedInstallment
+                : pendingInstallments.get(0);
+        BigDecimal pendingAmount = remainingAmount(messageInstallment.getAmount(), messageInstallment.getPaidAmount());
+        long daysOverdue = Math.max(0, ChronoUnit.DAYS.between(messageInstallment.getDueDate(), today));
+        long daysUntilDue = Math.max(0, ChronoUnit.DAYS.between(today, messageInstallment.getDueDate()));
+        String tooltip = highlightedInstallment != null
+                ? "Cliente dentro del rango de aviso de mora"
+                : "Cliente fuera del rango de aviso de mora";
+
+        return new MoraWarningInfo(
+                true,
+                true,
+                highlightedInstallment != null,
+                buildMoraMessage(account, messageInstallment, today, settings),
+                tooltip,
+                messageInstallment.getId(),
+                messageInstallment.getInstallmentNumber(),
+                messageInstallment.getDueDate(),
+                daysOverdue,
+                daysUntilDue,
+                pendingAmount
+        );
+    }
+
     private List<CreditInstallment> resolveInstallments(Long accountId, List<Long> installmentIds) {
         List<CreditInstallment> activeInstallments = creditInstallmentRepository
                 .findByAccount_IdOrderByInstallmentNumber(accountId)
@@ -385,6 +441,106 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             return new BigDecimal("1.26");
         }
         return recargo;
+    }
+
+    private boolean isWithinMoraWarningRange(CreditInstallment installment,
+                                             LocalDate today,
+                                             CompanySettings settings) {
+        if (installment == null || installment.getDueDate() == null || today == null || !isMoraWarningConfigured(settings)) {
+            return false;
+        }
+        return isWithinMoraWarningRange(
+                installment.getDueDate(),
+                today,
+                settings.getMoraNoticeDays(),
+                settings.getMoraNoticeTiming()
+        );
+    }
+
+    private boolean isWithinMoraWarningRange(LocalDate dueDate,
+                                             LocalDate today,
+                                             Integer configuredDays,
+                                             MoraNotificationTiming timing) {
+        if (dueDate == null || today == null || configuredDays == null || timing == null || configuredDays < 0) {
+            return false;
+        }
+        LocalDate start = timing == MoraNotificationTiming.BEFORE_DUE_DATE
+                ? dueDate.minusDays(configuredDays)
+                : dueDate;
+        LocalDate end = timing == MoraNotificationTiming.BEFORE_DUE_DATE
+                ? dueDate
+                : dueDate.plusDays(configuredDays);
+        return !today.isBefore(start) && !today.isAfter(end);
+    }
+
+    private String buildMoraMessage(CreditAccount account,
+                                    CreditInstallment installment,
+                                    LocalDate today,
+                                    CompanySettings settings) {
+        if (account == null || installment == null || !isMoraWarningConfigured(settings)) {
+            return "";
+        }
+        BigDecimal pendingAmount = remainingAmount(installment.getAmount(), installment.getPaidAmount());
+        long daysOverdue = Math.max(0, ChronoUnit.DAYS.between(installment.getDueDate(), today));
+        long daysUntilDue = Math.max(0, ChronoUnit.DAYS.between(today, installment.getDueDate()));
+
+        Map<String, String> placeholders = new LinkedHashMap<>();
+        placeholders.put("{CLIENTE}", buildClientFullName(account));
+        placeholders.put("{CUOTA}", "#" + installment.getInstallmentNumber());
+        placeholders.put("{FECHA_VENCIMIENTO}", formatDate(installment.getDueDate()));
+        placeholders.put("{DIAS_MORA}", String.valueOf(daysOverdue));
+        placeholders.put("{DIAS_PARA_VENCIMIENTO}", String.valueOf(daysUntilDue));
+        placeholders.put("{IMPORTE}", formatMoney(pendingAmount));
+        placeholders.put("{NUMERO_CREDITO}", account.getAccountNumber() != null ? account.getAccountNumber() : String.valueOf(account.getId()));
+        placeholders.put("{SALDO_CUENTA}", formatMoney(account.getBalance()));
+
+        String message = settings.getMoraNoticeTemplate();
+        for (Map.Entry<String, String> entry : placeholders.entrySet()) {
+            message = message.replace(entry.getKey(), entry.getValue());
+        }
+        return message;
+    }
+
+    private boolean isMoraWarningConfigured(CompanySettings settings) {
+        return settings != null
+                && settings.getMoraNoticeTemplate() != null
+                && !settings.getMoraNoticeTemplate().isBlank()
+                && settings.getMoraNoticeDays() != null
+                && settings.getMoraNoticeDays() >= 0
+                && settings.getMoraNoticeTiming() != null;
+    }
+
+    private boolean isPendingInstallment(CreditInstallment installment) {
+        return installment != null
+                && !installment.isVoided()
+                && installment.getStatus() != InstallmentStatus.VOID
+                && (installment.getStatus() == InstallmentStatus.PENDING
+                || installment.getStatus() == InstallmentStatus.PARTIAL);
+    }
+
+    private BigDecimal remainingAmount(BigDecimal amount, BigDecimal paidAmount) {
+        if (amount == null) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal paid = paidAmount == null ? BigDecimal.ZERO : paidAmount;
+        BigDecimal remaining = amount.subtract(paid);
+        return remaining.compareTo(BigDecimal.ZERO) < 0
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : remaining.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private String buildClientFullName(CreditAccount account) {
+        if (account == null || account.getClient() == null) {
+            return "-";
+        }
+        String firstName = account.getClient().getFirstName() == null ? "" : account.getClient().getFirstName().trim();
+        String lastName = account.getClient().getLastName() == null ? "" : account.getClient().getLastName().trim();
+        String fullName = (firstName + " " + lastName).trim();
+        return fullName.isEmpty() ? "-" : fullName;
+    }
+
+    private String formatDate(LocalDate date) {
+        return date == null ? "-" : MORA_DATE_FORMATTER.format(date);
     }
 
     private void recalculateAccountState(CreditAccount account) {

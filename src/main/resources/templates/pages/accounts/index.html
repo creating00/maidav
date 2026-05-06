@@ -112,10 +112,35 @@
                         </div>
 
                         <div class="flex flex-col items-start gap-3 lg:items-end">
+                            <button type="button"
+                                    th:if="${account.moraWarning != null and account.moraWarning.highlighted}"
+                                    th:disabled="${!account.moraWarning.configured or !account.moraWarning.hasPendingInstallment}"
+                                    th:title="${account.moraWarning.tooltip}"
+                                    th:attr="data-copy-mora-warning=true,data-message=${account.moraWarning.message},data-account-id=${account.id}"
+                                    class="inline-flex items-center gap-2 rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white ring-2 ring-rose-200 transition-colors duration-200 hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M16 1H6a2 2 0 0 0-2 2v14h2V3h10V1Zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H10V7h9v14Z"/>
+                                </svg>
+                                <span>Copiar Aviso de Mora</span>
+                            </button>
+                            <button type="button"
+                                    th:if="${account.moraWarning != null and !account.moraWarning.highlighted}"
+                                    th:disabled="${!account.moraWarning.configured or !account.moraWarning.hasPendingInstallment}"
+                                    th:title="${account.moraWarning.tooltip}"
+                                    th:attr="data-copy-mora-warning=true,data-message=${account.moraWarning.message},data-account-id=${account.id}"
+                                    class="inline-flex items-center gap-2 rounded-full bg-slate-200 px-4 py-2 text-sm font-semibold text-slate-800 transition-colors duration-200 hover:bg-slate-300 disabled:cursor-not-allowed disabled:opacity-60">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                    <path d="M16 1H6a2 2 0 0 0-2 2v14h2V3h10V1Zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H10V7h9v14Z"/>
+                                </svg>
+                                <span>Copiar Aviso de Mora</span>
+                            </button>
                             <a th:href="@{/accounts/{id}(id=${account.id})}"
                                class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
                                 Ver detalle
                             </a>
+                            <p th:if="${account.moraWarning != null and account.moraWarning.configured and account.moraWarning.hasPendingInstallment}"
+                               th:id="${'mora-warning-feedback-' + account.id}"
+                               class="hidden text-xs font-semibold"></p>
                         </div>
                     </div>
 
@@ -160,6 +185,42 @@
             No hay cuentas registradas
         </div>
     </div>
+
+    <script>
+        (function () {
+            const buttons = document.querySelectorAll('[data-copy-mora-warning="true"]');
+            if (!buttons.length) {
+                return;
+            }
+
+            function showFeedback(accountId, message, success) {
+                const feedback = document.getElementById('mora-warning-feedback-' + accountId);
+                if (!feedback) {
+                    return;
+                }
+                feedback.textContent = message;
+                feedback.classList.remove('hidden', 'text-green-700', 'text-red-700');
+                feedback.classList.add(success ? 'text-green-700' : 'text-red-700');
+            }
+
+            buttons.forEach(button => {
+                button.addEventListener('click', async function () {
+                    const message = button.dataset.message || '';
+                    const accountId = button.dataset.accountId;
+                    if (!message.trim()) {
+                        showFeedback(accountId, 'No hay un mensaje disponible para copiar.', false);
+                        return;
+                    }
+                    try {
+                        await navigator.clipboard.writeText(message);
+                        showFeedback(accountId, 'Mensaje copiado correctamente.', true);
+                    } catch (error) {
+                        showFeedback(accountId, 'No se pudo copiar el mensaje.', false);
+                    }
+                });
+            });
+        })();
+    </script>
 
 </section>
 </html>

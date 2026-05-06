@@ -1,6 +1,7 @@
 package com.sales.maidav.web.controller.web;
 
 import com.sales.maidav.model.settings.CompanySettings;
+import com.sales.maidav.model.settings.MoraNotificationTiming;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,7 @@ public class SettingsController {
     @PreAuthorize("hasAuthority('SETTINGS_READ')")
     public String view(Model model) {
         model.addAttribute("settings", companySettingsService.getSettings());
+        populateFormOptions(model);
         return "pages/settings/index";
     }
 
@@ -51,9 +53,14 @@ public class SettingsController {
             return "redirect:/settings";
         } catch (RuntimeException ex) {
             model.addAttribute("settings", settings);
+            populateFormOptions(model);
             model.addAttribute("formError", ex.getMessage());
             return "pages/settings/index";
         }
+    }
+
+    private void populateFormOptions(Model model) {
+        model.addAttribute("moraNotificationTimings", MoraNotificationTiming.values());
     }
 
     private void attachLogo(CompanySettings settings, MultipartFile logo) {

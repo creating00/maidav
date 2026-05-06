@@ -13,6 +13,7 @@ import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.service.sale.CreditPaymentPricingSupport;
 import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.sale.InvalidSaleException;
+import com.sales.maidav.service.sale.MoraWarningInfo;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import com.sales.maidav.service.user.UserService;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -75,6 +77,7 @@ public class CreditAccountController {
         }
         Map<Long, BigDecimal> currentInstallments = new HashMap<>();
         Map<Long, String> dueSchedules = new HashMap<>();
+        Map<Long, MoraWarningInfo> moraWarnings = new HashMap<>();
         for (CreditAccount account : accounts) {
             BigDecimal currentAmount = creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId()).stream()
                     .filter(installment -> installment.getStatus() != InstallmentStatus.PAID)
@@ -85,6 +88,7 @@ public class CreditAccountController {
                     .orElse(null);
             currentInstallments.put(account.getId(), currentAmount);
             dueSchedules.put(account.getId(), formatDueSchedule(account));
+            moraWarnings.put(account.getId(), creditAccountService.getMoraWarning(account.getId()));
         }
         Map<Long, List<AccountProductItemView>> productsByAccount = buildProductsByAccount(accounts);
         model.addAttribute("q", q);
@@ -94,7 +98,7 @@ public class CreditAccountController {
         model.addAttribute("accounts", accounts);
         model.addAttribute("currentInstallments", currentInstallments);
         model.addAttribute("dueSchedules", dueSchedules);
-        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount));
+        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount, moraWarnings));
         model.addAttribute("isAdmin", isAdmin(authentication));
         return "pages/accounts/index";
     }
@@ -125,6 +129,7 @@ public class CreditAccountController {
         BigDecimal currentInstallmentCarryForwardAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal currentInstallmentExpiredCash = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         Boolean currentInstallmentCashPricing = null;
+        Long currentInstallmentDaysOverdue = null;
         Map<Long, BigDecimal> chargeAmounts = new HashMap<>();
         Map<Long, BigDecimal> financedAmounts = new HashMap<>();
         Map<Long, Boolean> cashPricingAvailable = new HashMap<>();
@@ -159,8 +164,12 @@ public class CreditAccountController {
                 );
                 currentInstallmentExpiredCash = expiredCashAmount;
                 currentInstallmentCashPricing = usesCashValue;
+                currentInstallmentDaysOverdue = installment.getDueDate() == null
+                        ? null
+                        : Math.max(0, ChronoUnit.DAYS.between(installment.getDueDate(), LocalDate.now()));
             }
         }
+        MoraWarningInfo moraWarning = creditAccountService.getMoraWarning(id);
         model.addAttribute("account", account);
         model.addAttribute("installments", installments);
         model.addAttribute("activeInstallments", activeInstallments);
@@ -171,6 +180,8 @@ public class CreditAccountController {
         model.addAttribute("currentInstallmentCarryForwardAmount", currentInstallmentCarryForwardAmount);
         model.addAttribute("currentInstallmentExpiredCash", currentInstallmentExpiredCash);
         model.addAttribute("currentInstallmentCashPricing", currentInstallmentCashPricing);
+        model.addAttribute("currentInstallmentDaysOverdue", currentInstallmentDaysOverdue);
+        model.addAttribute("moraWarning", moraWarning);
         model.addAttribute("paymentFrequencyLabel", paymentFrequencyLabel(account));
         model.addAttribute("chargeAmounts", chargeAmounts);
         model.addAttribute("financedAmounts", financedAmounts);
@@ -401,7 +412,8 @@ public class CreditAccountController {
     private List<ClientGroupView> buildClientGroups(List<CreditAccount> accounts,
                                                     Map<Long, BigDecimal> currentInstallments,
                                                     Map<Long, String> dueSchedules,
-                                                    Map<Long, List<AccountProductItemView>> productsByAccount) {
+                                                    Map<Long, List<AccountProductItemView>> productsByAccount,
+                                                    Map<Long, MoraWarningInfo> moraWarnings) {
         Map<Long, MutableClientGroup> groups = new LinkedHashMap<>();
         List<CreditAccount> sortedAccounts = accounts.stream()
                 .sorted((a, b) -> {
@@ -438,7 +450,8 @@ public class CreditAccountController {
                     badge.label,
                     badge.cssClass,
                     resolveSellerDisplay(account),
-                    productsByAccount.getOrDefault(account.getId(), List.of())
+                    productsByAccount.getOrDefault(account.getId(), List.of()),
+                    moraWarnings.get(account.getId())
             ));
         }
 
@@ -753,7 +766,8 @@ public class CreditAccountController {
                                          String paymentFrequency,
                                          String dueSchedule, String badgeLabel, String badgeClass,
                                          String sellerDisplay,
-                                         List<AccountProductItemView> products) {}
+                                         List<AccountProductItemView> products,
+                                         MoraWarningInfo moraWarning) {}
     private record AccountProductItemView(String productCode, String description, Integer quantity, BigDecimal lineTotal) {}
     private record ClientGroupView(String clientName, String nationalId, BigDecimal totalBalance, int activeCredits,
                                    String badgeLabel, String badgeClass, List<ClientAccountItemView> accounts) {}
