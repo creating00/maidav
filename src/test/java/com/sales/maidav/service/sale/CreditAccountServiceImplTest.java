@@ -10,6 +10,7 @@ import com.sales.maidav.model.sale.PaymentFrequency;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleStatus;
 import com.sales.maidav.model.settings.CompanySettings;
+import com.sales.maidav.model.settings.MoraNotificationTiming;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
@@ -39,6 +40,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -514,14 +516,67 @@ class CreditAccountServiceImplTest {
         assertThat(moroseClients).isEqualTo(1);
     }
 
+    @Test
+    void moraWarningHighlightsInstallmentBeforeDueDateWithinConfiguredRange() {
+        CreditAccount account = account(61L, PaymentFrequency.WEEKLY, "1200.00");
+        account.setAccountNumber("CC-61");
+        CreditInstallment installment = installment(account, 611L, 3, "1200.00", LocalDate.now().plusDays(2));
+        mockAccount(account, List.of(installment), new BigDecimal("1.20"));
+
+        MoraWarningInfo warning = service.getMoraWarning(61L);
+
+        assertThat(warning.configured()).isTrue();
+        assertThat(warning.highlighted()).isTrue();
+        assertThat(warning.installmentNumber()).isEqualTo(3);
+        assertThat(warning.daysUntilDue()).isEqualTo(2);
+        assertThat(warning.message()).contains("Juan Perez");
+        assertThat(warning.message()).contains("cuota #3");
+        assertThat(warning.message()).contains("$ 1.200,00");
+    }
+
+    @Test
+    void moraWarningHighlightsInstallmentAfterDueDateWithinConfiguredRange() {
+        CreditAccount account = account(62L, PaymentFrequency.WEEKLY, "900.00");
+        CreditInstallment installment = installment(account, 621L, 1, "900.00", LocalDate.now().minusDays(1));
+        mockAccount(account, List.of(installment), new BigDecimal("1.20"));
+
+        CompanySettings settings = companySettingsService.getSettings();
+        settings.setMoraNoticeTiming(MoraNotificationTiming.AFTER_DUE_DATE);
+        settings.setMoraNoticeDays(2);
+        when(companySettingsService.getSettings()).thenReturn(settings);
+
+        MoraWarningInfo warning = service.getMoraWarning(62L);
+
+        assertThat(warning.highlighted()).isTrue();
+        assertThat(warning.daysOverdue()).isEqualTo(1);
+        assertThat(warning.pendingAmount()).isEqualByComparingTo("900.00");
+    }
+
+    @Test
+    void moraWarningStaysNeutralWhenNoInstallmentFallsInsideConfiguredRange() {
+        CreditAccount account = account(63L, PaymentFrequency.WEEKLY, "700.00");
+        CreditInstallment installment = installment(account, 631L, 1, "700.00", LocalDate.now().plusDays(10));
+        mockAccount(account, List.of(installment), new BigDecimal("1.20"));
+
+        MoraWarningInfo warning = service.getMoraWarning(63L);
+
+        assertThat(warning.configured()).isTrue();
+        assertThat(warning.hasPendingInstallment()).isTrue();
+        assertThat(warning.highlighted()).isFalse();
+        assertThat(warning.tooltip()).contains("fuera del rango");
+    }
+
     private void mockAccount(CreditAccount account, List<CreditInstallment> installments, BigDecimal recargo) {
         CompanySettings settings = new CompanySettings();
         settings.setCalcRecargo(recargo);
+        settings.setMoraNoticeTemplate("Hola {CLIENTE}, le recordamos que la cuota {CUOTA} con vencimiento el {FECHA_VENCIMIENTO} se encuentra pendiente de pago por {IMPORTE}.");
+        settings.setMoraNoticeDays(2);
+        settings.setMoraNoticeTiming(MoraNotificationTiming.BEFORE_DUE_DATE);
 
         when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
         when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId())).thenReturn(installments);
         when(companySettingsService.getSettings()).thenReturn(settings);
-        when(creditPaymentRepository.save(any(CreditPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        lenient().when(creditPaymentRepository.save(any(CreditPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private void mockStatefulAccount(CreditAccount account,
@@ -530,6 +585,9 @@ class CreditAccountServiceImplTest {
                                      BigDecimal recargo) {
         CompanySettings settings = new CompanySettings();
         settings.setCalcRecargo(recargo);
+        settings.setMoraNoticeTemplate("Hola {CLIENTE}, cuota {CUOTA}, importe {IMPORTE}");
+        settings.setMoraNoticeDays(2);
+        settings.setMoraNoticeTiming(MoraNotificationTiming.BEFORE_DUE_DATE);
 
         AtomicLong nextInstallmentId = new AtomicLong(
                 installments.stream()
@@ -586,6 +644,11 @@ class CreditAccountServiceImplTest {
         account.setTotalAmount(new BigDecimal(totalAmount));
         account.setBalance(new BigDecimal(totalAmount));
         account.setStatus(AccountStatus.OPEN);
+        com.sales.maidav.model.client.Client client = new com.sales.maidav.model.client.Client();
+        client.setId(id + 1000);
+        client.setFirstName("Juan");
+        client.setLastName("Perez");
+        account.setClient(client);
         return account;
     }
 
