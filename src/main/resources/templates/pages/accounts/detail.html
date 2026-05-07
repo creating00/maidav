@@ -70,17 +70,26 @@
                     <div class="text-slate-600"
                          th:text="${'Dias de mora: ' + (currentInstallmentDaysOverdue != null ? currentInstallmentDaysOverdue : 0)}"></div>
                     <div class="flex flex-wrap items-center gap-2">
-                        <button type="button"
-                                id="copyMoraWarningButton"
-                                th:disabled="${!moraWarning.configured or !moraWarning.hasPendingInstallment}"
-                                th:title="${moraWarning.tooltip}"
-                                th:attr="data-message=${moraWarning.message}"
-                                class="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60"
-                                th:classappend="${moraWarning.highlighted ? ' bg-rose-600 text-white hover:bg-rose-700 ring-2 ring-rose-200' : ' bg-slate-200 text-slate-800 hover:bg-slate-300'}">
+                        <a th:if="${moraWarning.whatsappAvailable and moraWarning.highlighted}"
+                           th:href="${moraWarning.whatsappUrl}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           th:title="${moraWarning.tooltip}"
+                           class="inline-flex items-center gap-2 rounded px-3 py-2 text-sm font-semibold transition-colors duration-200 bg-rose-600 text-white hover:bg-rose-700 ring-2 ring-rose-200">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                                 <path d="M16 1H6a2 2 0 0 0-2 2v14h2V3h10V1Zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H10V7h9v14Z"/>
                             </svg>
-                            <span>Copiar Aviso de Mora</span>
+                            <span th:text="${moraWarning.actionLabel}"></span>
+                        </a>
+                        <button th:if="${!moraWarning.whatsappAvailable or !moraWarning.highlighted}"
+                                type="button"
+                                disabled
+                                th:title="${moraWarning.tooltip}"
+                                class="inline-flex items-center gap-2 rounded bg-slate-200 px-3 py-2 text-sm font-semibold text-slate-800 transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                                <path d="M16 1H6a2 2 0 0 0-2 2v14h2V3h10V1Zm3 4H10a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H10V7h9v14Z"/>
+                            </svg>
+                            <span th:text="${moraWarning.actionLabel}"></span>
                         </button>
                         <span th:if="${moraWarning.highlighted}"
                               class="rounded-full bg-rose-100 px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-rose-700">
@@ -96,7 +105,6 @@
                     <p th:if="${moraWarning.configured and moraWarning.hasPendingInstallment and moraWarning.installmentNumber != null}"
                        class="text-xs text-slate-500"
                        th:text="${'Mensaje listo para la cuota #' + moraWarning.installmentNumber + ' con vencimiento ' + #temporals.format(moraWarning.dueDate, 'dd/MM/yyyy')}"></p>
-                    <p id="moraWarningFeedback" class="hidden text-xs font-semibold"></p>
                 </div>
             </div>
         </div>
@@ -410,8 +418,6 @@
             if (!paymentForm) {
                 return;
             }
-            const copyMoraWarningButton = document.getElementById('copyMoraWarningButton');
-            const moraWarningFeedback = document.getElementById('moraWarningFeedback');
             const amountInput = paymentForm.querySelector('input[name="amount"]');
             const methodSelect = paymentForm.querySelector('select[name="paymentMethod"]');
             const operationTokenInput = document.getElementById('paymentOperationToken');
@@ -441,15 +447,6 @@
 
             function money(value) {
                 return moneyFormatter.format(value || 0);
-            }
-
-            function showMoraWarningFeedback(message, success) {
-                if (!moraWarningFeedback) {
-                    return;
-                }
-                moraWarningFeedback.textContent = message;
-                moraWarningFeedback.classList.remove('hidden', 'text-green-700', 'text-red-700');
-                moraWarningFeedback.classList.add(success ? 'text-green-700' : 'text-red-700');
             }
 
             function updateAmount() {
@@ -585,21 +582,6 @@
                     methodField.addEventListener('change', updateTotals);
                 }
             });
-            if (copyMoraWarningButton) {
-                copyMoraWarningButton.addEventListener('click', async function () {
-                    const message = copyMoraWarningButton.dataset.message || '';
-                    if (!message.trim()) {
-                        showMoraWarningFeedback('No hay un mensaje disponible para copiar.', false);
-                        return;
-                    }
-                    try {
-                        await navigator.clipboard.writeText(message);
-                        showMoraWarningFeedback('Mensaje copiado correctamente.', true);
-                    } catch (error) {
-                        showMoraWarningFeedback('No se pudo copiar el mensaje.', false);
-                    }
-                });
-            }
             updateTotals();
         })();
     </script>

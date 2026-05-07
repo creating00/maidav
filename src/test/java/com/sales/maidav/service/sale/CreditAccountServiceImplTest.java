@@ -529,6 +529,9 @@ class CreditAccountServiceImplTest {
         assertThat(warning.highlighted()).isTrue();
         assertThat(warning.installmentNumber()).isEqualTo(3);
         assertThat(warning.daysUntilDue()).isEqualTo(2);
+        assertThat(warning.actionLabel()).isEqualTo("AVISAR VENCIMIENTO");
+        assertThat(warning.priority()).isEqualTo(2);
+        assertThat(warning.whatsappUrl()).contains("https://wa.me/541122334455?text=");
         assertThat(warning.message()).contains("Juan Perez");
         assertThat(warning.message()).contains("cuota #3");
         assertThat(warning.message()).contains("$ 1.200,00");
@@ -550,6 +553,8 @@ class CreditAccountServiceImplTest {
         assertThat(warning.highlighted()).isTrue();
         assertThat(warning.daysOverdue()).isEqualTo(1);
         assertThat(warning.pendingAmount()).isEqualByComparingTo("900.00");
+        assertThat(warning.actionLabel()).isEqualTo("AVISAR MORA");
+        assertThat(warning.priority()).isEqualTo(3);
     }
 
     @Test
@@ -563,6 +568,8 @@ class CreditAccountServiceImplTest {
         assertThat(warning.configured()).isTrue();
         assertThat(warning.hasPendingInstallment()).isTrue();
         assertThat(warning.highlighted()).isFalse();
+        assertThat(warning.actionLabel()).isEqualTo("CUOTA AL DIA");
+        assertThat(warning.priority()).isEqualTo(1);
         assertThat(warning.tooltip()).contains("fuera del rango");
     }
 
@@ -648,6 +655,7 @@ class CreditAccountServiceImplTest {
         client.setId(id + 1000);
         client.setFirstName("Juan");
         client.setLastName("Perez");
+        client.setPhone("11 2233-4455");
         account.setClient(client);
         return account;
     }
