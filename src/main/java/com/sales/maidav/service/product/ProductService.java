@@ -20,6 +20,7 @@ public interface ProductService {
     long count();
     long countLowStock();
     List<Product> findLowStock();
+    Product findByBarcode(String barcode);
     Page<Product> findPageForListing(boolean lowStock, String q, Long providerId, String updateAgeFilter, Pageable pageable);
     long bulkAdjustPrices(BigDecimal percentage, Long providerId, PriceAdjustmentType adjustmentType, PriceAdjustmentScope scope);
     List<ProductPriceAdjustment> findRecentAdjustments();

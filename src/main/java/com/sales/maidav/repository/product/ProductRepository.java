@@ -28,6 +28,9 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     boolean existsByBarcode(String barcode);
     boolean existsByBarcodeAndIdNot(String barcode, Long id);
 
+    @EntityGraph(attributePaths = "provider")
+    Optional<Product> findByBarcode(String barcode);
+
     @Query("select count(p) from Product p where p.stockAvailable <= p.stockMin")
     long countLowStock();
 

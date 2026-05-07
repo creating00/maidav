@@ -285,6 +285,18 @@ public class ProductController {
         return Map.of("barcode", productService.generateSystemBarcode());
     }
 
+    @GetMapping("/barcode/lookup")
+    @ResponseBody
+    @PreAuthorize("hasAuthority('PRODUCT_READ')")
+    public Map<String, Object> lookupBarcode(@RequestParam String barcode) {
+        Product product = productService.findByBarcode(barcode);
+        return Map.of(
+                "productId", product.getId(),
+                "barcode", product.getBarcode(),
+                "description", product.getDescription()
+        );
+    }
+
     // RESTRICCION POR ROL
     @GetMapping(value = "/barcode/label", produces = MediaType.TEXT_HTML_VALUE)
     @PreAuthorize("hasAuthority('PRODUCT_BARCODE_LABEL')")
