@@ -3,12 +3,12 @@
       th:replace="layout/main :: layout(~{::content}, ${editing == true} ? 'Editar venta' : 'Nueva venta')">
 
 <section th:fragment="content" th:with="isEditing=${editing == true}">
-    <div class="mb-6">
+    <div class="mb-6 sale-form-pagehead">
         <h1 class="text-2xl font-bold" th:text="${isEditing} ? 'Editar venta' : 'Nueva Venta'"></h1>
         <p class="text-gray-500 text-sm">Seleccione cliente, productos y forma de pago</p>
     </div>
 
-    <form id="saleForm" th:action="${isEditing} ? @{/sales/{id}/edit(id=${sale.id})} : @{/sales}" method="post" class="bg-white p-8 rounded-lg shadow">
+    <form id="saleForm" th:action="${isEditing} ? @{/sales/{id}/edit(id=${sale.id})} : @{/sales}" method="post" class="sale-form-shell bg-white p-8 rounded-lg shadow">
 
         <div th:if="${formError}"
              data-form-error="true"
@@ -37,7 +37,7 @@
                       data-int-mes-largo=${calculatorConfig.intMesLargo}"
              class="hidden"></div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="sale-form-grid grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
                 <label class="block text-sm font-semibold mb-1">Cliente</label>
                 <input type="text" id="clientSearch" placeholder="Buscar por DNI o nombre"
@@ -60,7 +60,7 @@
                 </label>
             </div>
 
-            <div id="quickClientFields" class="hidden md:col-span-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+            <div id="quickClientFields" class="sale-quick-client-panel hidden md:col-span-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
                 <p class="text-sm font-semibold mb-3">Alta rapida de cliente</p>
                 <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <input type="text" name="quickClientNationalId" id="quickClientNationalId"
@@ -255,9 +255,14 @@
             </div>
         </div>
 
-        <div class="mt-8">
+        <div class="sale-products-section mt-8">
             <h2 class="text-lg font-semibold mb-3">Productos</h2>
-            <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-center">
+            <button type="button" id="toggleSaleCatalogBtn"
+                    class="mb-4 block w-full rounded-3xl bg-slate-800 px-4 py-4 text-sm font-semibold uppercase tracking-[0.2em] text-white hover:bg-slate-900 md:!hidden"
+                    style="display:block">
+                Mostrar catalogo
+            </button>
+            <div class="mb-3 hidden flex-col gap-3 md:flex md:flex-row md:items-center">
                 <input type="text" id="productSearch" placeholder="Buscar por codigo de barra"
                        class="w-full md:w-1/2 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
                 <button type="button" id="startBarcodeScannerBtn"
@@ -269,10 +274,28 @@
                     Detener camara
                 </button>
             </div>
-            <p class="mb-3 text-xs text-gray-600">
+            <p class="mb-3 hidden text-xs text-gray-600 md:block">
                 Escanee o escriba el codigo y presione Enter para previsualizar el producto antes de agregarlo al carrito.
             </p>
-            <div id="barcodeScannerPanel" class="hidden mb-4 rounded-xl border border-blue-100 bg-blue-50/70 p-4">
+            <div id="saleCatalogPanel" class="mb-4 hidden rounded-3xl border border-slate-200 bg-slate-50 p-4 md:hidden">
+                <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-center">
+                    <input type="text" id="productSearchMobile" placeholder="Buscar por codigo o descripcion"
+                           class="w-full md:w-1/2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                    <button type="button" id="startBarcodeScannerBtnMobile"
+                            class="rounded-2xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 hover:bg-blue-100">
+                        Escanear con camara
+                    </button>
+                    <button type="button" id="stopBarcodeScannerBtnMobile"
+                            class="hidden rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100">
+                        Detener
+                    </button>
+                </div>
+                <p class="mb-3 text-xs text-gray-600">
+                    Escanee o busque por codigo para agregar productos al carrito desde el catalogo.
+                </p>
+                <div id="saleCatalogFeedback"
+                     class="mb-3 hidden rounded-2xl border px-4 py-3 text-sm font-medium"></div>
+                <div id="barcodeScannerPanel" class="hidden mb-4 rounded-[1.6rem] border border-blue-100 bg-blue-50/70 p-4">
                 <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <p class="text-sm font-semibold text-blue-900">Lector de codigo de barras</p>
@@ -281,7 +304,13 @@
                         </p>
                     </div>
                 </div>
-                <video id="barcodeScannerVideo" class="mt-3 hidden w-full max-w-xl rounded-lg border border-blue-200 bg-black" autoplay playsinline muted></video>
+                    <video id="barcodeScannerVideo" class="mt-3 hidden w-full max-w-xl rounded-[1.35rem] border border-blue-200 bg-black" autoplay playsinline muted></video>
+                </div>
+                <div id="saleCatalogEmpty"
+                     class="hidden rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-center text-sm text-slate-500">
+                    No se encontraron productos.
+                </div>
+                <div id="saleCatalogList" class="grid max-h-[16rem] gap-3 overflow-y-auto pr-1"></div>
             </div>
             <div id="productActionToast"
                  class="pointer-events-none fixed right-4 top-4 z-50 hidden max-w-sm rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-opacity duration-200">
@@ -390,7 +419,7 @@
                                        spellcheck="false"
                                        aria-label="Buscar producto"/>
                                 <button type="button"
-                                        class="product-combobox__toggle"
+                                        class="product-combobox__toggle hidden sm:inline-flex"
                                         aria-label="Mostrar productos">
                                     ▼
                                 </button>
@@ -463,7 +492,7 @@
                                        spellcheck="false"
                                        aria-label="Buscar producto"/>
                                 <button type="button"
-                                        class="product-combobox__toggle"
+                                        class="product-combobox__toggle hidden sm:inline-flex"
                                         aria-label="Mostrar productos">
                                     ▼
                                 </button>
@@ -519,11 +548,11 @@
             </div>
         </div>
 
-        <div class="flex justify-between items-center mt-8 pt-6 border-t">
+        <div class="sale-form-actions flex justify-between items-center mt-8 pt-6 border-t">
             <a th:href="@{/sales}" class="text-gray-600 hover:text-gray-900">
                 Volver al listado
             </a>
-            <div class="flex gap-3">
+            <div class="sale-form-actions__buttons flex gap-3">
                 <a th:href="@{/sales}"
                    class="px-5 py-2 rounded border border-gray-300 hover:bg-gray-100">
                     Cancelar
@@ -587,14 +616,22 @@
         </div>
     </div>
 
-    <script>
+        <script>
         (function () {
             const body = document.getElementById('itemsBody');
             const addRow = document.getElementById('addRow');
+            const toggleSaleCatalogBtn = document.getElementById('toggleSaleCatalogBtn');
+            const saleCatalogPanel = document.getElementById('saleCatalogPanel');
+            const saleCatalogList = document.getElementById('saleCatalogList');
+            const saleCatalogEmpty = document.getElementById('saleCatalogEmpty');
+            const saleCatalogFeedback = document.getElementById('saleCatalogFeedback');
             const clientSearch = document.getElementById('clientSearch');
             const productSearch = document.getElementById('productSearch');
+            const productSearchMobile = document.getElementById('productSearchMobile');
             const startBarcodeScannerBtn = document.getElementById('startBarcodeScannerBtn');
+            const startBarcodeScannerBtnMobile = document.getElementById('startBarcodeScannerBtnMobile');
             const stopBarcodeScannerBtn = document.getElementById('stopBarcodeScannerBtn');
+            const stopBarcodeScannerBtnMobile = document.getElementById('stopBarcodeScannerBtnMobile');
             const barcodeScannerPanel = document.getElementById('barcodeScannerPanel');
             const barcodeScannerVideo = document.getElementById('barcodeScannerVideo');
             const barcodeScannerStatus = document.getElementById('barcodeScannerStatus');
@@ -756,6 +793,21 @@
             }
             let productSearchFilterTimer = null;
             let productCatalogCache = null;
+            let saleCatalogOpen = false;
+            let saleCatalogFeedbackTimer = null;
+
+            function getCurrentProductSearchInput() {
+                return isCompactMobileViewport() ? (productSearchMobile || productSearch) : productSearch;
+            }
+
+            function setProductSearchValue(value) {
+                if (productSearch) {
+                    productSearch.value = value;
+                }
+                if (productSearchMobile) {
+                    productSearchMobile.value = value;
+                }
+            }
 
             function parseNumber(value) {
                 const num = parseFloat(value);
@@ -890,6 +942,103 @@
                 });
             }
 
+            function setSaleCatalogPanelOpen(open) {
+                if (!saleCatalogPanel) {
+                    return;
+                }
+                const isDesktopViewport = window.matchMedia('(min-width: 768px)').matches;
+                saleCatalogOpen = isDesktopViewport ? true : Boolean(open);
+                saleCatalogPanel.classList.toggle('hidden', !saleCatalogOpen);
+                if (toggleSaleCatalogBtn) {
+                    toggleSaleCatalogBtn.textContent = saleCatalogOpen ? 'Ocultar catalogo' : 'Mostrar catalogo';
+                }
+            }
+
+            function buildSaleCatalogCard(item) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'flex w-full items-center gap-4 rounded-3xl border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50';
+                button.dataset.productId = item.value;
+
+                const media = document.createElement('span');
+                media.className = 'flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-slate-100';
+
+                if (item.imagePath) {
+                    const image = document.createElement('img');
+                    image.src = item.imagePath;
+                    image.alt = '';
+                    image.className = 'h-full w-full object-cover';
+                    media.appendChild(image);
+                } else {
+                    const fallback = document.createElement('span');
+                    fallback.className = 'text-xl font-bold text-[var(--receipt-strong)]';
+                    fallback.textContent = '+';
+                    media.appendChild(fallback);
+                }
+
+                const content = document.createElement('span');
+                content.className = 'min-w-0 flex-1';
+
+                const title = document.createElement('strong');
+                title.className = 'block text-sm text-slate-900';
+                title.textContent = item.description || 'Sin descripcion';
+
+                const code = document.createElement('span');
+                code.className = 'mt-2 block font-mono text-[11px] uppercase tracking-[0.2em] text-slate-500';
+                code.textContent = item.productCode ? ('Cod. ' + item.productCode) : 'Sin codigo';
+
+                const meta = document.createElement('span');
+                meta.className = 'mt-3 flex items-center justify-between gap-3 text-xs text-slate-500';
+
+                const stock = document.createElement('span');
+                stock.textContent = 'Stock ' + item.stock;
+
+                const price = document.createElement('span');
+                price.className = 'rounded-full bg-emerald-50 px-2 py-1 font-semibold text-emerald-700';
+                price.textContent = money(getProductPriceForCatalogItem(item) || 0);
+
+                meta.appendChild(stock);
+                meta.appendChild(price);
+                content.appendChild(title);
+                content.appendChild(code);
+                content.appendChild(meta);
+                button.appendChild(media);
+                button.appendChild(content);
+
+                button.addEventListener('click', function () {
+                    const matchedOption = findProductOptionByValue(item.value);
+                    if (!matchedOption) {
+                        showProductToast('No se pudo agregar el producto seleccionado.', true);
+                        return;
+                    }
+                    const added = addProductOptionToCart(matchedOption);
+                    if (!added) {
+                        showProductToast('No se pudo agregar el producto seleccionado.', true);
+                        return;
+                    }
+                    showProductToast('Se agrego al carrito', false);
+                    if (isCompactMobileViewport()) {
+                        setProductSearchValue('');
+                        applyProductSearchFilter('');
+                    }
+                });
+
+                return button;
+            }
+
+            function renderSaleCatalogList(term) {
+                if (!saleCatalogList || !saleCatalogEmpty) {
+                    return;
+                }
+                const normalized = (term || '').trim().toLowerCase();
+                const items = buildProductCatalogCache().filter(item => !normalized || item.searchText.includes(normalized));
+                saleCatalogList.innerHTML = '';
+                saleCatalogEmpty.classList.toggle('hidden', items.length > 0);
+                items.forEach(item => {
+                    saleCatalogList.appendChild(buildSaleCatalogCard(item));
+                });
+            }
+
             function closeAllProductComboboxes(exceptRow) {
                 body.querySelectorAll('tr').forEach(row => {
                     if (exceptRow && row === exceptRow) {
@@ -952,11 +1101,14 @@
                     return;
                 }
                 const input = row.querySelector('.product-combobox__input');
+                const panel = row.querySelector('.product-combobox__panel');
                 const sheetSearch = getProductComboboxSheetSearch(row);
+                const combobox = row.querySelector('.product-combobox');
                 const isMobileViewport = isCompactMobileViewport();
                 if (input) {
                     input.readOnly = isMobileViewport;
                     input.setAttribute('inputmode', isMobileViewport ? 'none' : 'search');
+                    input.tabIndex = isMobileViewport ? -1 : 0;
                     input.classList.toggle('product-combobox__input--trigger', isMobileViewport);
                 }
                 if (sheetSearch) {
@@ -965,6 +1117,11 @@
                     if (!isMobileViewport) {
                         sheetSearch.value = '';
                     }
+                }
+                if (isMobileViewport && panel && combobox) {
+                    panel.classList.add('hidden');
+                    combobox.dataset.open = 'false';
+                    input?.setAttribute('aria-expanded', 'false');
                 }
             }
 
@@ -1246,10 +1403,8 @@
 
                 input.addEventListener('focus', function () {
                     if (isCompactMobileViewport()) {
-                        activateProductCombobox({
-                            focusInput: true,
-                            resetSearch: true
-                        });
+                        input.blur();
+                        closeProductCombobox(row);
                         return;
                     }
                     openProductCombobox(row);
@@ -1359,6 +1514,11 @@
 
                 if (control) {
                     control.addEventListener('click', function (event) {
+                        if (isCompactMobileViewport()) {
+                            event.preventDefault();
+                            closeProductCombobox(row);
+                            return;
+                        }
                         if (event.target === toggle) {
                             return;
                         }
@@ -1369,6 +1529,11 @@
                         });
                     });
                     control.addEventListener('pointerdown', function (event) {
+                        if (isCompactMobileViewport()) {
+                            event.preventDefault();
+                            closeProductCombobox(row);
+                            return;
+                        }
                         if (event.pointerType !== 'touch' || event.target === toggle) {
                             return;
                         }
@@ -1380,6 +1545,11 @@
                         });
                     });
                     control.addEventListener('touchstart', function (event) {
+                        if (isCompactMobileViewport()) {
+                            event.preventDefault();
+                            closeProductCombobox(row);
+                            return;
+                        }
                         if (event.target === toggle) {
                             return;
                         }
@@ -1393,6 +1563,11 @@
                 }
 
                 toggle.addEventListener('pointerdown', function (event) {
+                    if (isCompactMobileViewport()) {
+                        event.preventDefault();
+                        closeProductCombobox(row);
+                        return;
+                    }
                     if (event.pointerType !== 'touch') {
                         return;
                     }
@@ -1404,7 +1579,12 @@
                     });
                 });
 
-                toggle.addEventListener('click', function () {
+                toggle.addEventListener('click', function (event) {
+                    if (isCompactMobileViewport()) {
+                        event.preventDefault();
+                        closeProductCombobox(row);
+                        return;
+                    }
                     if (panel.classList.contains('hidden')) {
                         activateProductCombobox({
                             focusInput: true,
@@ -1641,9 +1821,22 @@
 
             function showProductToast(message, isError) {
                 if (!productActionToast) {
+                    showSaleCatalogFeedback(message, isError);
                     return;
                 }
-                productActionToast.textContent = message;
+                productActionToast.innerHTML = '';
+                const content = document.createElement('span');
+                content.className = 'flex items-center gap-2';
+                if (!isError) {
+                    const icon = document.createElement('span');
+                    icon.className = 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold';
+                    icon.innerHTML = '&#10003;';
+                    content.appendChild(icon);
+                }
+                const text = document.createElement('span');
+                text.textContent = message;
+                content.appendChild(text);
+                productActionToast.appendChild(content);
                 productActionToast.classList.remove('hidden', 'border-green-200', 'bg-green-50', 'text-green-800', 'border-red-200', 'bg-red-50', 'text-red-800');
                 if (isError) {
                     productActionToast.classList.add('border-red-200', 'bg-red-50', 'text-red-800');
@@ -1656,6 +1849,38 @@
                 productActionToastTimer = setTimeout(() => {
                     productActionToast.classList.add('hidden');
                 }, 2400);
+                showSaleCatalogFeedback(message, isError);
+            }
+
+            function showSaleCatalogFeedback(message, isError) {
+                if (!saleCatalogFeedback) {
+                    return;
+                }
+                saleCatalogFeedback.innerHTML = '';
+                const content = document.createElement('span');
+                content.className = 'flex items-center gap-2';
+                if (!isError) {
+                    const icon = document.createElement('span');
+                    icon.className = 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold';
+                    icon.innerHTML = '&#10003;';
+                    content.appendChild(icon);
+                }
+                const text = document.createElement('span');
+                text.textContent = message;
+                content.appendChild(text);
+                saleCatalogFeedback.appendChild(content);
+                saleCatalogFeedback.classList.remove('hidden', 'border-green-200', 'bg-green-50', 'text-green-800', 'border-red-200', 'bg-red-50', 'text-red-800');
+                if (isError) {
+                    saleCatalogFeedback.classList.add('border-red-200', 'bg-red-50', 'text-red-800');
+                } else {
+                    saleCatalogFeedback.classList.add('border-green-200', 'bg-green-50', 'text-green-800');
+                }
+                if (saleCatalogFeedbackTimer) {
+                    clearTimeout(saleCatalogFeedbackTimer);
+                }
+                saleCatalogFeedbackTimer = setTimeout(() => {
+                    saleCatalogFeedback.classList.add('hidden');
+                }, 3000);
             }
 
             function playProductPreviewSound() {
@@ -1759,8 +1984,8 @@
                     }
                 }
 
-                if (productSearch) {
-                    productSearch.blur();
+                if (getCurrentProductSearchInput()) {
+                    getCurrentProductSearchInput().blur();
                 }
                 resetProductPreviewState();
                 productPreviewModal.classList.remove('hidden');
@@ -1784,10 +2009,10 @@
                     startBarcodeScanner();
                     return;
                 }
-                if (productSearch) {
-                    productSearch.value = '';
+                if (getCurrentProductSearchInput()) {
+                    setProductSearchValue('');
                     applyProductSearchFilter('');
-                    productSearch.focus();
+                    getCurrentProductSearchInput().focus();
                 }
             }
 
@@ -1818,6 +2043,18 @@
                     const productCode = (option.dataset.productCode || '').trim().toLowerCase();
                     return barcode === term || productCode === term;
                 }) || null;
+            }
+
+            function findProductOptionByValue(productId) {
+                const normalized = String(productId || '').trim();
+                if (!normalized) {
+                    return null;
+                }
+                const selectTemplate = getProductTemplateSelect();
+                if (!selectTemplate) {
+                    return null;
+                }
+                return Array.from(selectTemplate.options).find(option => option.value === normalized) || null;
             }
 
             function ensureRowProductPrice(row) {
@@ -1862,6 +2099,7 @@
                     });
                 });
                 refreshProductComboboxes();
+                renderSaleCatalogList(normalized);
             }
 
             function clearRow(row) {
@@ -1957,9 +2195,9 @@
                 }
                 const productLabel = ((matchedOption.dataset.productCode || matchedOption.dataset.barcode || '').trim());
                 setBarcodeStatus('Producto agregado: ' + productLabel, false);
-                showProductToast('Producto agregado al carrito: ' + productLabel, false);
-                if (productSearch) {
-                    productSearch.value = '';
+                showProductToast('Se agrego al carrito', false);
+                if (getCurrentProductSearchInput()) {
+                    setProductSearchValue('');
                     applyProductSearchFilter('');
                 }
                 if (productPreviewTitle) {
@@ -2004,8 +2242,14 @@
                 if (startBarcodeScannerBtn) {
                     startBarcodeScannerBtn.classList.remove('hidden');
                 }
+                if (startBarcodeScannerBtnMobile) {
+                    startBarcodeScannerBtnMobile.classList.remove('hidden');
+                }
                 if (stopBarcodeScannerBtn) {
                     stopBarcodeScannerBtn.classList.add('hidden');
+                }
+                if (stopBarcodeScannerBtnMobile) {
+                    stopBarcodeScannerBtnMobile.classList.add('hidden');
                 }
             }
 
@@ -2075,8 +2319,14 @@
                     if (startBarcodeScannerBtn) {
                         startBarcodeScannerBtn.classList.add('hidden');
                     }
+                    if (startBarcodeScannerBtnMobile) {
+                        startBarcodeScannerBtnMobile.classList.add('hidden');
+                    }
                     if (stopBarcodeScannerBtn) {
                         stopBarcodeScannerBtn.classList.remove('hidden');
+                    }
+                    if (stopBarcodeScannerBtnMobile) {
+                        stopBarcodeScannerBtnMobile.classList.remove('hidden');
                     }
                     setBarcodeStatus('Apunte la camara al codigo de barras para agregarlo al carrito.', false);
                     scanBarcodeFrame();
@@ -2207,11 +2457,14 @@
                     syncProductComboboxPlaceholder(row);
                     syncProductComboboxInteractionMode(row);
                 });
+                setSaleCatalogPanelOpen(saleCatalogOpen);
                 if (activeProductCombobox) {
                     renderProductComboboxOptions(activeProductCombobox, getProductComboboxSearchValue(activeProductCombobox));
                     highlightProductComboboxOption(activeProductCombobox, 0);
                 }
             });
+            setSaleCatalogPanelOpen(false);
+            renderSaleCatalogList('');
             updateTotals();
             if (discountInput) {
                 discountInput.addEventListener('input', updateCalculator);
@@ -2315,14 +2568,40 @@
                 });
             }
 
+            function handleProductSearchInput(value) {
+                if (productSearchFilterTimer) {
+                    window.clearTimeout(productSearchFilterTimer);
+                }
+                productSearchFilterTimer = window.setTimeout(function () {
+                    applyProductSearchFilter(value);
+                }, 120);
+            }
+
+            function handleProductSearchEnter(value) {
+                if (productSearchFilterTimer) {
+                    window.clearTimeout(productSearchFilterTimer);
+                    productSearchFilterTimer = null;
+                }
+                const term = value.toLowerCase().trim();
+                if (!term) {
+                    return;
+                }
+                if (isCompactMobileViewport()) {
+                    const matchedOption = findProductOptionByCode(term);
+                    if (matchedOption) {
+                        addProductOptionToCart(matchedOption);
+                        showProductToast('Se agrego al carrito', false);
+                        setProductSearchValue('');
+                        applyProductSearchFilter('');
+                        return;
+                    }
+                }
+                handleProductCodeSubmit(term, 'manual');
+            }
+
             if (productSearch) {
                 productSearch.addEventListener('input', function () {
-                    if (productSearchFilterTimer) {
-                        window.clearTimeout(productSearchFilterTimer);
-                    }
-                    productSearchFilterTimer = window.setTimeout(function () {
-                        applyProductSearchFilter(productSearch.value);
-                    }, 120);
+                    handleProductSearchInput(productSearch.value);
                 });
 
                 productSearch.addEventListener('keydown', function (event) {
@@ -2330,15 +2609,20 @@
                         return;
                     }
                     event.preventDefault();
-                    if (productSearchFilterTimer) {
-                        window.clearTimeout(productSearchFilterTimer);
-                        productSearchFilterTimer = null;
-                    }
-                    const term = productSearch.value.toLowerCase().trim();
-                    if (!term) {
+                    handleProductSearchEnter(productSearch.value);
+                });
+            }
+            if (productSearchMobile) {
+                productSearchMobile.addEventListener('input', function () {
+                    handleProductSearchInput(productSearchMobile.value);
+                });
+
+                productSearchMobile.addEventListener('keydown', function (event) {
+                    if (event.key !== 'Enter') {
                         return;
                     }
-                    handleProductCodeSubmit(term, 'manual');
+                    event.preventDefault();
+                    handleProductSearchEnter(productSearchMobile.value);
                 });
             }
 
@@ -2357,6 +2641,7 @@
                         renderProductComboboxOptions(activeProductCombobox, getProductComboboxSearchValue(activeProductCombobox));
                         highlightProductComboboxOption(activeProductCombobox, 0);
                     }
+                    renderSaleCatalogList(getCurrentProductSearchInput() ? getCurrentProductSearchInput().value : '');
                     updateTotals();
                 });
             }
@@ -2366,14 +2651,25 @@
                 if (row) {
                     body.appendChild(row);
                 }
-                applyProductSearchFilter(productSearch ? productSearch.value : '');
-                updateTotals();
+                applyProductSearchFilter(getCurrentProductSearchInput() ? getCurrentProductSearchInput().value : '');
+            updateTotals();
             });
+            if (toggleSaleCatalogBtn) {
+                toggleSaleCatalogBtn.addEventListener('click', function () {
+                    setSaleCatalogPanelOpen(!saleCatalogOpen);
+                });
+            }
             if (startBarcodeScannerBtn) {
                 startBarcodeScannerBtn.addEventListener('click', startBarcodeScanner);
             }
+            if (startBarcodeScannerBtnMobile) {
+                startBarcodeScannerBtnMobile.addEventListener('click', startBarcodeScanner);
+            }
             if (stopBarcodeScannerBtn) {
                 stopBarcodeScannerBtn.addEventListener('click', stopBarcodeScanner);
+            }
+            if (stopBarcodeScannerBtnMobile) {
+                stopBarcodeScannerBtnMobile.addEventListener('click', stopBarcodeScanner);
             }
             if (confirmAddProductBtn) {
                 confirmAddProductBtn.addEventListener('click', confirmPendingProductAdd);
