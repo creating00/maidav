@@ -17,8 +17,10 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URLEncoder;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -299,6 +301,9 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         String tooltip = highlightedInstallment != null
                 ? "Cliente dentro del rango de aviso de mora"
                 : "Cliente fuera del rango de aviso de mora";
+        String whatsappPhone = normalizeWhatsappPhone(account);
+        String whatsappUrl = buildWhatsappUrl(whatsappPhone, buildMoraMessage(account, messageInstallment, today, settings));
+        WarningPresentation warningPresentation = resolveWarningPresentation(highlightedInstallment != null, daysOverdue);
 
         return new MoraWarningInfo(
                 true,
@@ -311,7 +316,13 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 messageInstallment.getDueDate(),
                 daysOverdue,
                 daysUntilDue,
-                pendingAmount
+                pendingAmount,
+                warningPresentation.actionLabel(),
+                warningPresentation.priority(),
+                warningPresentation.priorityLabel(),
+                whatsappUrl,
+                whatsappPhone,
+                whatsappUrl != null
         );
     }
 
@@ -541,6 +552,43 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     private String formatDate(LocalDate date) {
         return date == null ? "-" : MORA_DATE_FORMATTER.format(date);
+    }
+
+    private WarningPresentation resolveWarningPresentation(boolean highlighted, long daysOverdue) {
+        if (highlighted && daysOverdue > 0) {
+            return new WarningPresentation("AVISAR MORA", 3, "Mora");
+        }
+        if (highlighted) {
+            return new WarningPresentation("AVISAR VENCIMIENTO", 2, "Vencimiento");
+        }
+        return new WarningPresentation("CUOTA AL DIA", 1, "Al dia");
+    }
+
+    private String normalizeWhatsappPhone(CreditAccount account) {
+        if (account == null || account.getClient() == null || account.getClient().getPhone() == null) {
+            return null;
+        }
+        String digits = account.getClient().getPhone().replaceAll("\\D", "");
+        if (digits.isBlank()) {
+            return null;
+        }
+        if (digits.startsWith("549")) {
+            return digits;
+        }
+        if (digits.startsWith("54")) {
+            return digits;
+        }
+        if (digits.startsWith("0")) {
+            digits = digits.substring(1);
+        }
+        return "54" + digits;
+    }
+
+    private String buildWhatsappUrl(String whatsappPhone, String message) {
+        if (whatsappPhone == null || whatsappPhone.isBlank() || message == null || message.isBlank()) {
+            return null;
+        }
+        return "https://wa.me/" + whatsappPhone + "?text=" + URLEncoder.encode(message, StandardCharsets.UTF_8);
     }
 
     private void recalculateAccountState(CreditAccount account) {
@@ -1086,6 +1134,9 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     private record ReplayResult(Map<Long, CreditInstallment> installmentsById,
                                 List<PaymentAllocation> allocations) {
+    }
+
+    private record WarningPresentation(String actionLabel, int priority, String priorityLabel) {
     }
 
     private record PaymentAllocation(Long paymentId,

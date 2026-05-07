@@ -14,14 +14,22 @@ public record MoraWarningInfo(
         LocalDate dueDate,
         long daysOverdue,
         long daysUntilDue,
-        BigDecimal pendingAmount
+        BigDecimal pendingAmount,
+        String actionLabel,
+        int priority,
+        String priorityLabel,
+        String whatsappUrl,
+        String whatsappPhone,
+        boolean whatsappAvailable
 ) {
 
     public static MoraWarningInfo notConfigured(String tooltip) {
-        return new MoraWarningInfo(false, false, false, "", tooltip, null, null, null, 0, 0, null);
+        return new MoraWarningInfo(false, false, false, "", tooltip, null, null, null, 0, 0, null,
+                "CUOTA AL DIA", 1, "Al dia", null, null, false);
     }
 
     public static MoraWarningInfo empty(boolean configured, String tooltip) {
-        return new MoraWarningInfo(configured, false, false, "", tooltip, null, null, null, 0, 0, null);
+        return new MoraWarningInfo(configured, false, false, "", tooltip, null, null, null, 0, 0, null,
+                "SIN CUOTAS", 0, "Sin cuotas", null, null, false);
     }
 }

@@ -29,6 +29,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -51,6 +52,7 @@ public class CreditAccountController {
     @PreAuthorize("hasAuthority('ARREARS_READ')")
     public String list(@RequestParam(required = false) String q,
                        @RequestParam(required = false) Long sellerId,
+                       @RequestParam(required = false, defaultValue = "false") boolean priorityFirst,
                        Authentication authentication,
                        Model model) {
         List<CreditAccount> accounts = creditAccountService.findAll();
@@ -93,12 +95,13 @@ public class CreditAccountController {
         Map<Long, List<AccountProductItemView>> productsByAccount = buildProductsByAccount(accounts);
         model.addAttribute("q", q);
         model.addAttribute("sellerId", effectiveSellerId);
+        model.addAttribute("priorityFirst", priorityFirst);
         // FILTRO VENDEDOR FRONTEND
         model.addAttribute("sellerOptions", sellerOptions(authentication));
         model.addAttribute("accounts", accounts);
         model.addAttribute("currentInstallments", currentInstallments);
         model.addAttribute("dueSchedules", dueSchedules);
-        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount, moraWarnings));
+        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount, moraWarnings, priorityFirst));
         model.addAttribute("isAdmin", isAdmin(authentication));
         return "pages/accounts/index";
     }
@@ -413,14 +416,11 @@ public class CreditAccountController {
                                                     Map<Long, BigDecimal> currentInstallments,
                                                     Map<Long, String> dueSchedules,
                                                     Map<Long, List<AccountProductItemView>> productsByAccount,
-                                                    Map<Long, MoraWarningInfo> moraWarnings) {
+                                                    Map<Long, MoraWarningInfo> moraWarnings,
+                                                    boolean priorityFirst) {
         Map<Long, MutableClientGroup> groups = new LinkedHashMap<>();
         List<CreditAccount> sortedAccounts = accounts.stream()
-                .sorted((a, b) -> {
-                    String aName = (a.getClient().getLastName() + " " + a.getClient().getFirstName()).trim();
-                    String bName = (b.getClient().getLastName() + " " + b.getClient().getFirstName()).trim();
-                    return aName.compareToIgnoreCase(bName);
-                })
+                .sorted(resolveAccountComparator(moraWarnings, priorityFirst))
                 .toList();
 
         for (CreditAccount account : sortedAccounts) {
@@ -450,8 +450,14 @@ public class CreditAccountController {
                     badge.label,
                     badge.cssClass,
                     resolveSellerDisplay(account),
+                    account.getClient() != null ? account.getClient().getPhone() : null,
                     productsByAccount.getOrDefault(account.getId(), List.of()),
-                    moraWarnings.get(account.getId())
+                    moraWarnings.get(account.getId()),
+                    resolveAccentClass(moraWarnings.get(account.getId()) != null ? moraWarnings.get(account.getId()).priority() : 1),
+                    resolveActionClass(
+                            moraWarnings.get(account.getId()) != null ? moraWarnings.get(account.getId()).actionLabel() : "CUOTA AL DIA",
+                            moraWarnings.get(account.getId()) != null && moraWarnings.get(account.getId()).whatsappAvailable()
+                    )
             ));
         }
 
@@ -465,7 +471,49 @@ public class CreditAccountController {
                         group.badge.cssClass,
                         group.accounts
                 ))
+                .sorted(resolveGroupComparator(priorityFirst))
                 .toList();
+    }
+
+    private Comparator<CreditAccount> resolveAccountComparator(Map<Long, MoraWarningInfo> moraWarnings,
+                                                               boolean priorityFirst) {
+        Comparator<CreditAccount> defaultComparator = Comparator.comparing(
+                        (CreditAccount account) -> ((account.getClient().getLastName() + " " + account.getClient().getFirstName()).trim()),
+                        String.CASE_INSENSITIVE_ORDER
+                )
+                .thenComparing(CreditAccount::getId);
+        if (!priorityFirst) {
+            return defaultComparator;
+        }
+        return Comparator
+                .comparingInt((CreditAccount account) -> resolveWarningPriority(moraWarnings.get(account.getId())))
+                .reversed()
+                .thenComparing(
+                        account -> resolveWarningDueDate(moraWarnings.get(account.getId())),
+                        Comparator.nullsLast(LocalDate::compareTo)
+                )
+                .thenComparing(defaultComparator);
+    }
+
+    private Comparator<ClientGroupView> resolveGroupComparator(boolean priorityFirst) {
+        if (!priorityFirst) {
+            return Comparator.comparing(ClientGroupView::clientName, String.CASE_INSENSITIVE_ORDER);
+        }
+        return Comparator
+                .comparingInt((ClientGroupView group) -> group.accounts().stream()
+                        .mapToInt(account -> resolveWarningPriority(account.moraWarning()))
+                        .max()
+                        .orElse(1))
+                .reversed()
+                .thenComparing(ClientGroupView::clientName, String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private int resolveWarningPriority(MoraWarningInfo warning) {
+        return warning == null ? 1 : warning.priority();
+    }
+
+    private LocalDate resolveWarningDueDate(MoraWarningInfo warning) {
+        return warning == null ? null : warning.dueDate();
     }
 
     private Map<Long, List<AccountProductItemView>> buildProductsByAccount(List<CreditAccount> accounts) {
@@ -530,6 +578,25 @@ public class CreditAccountController {
             return new AccountBadge("Pronto a vencer · " + dueSoonDays + " dia(s)", "text-amber-600", 2);
         }
         return new AccountBadge("Al dia", "text-emerald-600", 1);
+    }
+
+    private String resolveActionClass(String actionLabel, boolean whatsappAvailable) {
+        if (!whatsappAvailable && !"CUOTA AL DIA".equals(actionLabel)) {
+            return "bg-slate-300 text-slate-700";
+        }
+        return switch (actionLabel) {
+            case "AVISAR MORA" -> "bg-rose-500 text-white hover:bg-rose-600";
+            case "AVISAR VENCIMIENTO" -> "bg-amber-400 text-white hover:bg-amber-500";
+            default -> "bg-slate-300 text-white";
+        };
+    }
+
+    private String resolveAccentClass(int priority) {
+        return switch (priority) {
+            case 3 -> "border-l-red-500";
+            case 2 -> "border-l-amber-400";
+            default -> "border-l-sky-400";
+        };
     }
 
     private String paymentFrequencyLabel(CreditAccount account) {
@@ -766,8 +833,11 @@ public class CreditAccountController {
                                          String paymentFrequency,
                                          String dueSchedule, String badgeLabel, String badgeClass,
                                          String sellerDisplay,
+                                         String clientPhone,
                                          List<AccountProductItemView> products,
-                                         MoraWarningInfo moraWarning) {}
+                                         MoraWarningInfo moraWarning,
+                                         String accentClass,
+                                         String actionClass) {}
     private record AccountProductItemView(String productCode, String description, Integer quantity, BigDecimal lineTotal) {}
     private record ClientGroupView(String clientName, String nationalId, BigDecimal totalBalance, int activeCredits,
                                    String badgeLabel, String badgeClass, List<ClientAccountItemView> accounts) {}
