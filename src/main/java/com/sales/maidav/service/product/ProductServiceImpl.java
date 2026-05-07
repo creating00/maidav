@@ -108,6 +108,16 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public Product findByBarcode(String barcode) {
+        String normalized = barcode == null ? "" : barcode.trim();
+        if (normalized.isEmpty()) {
+            throw new InvalidProductException("Codigo de barras invalido");
+        }
+        return productRepository.findByBarcode(normalized)
+                .orElseThrow(() -> new InvalidProductException("Producto no encontrado"));
+    }
+
+    @Override
     public Page<Product> findPageForListing(boolean lowStock, String q, Long providerId, String updateAgeFilter, Pageable pageable) {
         String normalizedTerm = (q == null || q.isBlank())
                 ? null
