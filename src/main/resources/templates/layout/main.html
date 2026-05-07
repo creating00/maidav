@@ -19,7 +19,16 @@
     </style>
 </head>
 
-<body x-data="{ sidebarOpen: false, sidebarCollapsed: false }"
+<body x-data="{
+        sidebarOpen: false,
+        sidebarCollapsed: false,
+        headerHeight: 74,
+        syncHeaderHeight() {
+            const header = document.querySelector('.app-header');
+            this.headerHeight = header ? Math.round(header.getBoundingClientRect().height) : 74;
+        }
+      }"
+      x-init="syncHeaderHeight(); window.addEventListener('resize', () => syncHeaderHeight())"
       @open-sidebar.window="sidebarOpen = true"
       @close-sidebar.window="sidebarOpen = false"
       @toggle-sidebar.window="sidebarCollapsed = !sidebarCollapsed"
@@ -36,10 +45,13 @@
          x-show="sidebarOpen"
          x-transition.opacity
          class="fixed inset-0 z-30 bg-slate-950/35 backdrop-blur-sm md:hidden"
+         :style="`top:${headerHeight}px`"
          @click="$dispatch('close-sidebar')"></div>
 
     <!-- SIDEBAR MOBILE -->
-    <div class="fixed inset-y-0 left-0 z-40 w-72 max-w-[92vw] transform transition-transform duration-200 md:hidden"
+    <div class="fixed left-0 z-40 w-72 max-w-[92vw] transform transition-transform duration-200 md:hidden"
+         style="top:74px;height:calc(100dvh - 74px)"
+         :style="`top:${headerHeight}px;height:calc(100dvh - ${headerHeight}px)`"
          :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
         <div th:replace="fragments/sidebar :: sidebar"></div>
     </div>
