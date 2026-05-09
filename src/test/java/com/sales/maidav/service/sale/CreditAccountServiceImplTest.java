@@ -90,11 +90,11 @@ class CreditAccountServiceImplTest {
         assertThat(firstInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
         assertThat(firstInstallment.getPaidAmount()).isEqualByComparingTo("1200.00");
         assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PARTIAL);
-        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("600.00");
-        assertThat(account.getBalance()).isEqualByComparingTo("600.00");
+        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("500.00");
+        assertThat(account.getBalance()).isEqualByComparingTo("700.00");
         assertThat(account.getStatus()).isEqualTo(AccountStatus.OPEN);
 
-        service.registerPayment(1L, new BigDecimal("500.00"), null, "tester", PaymentCollectionMethod.CASH);
+        service.registerPayment(1L, new BigDecimal("600.00"), null, "tester", PaymentCollectionMethod.CASH);
 
         assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
         assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("1200.00");
@@ -106,12 +106,12 @@ class CreditAccountServiceImplTest {
         List<CreditPayment> savedPayments = paymentCaptor.getAllValues();
 
         assertThat(savedPayments.get(0).getAmount()).isEqualByComparingTo("1500.00");
-        assertThat(savedPayments.get(0).getImpactAmount()).isEqualByComparingTo("1800.00");
+        assertThat(savedPayments.get(0).getImpactAmount()).isEqualByComparingTo("1700.00");
         assertThat(savedPayments.get(0).getAllocationSummary()).contains("Cuota #1: se aplican $ 1.000,00 y queda saldada");
-        assertThat(savedPayments.get(0).getAllocationSummary()).contains("Cuota #2: recibe $ 500,00 por saldo a favor y quedan $ 600,00 pendientes");
-        assertThat(savedPayments.get(1).getAmount()).isEqualByComparingTo("500.00");
-        assertThat(savedPayments.get(1).getImpactAmount()).isEqualByComparingTo("600.00");
-        assertThat(savedPayments.get(1).getAllocationSummary()).contains("Cuota #2: recibe $ 500,00 por saldo a favor y queda saldada");
+        assertThat(savedPayments.get(0).getAllocationSummary()).contains("Cuota #2: recibe $ 500,00 por saldo a favor y quedan $ 700,00 pendientes");
+        assertThat(savedPayments.get(1).getAmount()).isEqualByComparingTo("600.00");
+        assertThat(savedPayments.get(1).getImpactAmount()).isEqualByComparingTo("700.00");
+        assertThat(savedPayments.get(1).getAllocationSummary()).contains("Cuota #2: se aplican $ 600,00 y queda saldada");
     }
 
     @Test
@@ -185,10 +185,10 @@ class CreditAccountServiceImplTest {
         assertThat(firstInstallment.getPaidAmount()).isEqualByComparingTo("480.00");
         assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
         assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("480.00");
-        assertThat(thirdInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
-        assertThat(thirdInstallment.getPaidAmount()).isEqualByComparingTo("240.00");
-        assertThat(account.getBalance()).isEqualByComparingTo("0.00");
-        assertThat(account.getStatus()).isEqualTo(AccountStatus.CLOSED);
+        assertThat(thirdInstallment.getStatus()).isEqualTo(InstallmentStatus.PARTIAL);
+        assertThat(thirdInstallment.getPaidAmount()).isEqualByComparingTo("120.00");
+        assertThat(account.getBalance()).isEqualByComparingTo("120.00");
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.OPEN);
     }
 
     @Test

@@ -292,6 +292,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         BigDecimal impactAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal cashRecargo = resolveCashRecargo();
         Map<Integer, String> paymentReferences = new LinkedHashMap<>();
+        boolean appliedCurrentPayment = false;
 
         for (int index = 0; index < installments.size(); index++) {
             CreditInstallment installment = installments.get(index);
@@ -312,24 +313,29 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             }
             // SALDO A FAVOR
             // APLICAR SALDO A FAVOR A PROXIMA CUOTA
-            BigDecimal collectedNeeded = CreditPaymentPricingSupport.resolveCollectedAmountDue(
-                    financedRemaining,
-                    cashRecargo,
-                    paymentMethod,
-                    account.getPaymentFrequency(),
-                    installment.getDueDate(),
-                    paidAt
-            );
+            boolean carriedForward = appliedCurrentPayment;
+            BigDecimal collectedNeeded = carriedForward
+                    ? financedRemaining
+                    : CreditPaymentPricingSupport.resolveCollectedAmountDue(
+                            financedRemaining,
+                            cashRecargo,
+                            paymentMethod,
+                            account.getPaymentFrequency(),
+                            installment.getDueDate(),
+                            paidAt
+                    );
             BigDecimal collectedApplied = remainingInput.min(collectedNeeded).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal allocationImpact = CreditPaymentPricingSupport.resolveImpactAmount(
-                    financedRemaining,
-                    collectedApplied,
-                    cashRecargo,
-                    paymentMethod,
-                    account.getPaymentFrequency(),
-                    installment.getDueDate(),
-                    paidAt
-            );
+            BigDecimal allocationImpact = carriedForward
+                    ? collectedApplied
+                    : CreditPaymentPricingSupport.resolveImpactAmount(
+                            financedRemaining,
+                            collectedApplied,
+                            cashRecargo,
+                            paymentMethod,
+                            account.getPaymentFrequency(),
+                            installment.getDueDate(),
+                            paidAt
+                    );
             if (allocationImpact.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
@@ -352,24 +358,25 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                     installment.getInstallmentNumber(),
                     buildPaymentReference(
                             account,
-                            installment,
-                            paymentMethod,
-                            paidAt,
-                            collectedApplied,
-                            remainingAfterAllocation,
-                            index > 0,
-                            installment.getStatus() == InstallmentStatus.PAID
-                    )
+                        installment,
+                        paymentMethod,
+                        paidAt,
+                        collectedApplied,
+                        remainingAfterAllocation,
+                        carriedForward,
+                        installment.getStatus() == InstallmentStatus.PAID
+                )
             );
             allocations.add(new PaymentAllocation(
                     paymentId,
                     installment.getId(),
                     installment.getInstallmentNumber(),
                     paymentMethod,
-                    index > 0,
+                    carriedForward,
                     collectedApplied,
                     allocationImpact
             ));
+            appliedCurrentPayment = true;
         }
 
         return new PaymentApplicationResult(
@@ -976,7 +983,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                                          BigDecimal remainingAfterAllocation,
                                          boolean carriedForward,
                                          boolean fullPayment) {
-        boolean cashValue = CreditPaymentPricingSupport.usesCashValue(
+        boolean cashValue = !carriedForward && CreditPaymentPricingSupport.usesCashValue(
                 paymentMethod,
                 account.getPaymentFrequency(),
                 installment.getDueDate(),
