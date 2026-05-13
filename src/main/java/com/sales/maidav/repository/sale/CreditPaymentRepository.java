@@ -28,5 +28,33 @@ public interface CreditPaymentRepository extends JpaRepository<CreditPayment, Lo
     BigDecimal sumPaidAmountUpTo(@Param("cutoffDate") LocalDate cutoffDate,
                                  @Param("sellerId") Long sellerId,
                                  @Param("zoneId") Long zoneId);
+
+    @Query("""
+            select coalesce(sum(payment.amount), 0)
+            from CreditPayment payment
+            where payment.paidAt <= :cutoffDate
+              and payment.reversal = false
+              and payment.account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and payment.account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
+              and (:sellerId is null or payment.account.sale.seller.id = :sellerId)
+              and (:zoneId is null or payment.account.client.zone.id = :zoneId)
+            """)
+    BigDecimal sumPositivePaidAmountUpTo(@Param("cutoffDate") LocalDate cutoffDate,
+                                         @Param("sellerId") Long sellerId,
+                                         @Param("zoneId") Long zoneId);
+
+    @Query("""
+            select coalesce(sum(abs(payment.amount)), 0)
+            from CreditPayment payment
+            where payment.paidAt <= :cutoffDate
+              and payment.reversal = true
+              and payment.account.status <> com.sales.maidav.model.sale.AccountStatus.VOID
+              and payment.account.sale.status <> com.sales.maidav.model.sale.SaleStatus.VOID
+              and (:sellerId is null or payment.account.sale.seller.id = :sellerId)
+              and (:zoneId is null or payment.account.client.zone.id = :zoneId)
+            """)
+    BigDecimal sumReversalPaidAmountUpTo(@Param("cutoffDate") LocalDate cutoffDate,
+                                         @Param("sellerId") Long sellerId,
+                                         @Param("zoneId") Long zoneId);
 }
 
