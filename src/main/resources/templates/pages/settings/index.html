@@ -184,13 +184,24 @@
             </div>
 
             <div class="md:col-span-2">
-                <label class="block text-sm font-semibold mb-1">Mensaje plantilla del aviso</label>
-                <textarea name="moraNoticeTemplate"
+                <label class="block text-sm font-semibold mb-1">Plantilla antes del vencimiento</label>
+                <textarea name="moraNoticeTemplateBeforeDue"
                           rows="5"
                           class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          th:text="${settings.moraNoticeTemplate}"></textarea>
+                          th:text="${settings.moraNoticeTemplateBeforeDue}"></textarea>
                 <p class="mt-2 text-xs text-gray-500">
-                    Ejemplo: Hola {CLIENTE}, le recordamos que la cuota {CUOTA} con vencimiento el {FECHA_VENCIMIENTO} se encuentra pendiente de pago por {IMPORTE}.
+                    Se usa cuando el tipo de aviso es antes del vencimiento.
+                </p>
+            </div>
+
+            <div class="md:col-span-2">
+                <label class="block text-sm font-semibold mb-1">Plantilla despues del vencimiento</label>
+                <textarea name="moraNoticeTemplateAfterDue"
+                          rows="5"
+                          class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          th:text="${settings.moraNoticeTemplateAfterDue}"></textarea>
+                <p class="mt-2 text-xs text-gray-500">
+                    Se usa cuando el tipo de aviso es despues del vencimiento.
                 </p>
             </div>
 

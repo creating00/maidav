@@ -64,6 +64,12 @@ public class CompanySettings extends BaseEntity {
     @Column(name = "mora_notice_template", length = 2000)
     private String moraNoticeTemplate;
 
+    @Column(name = "mora_notice_template_before_due", length = 2000)
+    private String moraNoticeTemplateBeforeDue;
+
+    @Column(name = "mora_notice_template_after_due", length = 2000)
+    private String moraNoticeTemplateAfterDue;
+
     @Column(name = "mora_notice_days")
     private Integer moraNoticeDays;
 
@@ -123,6 +129,12 @@ public class CompanySettings extends BaseEntity {
 
     public String getMoraNoticeTemplate() { return moraNoticeTemplate; }
     public void setMoraNoticeTemplate(String moraNoticeTemplate) { this.moraNoticeTemplate = moraNoticeTemplate; }
+
+    public String getMoraNoticeTemplateBeforeDue() { return moraNoticeTemplateBeforeDue; }
+    public void setMoraNoticeTemplateBeforeDue(String moraNoticeTemplateBeforeDue) { this.moraNoticeTemplateBeforeDue = moraNoticeTemplateBeforeDue; }
+
+    public String getMoraNoticeTemplateAfterDue() { return moraNoticeTemplateAfterDue; }
+    public void setMoraNoticeTemplateAfterDue(String moraNoticeTemplateAfterDue) { this.moraNoticeTemplateAfterDue = moraNoticeTemplateAfterDue; }
 
     public Integer getMoraNoticeDays() { return moraNoticeDays; }
     public void setMoraNoticeDays(Integer moraNoticeDays) { this.moraNoticeDays = moraNoticeDays; }
