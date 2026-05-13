@@ -49,6 +49,8 @@ public class DashboardPortfolioService {
         BigDecimal totalFinanced = creditAccountRepository.sumTotalAmountByFilters(effectiveSellerId, effectiveZoneId);
         BigDecimal expectedCollected = creditInstallmentRepository.sumScheduledAmountDueUpTo(cutoffDate, effectiveSellerId, effectiveZoneId);
         BigDecimal collectedAmount = creditPaymentRepository.sumPaidAmountUpTo(cutoffDate, effectiveSellerId, effectiveZoneId);
+        BigDecimal grossCollectedAmount = creditPaymentRepository.sumPositivePaidAmountUpTo(cutoffDate, effectiveSellerId, effectiveZoneId);
+        BigDecimal reversedCollectedAmount = creditPaymentRepository.sumReversalPaidAmountUpTo(cutoffDate, effectiveSellerId, effectiveZoneId);
         BigDecimal overdueDebt = creditInstallmentRepository.sumOverdueOutstandingByFilters(
                 cutoffDate,
                 List.of(InstallmentStatus.PENDING, InstallmentStatus.PARTIAL),
@@ -64,6 +66,8 @@ public class DashboardPortfolioService {
                 totalFinanced,
                 expectedCollected,
                 collectedAmount,
+                grossCollectedAmount,
+                reversedCollectedAmount,
                 overdueDebt,
                 pendingBalance,
                 adminView ? effectiveSellerId : currentSellerId,

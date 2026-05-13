@@ -11,6 +11,8 @@ public class DashboardPortfolioSnapshot {
     private final BigDecimal totalFinanced;
     private final BigDecimal expectedCollected;
     private final BigDecimal collectedAmount;
+    private final BigDecimal grossCollectedAmount;
+    private final BigDecimal reversedCollectedAmount;
     private final BigDecimal overdueDebt;
     private final BigDecimal pendingBalance;
     private final Long effectiveSellerId;
@@ -24,6 +26,8 @@ public class DashboardPortfolioSnapshot {
                                       BigDecimal totalFinanced,
                                       BigDecimal expectedCollected,
                                       BigDecimal collectedAmount,
+                                      BigDecimal grossCollectedAmount,
+                                      BigDecimal reversedCollectedAmount,
                                       BigDecimal overdueDebt,
                                       BigDecimal pendingBalance,
                                       Long effectiveSellerId,
@@ -36,6 +40,8 @@ public class DashboardPortfolioSnapshot {
         this.totalFinanced = normalize(totalFinanced);
         this.expectedCollected = normalize(expectedCollected);
         this.collectedAmount = normalize(collectedAmount);
+        this.grossCollectedAmount = normalize(grossCollectedAmount);
+        this.reversedCollectedAmount = normalize(reversedCollectedAmount);
         this.overdueDebt = normalize(overdueDebt);
         this.pendingBalance = normalize(pendingBalance);
         this.effectiveSellerId = effectiveSellerId;
@@ -63,6 +69,14 @@ public class DashboardPortfolioSnapshot {
 
     public BigDecimal getCollectedAmount() {
         return collectedAmount;
+    }
+
+    public BigDecimal getGrossCollectedAmount() {
+        return grossCollectedAmount;
+    }
+
+    public BigDecimal getReversedCollectedAmount() {
+        return reversedCollectedAmount;
     }
 
     public BigDecimal getOverdueDebt() {
@@ -99,6 +113,10 @@ public class DashboardPortfolioSnapshot {
 
     public boolean isFiltered() {
         return !isGlobalPortfolio();
+    }
+
+    public boolean hasCollectionReversals() {
+        return reversedCollectedAmount.compareTo(BigDecimal.ZERO) > 0;
     }
 
     public BigDecimal getCollectionProgressPercent() {
