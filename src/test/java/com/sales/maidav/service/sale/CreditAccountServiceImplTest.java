@@ -14,6 +14,7 @@ import com.sales.maidav.model.settings.MoraNotificationTiming;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
+import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import org.junit.jupiter.api.AfterEach;
@@ -56,6 +57,9 @@ class CreditAccountServiceImplTest {
 
     @Mock
     private CreditPaymentRepository creditPaymentRepository;
+
+    @Mock
+    private SaleItemRepository saleItemRepository;
 
     @Mock
     private CompanySettingsService companySettingsService;
@@ -520,8 +524,15 @@ class CreditAccountServiceImplTest {
     void moraWarningHighlightsInstallmentBeforeDueDateWithinConfiguredRange() {
         CreditAccount account = account(61L, PaymentFrequency.WEEKLY, "1200.00");
         account.setAccountNumber("CC-61");
+        Sale sale = new Sale();
+        sale.setId(6101L);
+        account.setSale(sale);
         CreditInstallment installment = installment(account, 611L, 3, "1200.00", LocalDate.now().plusDays(2));
         mockAccount(account, List.of(installment), new BigDecimal("1.20"));
+        when(saleItemRepository.findBySale_IdOrderByIdAsc(6101L)).thenReturn(List.of(
+                saleItem(sale, "Licuadora", 1),
+                saleItem(sale, "Vaso termico", 2)
+        ));
 
         MoraWarningInfo warning = service.getMoraWarning(61L);
 
@@ -535,6 +546,8 @@ class CreditAccountServiceImplTest {
         assertThat(warning.message()).contains("Juan Perez");
         assertThat(warning.message()).contains("cuota #3");
         assertThat(warning.message()).contains("$ 1.200,00");
+        assertThat(warning.message()).contains("Licuadora");
+        assertThat(warning.message()).contains("2 x Vaso termico");
     }
 
     @Test
@@ -558,6 +571,20 @@ class CreditAccountServiceImplTest {
     }
 
     @Test
+    void moraWarningUsesRedStateOnDueDateEvenIfPrewarningRangeIsActive() {
+        CreditAccount account = account(64L, PaymentFrequency.WEEKLY, "950.00");
+        CreditInstallment installment = installment(account, 641L, 1, "950.00", LocalDate.now());
+        mockAccount(account, List.of(installment), new BigDecimal("1.20"));
+
+        MoraWarningInfo warning = service.getMoraWarning(64L);
+
+        assertThat(warning.highlighted()).isTrue();
+        assertThat(warning.daysOverdue()).isEqualTo(0);
+        assertThat(warning.actionLabel()).isEqualTo("AVISAR MORA");
+        assertThat(warning.priority()).isEqualTo(3);
+    }
+
+    @Test
     void moraWarningStaysNeutralWhenNoInstallmentFallsInsideConfiguredRange() {
         CreditAccount account = account(63L, PaymentFrequency.WEEKLY, "700.00");
         CreditInstallment installment = installment(account, 631L, 1, "700.00", LocalDate.now().plusDays(10));
@@ -576,7 +603,7 @@ class CreditAccountServiceImplTest {
     private void mockAccount(CreditAccount account, List<CreditInstallment> installments, BigDecimal recargo) {
         CompanySettings settings = new CompanySettings();
         settings.setCalcRecargo(recargo);
-        settings.setMoraNoticeTemplate("Hola {CLIENTE}, le recordamos que la cuota {CUOTA} con vencimiento el {FECHA_VENCIMIENTO} se encuentra pendiente de pago por {IMPORTE}.");
+        settings.setMoraNoticeTemplate("Hola {CLIENTE}, le recordamos que la cuota {CUOTA} con vencimiento el {FECHA_VENCIMIENTO} se encuentra pendiente de pago por {IMPORTE}. Productos: {PRODUCTOS}.");
         settings.setMoraNoticeDays(2);
         settings.setMoraNoticeTiming(MoraNotificationTiming.BEFORE_DUE_DATE);
 
@@ -592,7 +619,7 @@ class CreditAccountServiceImplTest {
                                      BigDecimal recargo) {
         CompanySettings settings = new CompanySettings();
         settings.setCalcRecargo(recargo);
-        settings.setMoraNoticeTemplate("Hola {CLIENTE}, cuota {CUOTA}, importe {IMPORTE}");
+        settings.setMoraNoticeTemplate("Hola {CLIENTE}, cuota {CUOTA}, importe {IMPORTE}, productos: {PRODUCTOS}");
         settings.setMoraNoticeDays(2);
         settings.setMoraNoticeTiming(MoraNotificationTiming.BEFORE_DUE_DATE);
 
@@ -696,6 +723,16 @@ class CreditAccountServiceImplTest {
         payment.setReversal(true);
         payment.setTargetInstallmentId(targetInstallmentId);
         return payment;
+    }
+
+    private com.sales.maidav.model.sale.SaleItem saleItem(Sale sale, String description, int quantity) {
+        com.sales.maidav.model.sale.SaleItem saleItem = new com.sales.maidav.model.sale.SaleItem();
+        saleItem.setSale(sale);
+        saleItem.setQuantity(quantity);
+        com.sales.maidav.model.product.Product product = new com.sales.maidav.model.product.Product();
+        product.setDescription(description);
+        saleItem.setProduct(product);
+        return saleItem;
     }
 
     private void invokeRecalculateAccountState(CreditAccount account) throws Exception {
