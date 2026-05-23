@@ -1,13 +1,13 @@
 spring:
   datasource:
-    url: jdbc:postgresql://127.0.0.1:${MAIDAV_LOCAL_DB_PORT:5432}/${MAIDAV_LOCAL_DB_NAME:sales_db}
-    username: ${MAIDAV_LOCAL_DB_USERNAME:sales}
-    password: ${MAIDAV_LOCAL_DB_PASSWORD:sales123}
+    url: jdbc:postgresql://127.0.0.1:${MAIDAV_TESTING_DB_PORT:5434}/${MAIDAV_TESTING_DB_NAME:sales_db}
+    username: ${MAIDAV_TESTING_DB_USERNAME:sales}
+    password: ${MAIDAV_TESTING_DB_PASSWORD:}
 
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
+    show-sql: ${MAIDAV_TESTING_SHOW_SQL:true}
     open-in-view: false
     properties:
       hibernate.jdbc.time_zone: America/Argentina/Buenos_Aires
@@ -16,7 +16,7 @@ spring:
     time-zone: America/Argentina/Buenos_Aires
 
   flyway:
-    enabled: ${MAIDAV_LOCAL_FLYWAY_ENABLED:true}
+    enabled: ${MAIDAV_TESTING_FLYWAY_ENABLED:true}
     baseline-on-migrate: true
 
   thymeleaf:
@@ -27,7 +27,7 @@ server:
 
 logging:
   level:
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: ${HIBERNATE_SQL_LOG_LEVEL:DEBUG}
 
 app:
   upload-dir: uploads

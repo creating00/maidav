@@ -6,6 +6,7 @@ import com.sales.maidav.model.settings.MoraNotificationTiming;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
+import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import jakarta.transaction.Transactional;
@@ -46,6 +47,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final CreditPaymentRepository creditPaymentRepository;
+    private final SaleItemRepository saleItemRepository;
     private final CompanySettingsService companySettingsService;
     private final UserRepository userRepository;
 
@@ -287,7 +289,14 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             return MoraWarningInfo.empty(true, "No hay cuotas pendientes dentro de esta cuenta");
         }
 
-        CreditInstallment highlightedInstallment = pendingInstallments.stream()
+        CreditInstallment overdueInstallment = pendingInstallments.stream()
+                .filter(installment -> isDueOrOverdue(installment, today))
+                .findFirst()
+                .orElse(null);
+
+        CreditInstallment highlightedInstallment = overdueInstallment != null
+                ? overdueInstallment
+                : pendingInstallments.stream()
                 .filter(installment -> isWithinMoraWarningRange(installment, today, settings))
                 .findFirst()
                 .orElse(null);
@@ -303,7 +312,10 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 : "Cliente fuera del rango de aviso de mora";
         String whatsappPhone = normalizeWhatsappPhone(account);
         String whatsappUrl = buildWhatsappUrl(whatsappPhone, buildMoraMessage(account, messageInstallment, today, settings));
-        WarningPresentation warningPresentation = resolveWarningPresentation(highlightedInstallment != null, daysOverdue);
+        WarningPresentation warningPresentation = resolveWarningPresentation(
+                highlightedInstallment != null,
+                isDueOrOverdue(messageInstallment, today)
+        );
 
         return new MoraWarningInfo(
                 true,
@@ -511,12 +523,34 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         placeholders.put("{IMPORTE}", formatMoney(pendingAmount));
         placeholders.put("{NUMERO_CREDITO}", account.getAccountNumber() != null ? account.getAccountNumber() : String.valueOf(account.getId()));
         placeholders.put("{SALDO_CUENTA}", formatMoney(account.getBalance()));
+        placeholders.put("{PRODUCTOS}", buildProductsDescription(account));
 
         String message = settings.getMoraNoticeTemplate();
         for (Map.Entry<String, String> entry : placeholders.entrySet()) {
             message = message.replace(entry.getKey(), entry.getValue());
         }
         return message;
+    }
+
+    private String buildProductsDescription(CreditAccount account) {
+        if (account == null || account.getSale() == null || account.getSale().getId() == null) {
+            return "Sin productos";
+        }
+        List<String> productDescriptions = saleItemRepository.findBySale_IdOrderByIdAsc(account.getSale().getId()).stream()
+                .map(saleItem -> {
+                    String description = saleItem.getProduct() != null ? saleItem.getProduct().getDescription() : null;
+                    Integer quantity = saleItem.getQuantity();
+                    if (description == null || description.isBlank()) {
+                        return null;
+                    }
+                    return quantity != null && quantity > 1
+                            ? quantity + " x " + description.trim()
+                            : description.trim();
+                })
+                .filter(description -> description != null && !description.isBlank())
+                .distinct()
+                .toList();
+        return productDescriptions.isEmpty() ? "Sin productos" : String.join(", ", productDescriptions);
     }
 
     private boolean isMoraWarningConfigured(CompanySettings settings) {
@@ -561,14 +595,21 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         return date == null ? "-" : MORA_DATE_FORMATTER.format(date);
     }
 
-    private WarningPresentation resolveWarningPresentation(boolean highlighted, long daysOverdue) {
-        if (highlighted && daysOverdue > 0) {
+    private WarningPresentation resolveWarningPresentation(boolean highlighted, boolean dueOrOverdue) {
+        if (highlighted && dueOrOverdue) {
             return new WarningPresentation("AVISAR MORA", 3, "Mora");
         }
         if (highlighted) {
             return new WarningPresentation("AVISAR VENCIMIENTO", 2, "Vencimiento");
         }
         return new WarningPresentation("CUOTA AL DIA", 1, "Al dia");
+    }
+
+    private boolean isDueOrOverdue(CreditInstallment installment, LocalDate today) {
+        return installment != null
+                && installment.getDueDate() != null
+                && today != null
+                && !today.isBefore(installment.getDueDate());
     }
 
     private String normalizeWhatsappPhone(CreditAccount account) {

@@ -190,7 +190,7 @@
                           class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           th:text="${settings.moraNoticeTemplateBeforeDue}"></textarea>
                 <p class="mt-2 text-xs text-gray-500">
-                    Se usa cuando el tipo de aviso es antes del vencimiento.
+                    Se usa cuando el tipo de aviso es antes del vencimiento. Variables disponibles: {CLIENTE}, {CUOTA}, {FECHA_VENCIMIENTO}, {DIAS_MORA}, {DIAS_PARA_VENCIMIENTO}, {IMPORTE}, {NUMERO_CREDITO}, {SALDO_CUENTA}, {PRODUCTOS}
                 </p>
             </div>
 
@@ -201,7 +201,7 @@
                           class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                           th:text="${settings.moraNoticeTemplateAfterDue}"></textarea>
                 <p class="mt-2 text-xs text-gray-500">
-                    Se usa cuando el tipo de aviso es despues del vencimiento.
+                    Se usa cuando el tipo de aviso es despues del vencimiento. Variables disponibles: {CLIENTE}, {CUOTA}, {FECHA_VENCIMIENTO}, {DIAS_MORA}, {DIAS_PARA_VENCIMIENTO}, {IMPORTE}, {NUMERO_CREDITO}, {SALDO_CUENTA}, {PRODUCTOS}
                 </p>
             </div>
 
