@@ -13,6 +13,7 @@ import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.service.sale.CreditPaymentPricingSupport;
 import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.sale.InvalidSaleException;
+import com.sales.maidav.service.sale.MoraWarningInfo;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import com.sales.maidav.service.user.UserService;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -49,6 +52,7 @@ public class CreditAccountController {
     @PreAuthorize("hasAuthority('ARREARS_READ')")
     public String list(@RequestParam(required = false) String q,
                        @RequestParam(required = false) Long sellerId,
+                       @RequestParam(required = false, defaultValue = "false") boolean priorityFirst,
                        Authentication authentication,
                        Model model) {
         List<CreditAccount> accounts = creditAccountService.findAll();
@@ -75,6 +79,7 @@ public class CreditAccountController {
         }
         Map<Long, BigDecimal> currentInstallments = new HashMap<>();
         Map<Long, String> dueSchedules = new HashMap<>();
+        Map<Long, MoraWarningInfo> moraWarnings = new HashMap<>();
         for (CreditAccount account : accounts) {
             BigDecimal currentAmount = creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId()).stream()
                     .filter(installment -> installment.getStatus() != InstallmentStatus.PAID)
@@ -85,16 +90,18 @@ public class CreditAccountController {
                     .orElse(null);
             currentInstallments.put(account.getId(), currentAmount);
             dueSchedules.put(account.getId(), formatDueSchedule(account));
+            moraWarnings.put(account.getId(), creditAccountService.getMoraWarning(account.getId()));
         }
         Map<Long, List<AccountProductItemView>> productsByAccount = buildProductsByAccount(accounts);
         model.addAttribute("q", q);
         model.addAttribute("sellerId", effectiveSellerId);
+        model.addAttribute("priorityFirst", priorityFirst);
         // FILTRO VENDEDOR FRONTEND
         model.addAttribute("sellerOptions", sellerOptions(authentication));
         model.addAttribute("accounts", accounts);
         model.addAttribute("currentInstallments", currentInstallments);
         model.addAttribute("dueSchedules", dueSchedules);
-        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount));
+        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount, moraWarnings, priorityFirst));
         model.addAttribute("isAdmin", isAdmin(authentication));
         return "pages/accounts/index";
     }
@@ -125,6 +132,7 @@ public class CreditAccountController {
         BigDecimal currentInstallmentCarryForwardAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal currentInstallmentExpiredCash = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         Boolean currentInstallmentCashPricing = null;
+        Long currentInstallmentDaysOverdue = null;
         Map<Long, BigDecimal> chargeAmounts = new HashMap<>();
         Map<Long, BigDecimal> financedAmounts = new HashMap<>();
         Map<Long, Boolean> cashPricingAvailable = new HashMap<>();
@@ -159,8 +167,12 @@ public class CreditAccountController {
                 );
                 currentInstallmentExpiredCash = expiredCashAmount;
                 currentInstallmentCashPricing = usesCashValue;
+                currentInstallmentDaysOverdue = installment.getDueDate() == null
+                        ? null
+                        : Math.max(0, ChronoUnit.DAYS.between(installment.getDueDate(), LocalDate.now()));
             }
         }
+        MoraWarningInfo moraWarning = creditAccountService.getMoraWarning(id);
         model.addAttribute("account", account);
         model.addAttribute("installments", installments);
         model.addAttribute("activeInstallments", activeInstallments);
@@ -171,6 +183,8 @@ public class CreditAccountController {
         model.addAttribute("currentInstallmentCarryForwardAmount", currentInstallmentCarryForwardAmount);
         model.addAttribute("currentInstallmentExpiredCash", currentInstallmentExpiredCash);
         model.addAttribute("currentInstallmentCashPricing", currentInstallmentCashPricing);
+        model.addAttribute("currentInstallmentDaysOverdue", currentInstallmentDaysOverdue);
+        model.addAttribute("moraWarning", moraWarning);
         model.addAttribute("paymentFrequencyLabel", paymentFrequencyLabel(account));
         model.addAttribute("chargeAmounts", chargeAmounts);
         model.addAttribute("financedAmounts", financedAmounts);
@@ -401,14 +415,12 @@ public class CreditAccountController {
     private List<ClientGroupView> buildClientGroups(List<CreditAccount> accounts,
                                                     Map<Long, BigDecimal> currentInstallments,
                                                     Map<Long, String> dueSchedules,
-                                                    Map<Long, List<AccountProductItemView>> productsByAccount) {
+                                                    Map<Long, List<AccountProductItemView>> productsByAccount,
+                                                    Map<Long, MoraWarningInfo> moraWarnings,
+                                                    boolean priorityFirst) {
         Map<Long, MutableClientGroup> groups = new LinkedHashMap<>();
         List<CreditAccount> sortedAccounts = accounts.stream()
-                .sorted((a, b) -> {
-                    String aName = (a.getClient().getLastName() + " " + a.getClient().getFirstName()).trim();
-                    String bName = (b.getClient().getLastName() + " " + b.getClient().getFirstName()).trim();
-                    return aName.compareToIgnoreCase(bName);
-                })
+                .sorted(resolveAccountComparator(moraWarnings, priorityFirst))
                 .toList();
 
         for (CreditAccount account : sortedAccounts) {
@@ -438,7 +450,14 @@ public class CreditAccountController {
                     badge.label,
                     badge.cssClass,
                     resolveSellerDisplay(account),
-                    productsByAccount.getOrDefault(account.getId(), List.of())
+                    account.getClient() != null ? account.getClient().getPhone() : null,
+                    productsByAccount.getOrDefault(account.getId(), List.of()),
+                    moraWarnings.get(account.getId()),
+                    resolveAccentClass(moraWarnings.get(account.getId()) != null ? moraWarnings.get(account.getId()).priority() : 1),
+                    resolveActionClass(
+                            moraWarnings.get(account.getId()) != null ? moraWarnings.get(account.getId()).actionLabel() : "CUOTA AL DIA",
+                            moraWarnings.get(account.getId()) != null && moraWarnings.get(account.getId()).whatsappAvailable()
+                    )
             ));
         }
 
@@ -452,7 +471,49 @@ public class CreditAccountController {
                         group.badge.cssClass,
                         group.accounts
                 ))
+                .sorted(resolveGroupComparator(priorityFirst))
                 .toList();
+    }
+
+    private Comparator<CreditAccount> resolveAccountComparator(Map<Long, MoraWarningInfo> moraWarnings,
+                                                               boolean priorityFirst) {
+        Comparator<CreditAccount> defaultComparator = Comparator.comparing(
+                        (CreditAccount account) -> ((account.getClient().getLastName() + " " + account.getClient().getFirstName()).trim()),
+                        String.CASE_INSENSITIVE_ORDER
+                )
+                .thenComparing(CreditAccount::getId);
+        if (!priorityFirst) {
+            return defaultComparator;
+        }
+        return Comparator
+                .comparingInt((CreditAccount account) -> resolveWarningPriority(moraWarnings.get(account.getId())))
+                .reversed()
+                .thenComparing(
+                        account -> resolveWarningDueDate(moraWarnings.get(account.getId())),
+                        Comparator.nullsLast(LocalDate::compareTo)
+                )
+                .thenComparing(defaultComparator);
+    }
+
+    private Comparator<ClientGroupView> resolveGroupComparator(boolean priorityFirst) {
+        if (!priorityFirst) {
+            return Comparator.comparing(ClientGroupView::clientName, String.CASE_INSENSITIVE_ORDER);
+        }
+        return Comparator
+                .comparingInt((ClientGroupView group) -> group.accounts().stream()
+                        .mapToInt(account -> resolveWarningPriority(account.moraWarning()))
+                        .max()
+                        .orElse(1))
+                .reversed()
+                .thenComparing(ClientGroupView::clientName, String.CASE_INSENSITIVE_ORDER);
+    }
+
+    private int resolveWarningPriority(MoraWarningInfo warning) {
+        return warning == null ? 1 : warning.priority();
+    }
+
+    private LocalDate resolveWarningDueDate(MoraWarningInfo warning) {
+        return warning == null ? null : warning.dueDate();
     }
 
     private Map<Long, List<AccountProductItemView>> buildProductsByAccount(List<CreditAccount> accounts) {
@@ -517,6 +578,25 @@ public class CreditAccountController {
             return new AccountBadge("Pronto a vencer · " + dueSoonDays + " dia(s)", "text-amber-600", 2);
         }
         return new AccountBadge("Al dia", "text-emerald-600", 1);
+    }
+
+    private String resolveActionClass(String actionLabel, boolean whatsappAvailable) {
+        if (!whatsappAvailable && !"CUOTA AL DIA".equals(actionLabel)) {
+            return "bg-slate-300 text-slate-700";
+        }
+        return switch (actionLabel) {
+            case "AVISAR MORA" -> "bg-rose-500 text-white hover:bg-rose-600";
+            case "AVISAR VENCIMIENTO" -> "bg-amber-400 text-white hover:bg-amber-500";
+            default -> "bg-slate-300 text-white";
+        };
+    }
+
+    private String resolveAccentClass(int priority) {
+        return switch (priority) {
+            case 3 -> "border-l-red-500";
+            case 2 -> "border-l-amber-400";
+            default -> "border-l-sky-400";
+        };
     }
 
     private String paymentFrequencyLabel(CreditAccount account) {
@@ -753,7 +833,11 @@ public class CreditAccountController {
                                          String paymentFrequency,
                                          String dueSchedule, String badgeLabel, String badgeClass,
                                          String sellerDisplay,
-                                         List<AccountProductItemView> products) {}
+                                         String clientPhone,
+                                         List<AccountProductItemView> products,
+                                         MoraWarningInfo moraWarning,
+                                         String accentClass,
+                                         String actionClass) {}
     private record AccountProductItemView(String productCode, String description, Integer quantity, BigDecimal lineTotal) {}
     private record ClientGroupView(String clientName, String nationalId, BigDecimal totalBalance, int activeCredits,
                                    String badgeLabel, String badgeClass, List<ClientAccountItemView> accounts) {}

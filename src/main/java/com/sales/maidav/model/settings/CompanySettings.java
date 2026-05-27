@@ -3,6 +3,8 @@ package com.sales.maidav.model.settings;
 import com.sales.maidav.model.common.BaseEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
@@ -59,6 +61,22 @@ public class CompanySettings extends BaseEntity {
     @Column(name = "calc_int_mes_largo", precision = 8, scale = 4)
     private BigDecimal calcIntMesLargo;
 
+    @Column(name = "mora_notice_template", length = 2000)
+    private String moraNoticeTemplate;
+
+    @Column(name = "mora_notice_template_before_due", length = 2000)
+    private String moraNoticeTemplateBeforeDue;
+
+    @Column(name = "mora_notice_template_after_due", length = 2000)
+    private String moraNoticeTemplateAfterDue;
+
+    @Column(name = "mora_notice_days")
+    private Integer moraNoticeDays;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "mora_notice_timing", length = 30)
+    private MoraNotificationTiming moraNoticeTiming;
+
     public CompanySettings() {}
 
     public String getName() { return name; }
@@ -108,4 +126,19 @@ public class CompanySettings extends BaseEntity {
 
     public BigDecimal getCalcIntMesLargo() { return calcIntMesLargo; }
     public void setCalcIntMesLargo(BigDecimal calcIntMesLargo) { this.calcIntMesLargo = calcIntMesLargo; }
+
+    public String getMoraNoticeTemplate() { return moraNoticeTemplate; }
+    public void setMoraNoticeTemplate(String moraNoticeTemplate) { this.moraNoticeTemplate = moraNoticeTemplate; }
+
+    public String getMoraNoticeTemplateBeforeDue() { return moraNoticeTemplateBeforeDue; }
+    public void setMoraNoticeTemplateBeforeDue(String moraNoticeTemplateBeforeDue) { this.moraNoticeTemplateBeforeDue = moraNoticeTemplateBeforeDue; }
+
+    public String getMoraNoticeTemplateAfterDue() { return moraNoticeTemplateAfterDue; }
+    public void setMoraNoticeTemplateAfterDue(String moraNoticeTemplateAfterDue) { this.moraNoticeTemplateAfterDue = moraNoticeTemplateAfterDue; }
+
+    public Integer getMoraNoticeDays() { return moraNoticeDays; }
+    public void setMoraNoticeDays(Integer moraNoticeDays) { this.moraNoticeDays = moraNoticeDays; }
+
+    public MoraNotificationTiming getMoraNoticeTiming() { return moraNoticeTiming; }
+    public void setMoraNoticeTiming(MoraNotificationTiming moraNoticeTiming) { this.moraNoticeTiming = moraNoticeTiming; }
 }

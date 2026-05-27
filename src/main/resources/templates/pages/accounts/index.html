@@ -21,8 +21,6 @@
     <form method="get" th:action="@{/accounts}" class="mb-4 flex flex-wrap gap-2 items-center">
         <input type="text" name="q" th:value="${q}" placeholder="Buscar por ID, cuenta, DNI, nombre o estado"
                class="w-full md:w-96 border rounded px-4 py-2"/>
-        <!-- FILTRO POR VENDEDOR -->
-        <!-- FILTRO VENDEDOR FRONTEND -->
         <select name="sellerId"
                 th:if="${!#lists.isEmpty(sellerOptions)}"
                 class="border rounded px-4 py-2">
@@ -33,7 +31,13 @@
                     th:text="${seller.label}">
             </option>
         </select>
+        <input type="hidden" name="priorityFirst" th:value="${priorityFirst}"/>
         <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
+        <a th:href="@{/accounts(q=${q},sellerId=${sellerId},priorityFirst=${!priorityFirst})}"
+           class="px-4 py-2 rounded border font-semibold transition"
+           th:classappend="${priorityFirst ? ' border-red-200 bg-red-50 text-red-700 hover:bg-red-100' : ' border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'}"
+           th:text="${priorityFirst ? 'Quitar filtro de prioridad' : 'Ordenar por Prioridad (Mora primero)'}">
+        </a>
     </form>
 
     <div class="grid gap-5">
@@ -64,94 +68,116 @@
             </div>
 
             <div class="bg-slate-100 px-4 py-4 md:px-5">
-            <div class="grid gap-4">
-                <div th:each="account : ${group.accounts}"
-                     class="rounded-2xl border-2 border-slate-300 bg-white px-4 py-4 shadow-sm">
-                    <div class="mb-4 flex flex-col gap-2 border-b border-slate-200 pb-3 md:flex-row md:items-center md:justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Credito</p>
-                            <p class="mt-1 text-lg font-bold text-slate-900" th:text="${'ID #' + account.id + ' · ' + group.clientName}"></p>
-                            <p class="text-sm text-slate-600" th:text="${group.nationalId}"></p>
+                <div class="grid gap-4">
+                    <div th:each="account : ${group.accounts}"
+                         class="rounded-2xl border-2 border-slate-300 bg-white px-4 py-4 shadow-sm border-l-8"
+                         th:classappend="${' ' + account.accentClass}">
+                        <div class="mb-4 flex flex-col gap-2 border-b border-slate-200 pb-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Credito</p>
+                                <p class="mt-1 text-lg font-bold text-slate-900" th:text="${'ID #' + account.id + ' · ' + group.clientName}"></p>
+                                <p class="text-sm text-slate-600" th:text="${group.nationalId}"></p>
+                            </div>
+                            <span class="inline-flex rounded-full px-3 py-1 text-sm font-semibold" th:text="${account.badgeLabel}"
+                                  th:classappend="${' ' + account.badgeClass}"></span>
                         </div>
-                        <span class="inline-flex rounded-full px-3 py-1 text-sm font-semibold" th:text="${account.badgeLabel}"
-                              th:classappend="${' ' + account.badgeClass}"></span>
-                    </div>
-                    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-                            <div>
-                                <p class="text-xs uppercase tracking-wide text-slate-500">ID credito</p>
-                                <p class="font-mono text-sm font-semibold text-slate-900" th:text="${account.id}"></p>
-                            </div>
-                            <div>
-                                <p class="text-xs uppercase tracking-wide text-slate-500">Nro. cuenta</p>
-                                <p class="text-sm font-semibold text-slate-900"
-                                   th:text="${account.accountNumber != null ? account.accountNumber : '-'}"></p>
-                            </div>
-                            <div>
-                                <p class="text-xs uppercase tracking-wide text-slate-500">Cuota actual</p>
-                                <p class="text-sm font-semibold text-slate-900"
-                                   th:text="${account.currentInstallment != null ? '$ ' + #numbers.formatDecimal(account.currentInstallment, 1, 'POINT', 2, 'COMMA') : '-'}"></p>
-                            </div>
-                            <div>
-                                <p class="text-xs uppercase tracking-wide text-slate-500">Frecuencia</p>
-                                <p class="text-sm text-slate-700" th:text="${account.paymentFrequency}"></p>
-                            </div>
-                            <div>
-                                <p class="text-xs uppercase tracking-wide text-slate-500">Saldo</p>
-                                <p class="text-sm font-semibold text-slate-900"
-                                   th:text="${'$ ' + #numbers.formatDecimal(account.balance, 1, 'POINT', 2, 'COMMA')}"></p>
-                            </div>
-                            <div>
-                                <p class="text-xs uppercase tracking-wide text-slate-500">Vencimientos</p>
-                                <p class="text-sm text-slate-700" th:text="${account.dueSchedule}"></p>
-                            </div>
-                            <div th:if="${isAdmin}">
-                                <p class="text-xs uppercase tracking-wide text-slate-500">Creada por</p>
-                                <p class="text-sm text-slate-700" th:text="${account.sellerDisplay}"></p>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-col items-start gap-3 lg:items-end">
-                            <a th:href="@{/accounts/{id}(id=${account.id})}"
-                               class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
-                                Ver detalle
-                            </a>
-                        </div>
-                    </div>
-
-                    <details class="mt-4 rounded-lg border border-slate-200 bg-white/90">
-                        <summary class="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-700">
-                            <div class="flex items-center justify-between gap-3">
-                                <span>Productos de esta cuenta</span>
-                                <span class="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600"
-                                      th:text="${#lists.size(account.products)} + ' item(s)'"></span>
-                            </div>
-                        </summary>
-                        <div class="border-t border-slate-200 px-4 py-3">
-                            <div th:if="${#lists.isEmpty(account.products)}"
-                                 class="text-sm text-slate-500">
-                                Esta cuenta no tiene productos asociados.
-                            </div>
-                            <div th:unless="${#lists.isEmpty(account.products)}"
-                                 class="max-h-52 overflow-y-auto pr-2">
-                                <div th:each="product : ${account.products}"
-                                     class="grid grid-cols-1 gap-2 border-b border-slate-100 py-2 last:border-b-0 md:grid-cols-[1fr_auto_auto] md:items-center">
-                                    <div>
-                                        <p class="text-sm font-semibold text-slate-800"
-                                           th:text="${product.description != null ? product.description : '-'}"></p>
-                                        <p class="text-xs text-slate-500"
-                                           th:text="${product.productCode != null ? 'Codigo: ' + product.productCode : 'Sin codigo'}"></p>
-                                    </div>
-                                    <p class="text-sm text-slate-700"
-                                       th:text="${'x' + product.quantity}"></p>
+                        <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">ID credito</p>
+                                    <p class="font-mono text-sm font-semibold text-slate-900" th:text="${account.id}"></p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">Nro. cuenta</p>
                                     <p class="text-sm font-semibold text-slate-900"
-                                       th:text="${'$ ' + #numbers.formatDecimal(product.lineTotal, 1, 'POINT', 2, 'COMMA')}"></p>
+                                       th:text="${account.accountNumber != null ? account.accountNumber : '-'}"></p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">Cuota actual</p>
+                                    <p class="text-sm font-semibold text-slate-900"
+                                       th:text="${account.currentInstallment != null ? '$ ' + #numbers.formatDecimal(account.currentInstallment, 1, 'POINT', 2, 'COMMA') : '-'}"></p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">Frecuencia</p>
+                                    <p class="text-sm text-slate-700" th:text="${account.paymentFrequency}"></p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">Saldo</p>
+                                    <p class="text-sm font-semibold text-slate-900"
+                                       th:text="${'$ ' + #numbers.formatDecimal(account.balance, 1, 'POINT', 2, 'COMMA')}"></p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">Vencimientos</p>
+                                    <p class="text-sm text-slate-700" th:text="${account.dueSchedule}"></p>
+                                </div>
+                                <div>
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">Telefono</p>
+                                    <p class="text-sm text-slate-700"
+                                       th:text="${account.clientPhone != null and !account.clientPhone.isBlank() ? account.clientPhone : 'Sin telefono'}"></p>
+                                </div>
+                                <div th:if="${isAdmin}">
+                                    <p class="text-xs uppercase tracking-wide text-slate-500">Creada por</p>
+                                    <p class="text-sm text-slate-700" th:text="${account.sellerDisplay}"></p>
                                 </div>
                             </div>
+
+                            <div class="flex flex-col items-start gap-3 lg:items-end">
+                                <a th:if="${account.moraWarning != null and account.moraWarning.whatsappAvailable}"
+                                   th:href="${account.moraWarning.whatsappUrl}"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   th:title="${account.moraWarning.tooltip}"
+                                   class="rounded-lg px-4 py-2 text-sm font-bold uppercase tracking-wide shadow-sm"
+                                   th:text="${account.moraWarning.actionLabel}"
+                                   th:classappend="${' ' + account.actionClass}">
+                                </a>
+                                <button th:if="${account.moraWarning == null or !account.moraWarning.whatsappAvailable}"
+                                        type="button"
+                                        disabled
+                                        th:title="${account.moraWarning != null ? account.moraWarning.tooltip : 'Sin aviso disponible'}"
+                                        class="rounded-lg bg-slate-300 px-4 py-2 text-sm font-bold uppercase tracking-wide text-slate-700 opacity-80 cursor-not-allowed"
+                                        th:text="${account.moraWarning != null ? account.moraWarning.actionLabel : 'CUOTA AL DIA'}">
+                                </button>
+                                <a th:href="@{/accounts/{id}(id=${account.id})}"
+                                   class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">
+                                    Ver detalle
+                                </a>
+                            </div>
                         </div>
-                    </details>
+
+                        <details class="mt-4 rounded-lg border border-slate-200 bg-white/90">
+                            <summary class="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-700">
+                                <div class="flex items-center justify-between gap-3">
+                                    <span>Productos de esta cuenta</span>
+                                    <span class="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-600"
+                                          th:text="${#lists.size(account.products)} + ' item(s)'"></span>
+                                </div>
+                            </summary>
+                            <div class="border-t border-slate-200 px-4 py-3">
+                                <div th:if="${#lists.isEmpty(account.products)}"
+                                     class="text-sm text-slate-500">
+                                    Esta cuenta no tiene productos asociados.
+                                </div>
+                                <div th:unless="${#lists.isEmpty(account.products)}"
+                                     class="max-h-52 overflow-y-auto pr-2">
+                                    <div th:each="product : ${account.products}"
+                                         class="grid grid-cols-1 gap-2 border-b border-slate-100 py-2 last:border-b-0 md:grid-cols-[1fr_auto_auto] md:items-center">
+                                        <div>
+                                            <p class="text-sm font-semibold text-slate-800"
+                                               th:text="${product.description != null ? product.description : '-'}"></p>
+                                            <p class="text-xs text-slate-500"
+                                               th:text="${product.productCode != null ? 'Codigo: ' + product.productCode : 'Sin codigo'}"></p>
+                                        </div>
+                                        <p class="text-sm text-slate-700"
+                                           th:text="${'x' + product.quantity}"></p>
+                                        <p class="text-sm font-semibold text-slate-900"
+                                           th:text="${'$ ' + #numbers.formatDecimal(product.lineTotal, 1, 'POINT', 2, 'COMMA')}"></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
                 </div>
-            </div>
             </div>
         </article>
 

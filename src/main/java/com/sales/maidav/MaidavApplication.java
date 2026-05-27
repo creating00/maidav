@@ -7,6 +7,9 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 
+import java.time.ZoneId;
+import java.util.TimeZone;
+
 @SpringBootApplication
 @EnableJpaAuditing(dateTimeProviderRef = "auditingDateTimeProvider")
 public class MaidavApplication {
