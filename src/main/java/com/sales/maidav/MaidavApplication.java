@@ -1,5 +1,8 @@
 package com.sales.maidav;
 
+import java.time.ZoneId;
+import java.util.TimeZone;
+
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
@@ -8,9 +11,17 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 @EnableJpaAuditing(dateTimeProviderRef = "auditingDateTimeProvider")
 public class MaidavApplication {
 
+	private static final String ARGENTINA_TIME_ZONE = "America/Argentina/Buenos_Aires";
+
 	public static void main(String[] args) {
+		normalizeJvmTimeZone();
 		normalizeDatasourceUrl();
 		SpringApplication.run(MaidavApplication.class, args);
+	}
+
+	private static void normalizeJvmTimeZone() {
+		System.setProperty("user.timezone", ARGENTINA_TIME_ZONE);
+		TimeZone.setDefault(TimeZone.getTimeZone(ZoneId.of(ARGENTINA_TIME_ZONE)));
 	}
 
 	private static void normalizeDatasourceUrl() {
