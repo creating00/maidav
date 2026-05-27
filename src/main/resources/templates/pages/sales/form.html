@@ -689,6 +689,8 @@
             let lastScannedCode = '';
             let lastScannedAt = 0;
             let productActionToastTimer = null;
+            let appliedPricingPreset = null;
+            let appliedPricingInternalUpdate = false;
             let confirmedSubmit = false;
             let pendingProductOption = null;
             let pendingProductSource = 'manual';
@@ -1642,7 +1644,8 @@
                 }
             }
 
-            function updateTotals() {
+            function updateTotals(options) {
+                const opts = options || {};
                 let totalItems = 0;
                 let totalAmount = 0;
                 body.querySelectorAll('tr').forEach(row => {
@@ -1655,6 +1658,9 @@
                 });
                 document.getElementById('totalItems').textContent = totalItems.toString();
                 document.getElementById('totalAmount').textContent = totalAmount.toFixed(2);
+                if (!opts.skipAppliedPricingSync && syncAppliedPricingPreset()) {
+                    return;
+                }
                 updateCalculator();
                 saveDraft();
             }
@@ -1724,6 +1730,126 @@
                         MONTHLY_LONG: {count: cfg.mesesLargo, fee: mensualLargo, cashFee: roundTo50(mensualLargo / recargo), frequency: 'MONTHLY'}
                     }
                 };
+            }
+
+            function planPresetLabel(planKey) {
+                return planKey === 'DAILY'
+                    ? 'Diaria'
+                    : planKey === 'WEEKLY'
+                        ? 'Semanal'
+                        : planKey === 'MONTHLY_SHORT' ? 'Mensual corto' : 'Mensual largo';
+            }
+
+            function buildAppliedPricingPresetSnapshot(preset) {
+                if (!preset) {
+                    return null;
+                }
+                const data = calculatePlans(getBaseCartTotal());
+                if (preset.kind === 'PLAN') {
+                    const plan = data.plans[preset.planKey];
+                    if (!plan || plan.count < 1 || plan.fee <= 0) {
+                        return null;
+                    }
+                    return {
+                        targetTotal: plan.fee * plan.count,
+                        paymentType: 'CREDIT',
+                        paymentFrequency: plan.frequency,
+                        weeksCount: String(plan.count),
+                        message: 'Plan aplicado: ' + planPresetLabel(preset.planKey) + ' | ' + plan.count + ' cuotas de ' + money(plan.fee)
+                    };
+                }
+                if (preset.kind === 'CASH') {
+                    return {
+                        targetTotal: data.contado,
+                        paymentType: 'CASH',
+                        paymentFrequency: '',
+                        weeksCount: '',
+                        message: 'Modo aplicado: Contado ' + money(data.contado)
+                    };
+                }
+                if (preset.kind === 'DEBIT') {
+                    return {
+                        targetTotal: data.debito,
+                        paymentType: 'CASH',
+                        paymentFrequency: '',
+                        weeksCount: '',
+                        message: 'Modo aplicado: Debito/Transferencia ' + money(data.debito)
+                    };
+                }
+                return null;
+            }
+
+            function setAppliedPricingMessage(message) {
+                if (calcAppliedPlan) {
+                    calcAppliedPlan.textContent = message || '';
+                }
+            }
+
+            function clearCreditPlanSelection() {
+                if (paymentFrequency) {
+                    paymentFrequency.value = '';
+                }
+                if (weeksCountInput) {
+                    weeksCountInput.value = '';
+                }
+                toggleFrequencyOptions();
+            }
+
+            function invalidateAppliedPricingPreset(message, options) {
+                const opts = options || {};
+                const preset = appliedPricingPreset;
+                appliedPricingPreset = null;
+                if (opts.clearCreditPlan && preset && preset.kind === 'PLAN') {
+                    clearCreditPlanSelection();
+                }
+                setAppliedPricingMessage(message || '');
+            }
+
+            function syncAppliedPricingPreset() {
+                if (!appliedPricingPreset || appliedPricingInternalUpdate) {
+                    return false;
+                }
+                const snapshot = buildAppliedPricingPresetSnapshot(appliedPricingPreset);
+                if (!snapshot || snapshot.targetTotal <= 0) {
+                    invalidateAppliedPricingPreset(
+                        'No se pudo recalcular el modo aplicado. Revise el carrito.',
+                        {clearCreditPlan: true}
+                    );
+                    return false;
+                }
+
+                const totalAmountEl = document.getElementById('totalAmount');
+                const currentTotal = totalAmountEl ? parseNumber(totalAmountEl.textContent) : 0;
+                if (Math.abs(currentTotal - snapshot.targetTotal) < 0.01) {
+                    setAppliedPricingMessage(snapshot.message);
+                    return false;
+                }
+
+                appliedPricingInternalUpdate = true;
+                const applied = applyTargetTotal(snapshot.targetTotal);
+                appliedPricingInternalUpdate = false;
+                if (!applied) {
+                    invalidateAppliedPricingPreset(
+                        'No se pudo recalcular el modo aplicado. Revise el carrito.',
+                        {clearCreditPlan: true}
+                    );
+                    return false;
+                }
+
+                if (paymentType) {
+                    paymentType.value = snapshot.paymentType;
+                }
+                if (paymentFrequency) {
+                    paymentFrequency.value = snapshot.paymentFrequency;
+                }
+                if (weeksCountInput) {
+                    weeksCountInput.value = snapshot.weeksCount;
+                }
+                toggleCreditFields();
+                toggleFrequencyOptions();
+                updateTotals({skipAppliedPricingSync: true});
+                setAppliedPricingMessage(snapshot.message + ' | Recalculado por cambios en el carrito.');
+                return true;
             }
 
             function updateCalculator() {
@@ -2361,6 +2487,7 @@
                 if (weeksCountInput) {
                     weeksCountInput.value = String(plan.count);
                 }
+                appliedPricingPreset = {kind: 'PLAN', planKey: planKey};
 
                 const saleDate = toDateOnly(saleDateInput ? saleDateInput.value : '');
                 let dueDate = new Date(saleDate);
@@ -2378,16 +2505,8 @@
 
                 toggleCreditFields();
                 toggleFrequencyOptions();
-                updateTotals();
-
-                const label = planKey === 'DAILY'
-                    ? 'Diaria'
-                    : planKey === 'WEEKLY'
-                        ? 'Semanal'
-                        : planKey === 'MONTHLY_SHORT' ? 'Mensual corto' : 'Mensual largo';
-                if (calcAppliedPlan) {
-                    calcAppliedPlan.textContent = 'Plan aplicado: ' + label + ' | ' + plan.count + ' cuotas de ' + money(plan.fee);
-                }
+                updateTotals({skipAppliedPricingSync: true});
+                setAppliedPricingMessage('Plan aplicado: ' + planPresetLabel(planKey) + ' | ' + plan.count + ' cuotas de ' + money(plan.fee));
                 saveDraft();
             }
 
@@ -2420,7 +2539,17 @@
                     updateTotals();
                 });
 
-                priceInput.addEventListener('input', updateTotals);
+                priceInput.addEventListener('input', function () {
+                    if (appliedPricingPreset && !appliedPricingInternalUpdate) {
+                        invalidateAppliedPricingPreset(
+                            appliedPricingPreset.kind === 'PLAN'
+                                ? 'Plan automatico desactivado por cambio manual de precios. Reaplique una opcion para credito.'
+                                : 'Modo automatico desactivado por cambio manual de precios.',
+                            {clearCreditPlan: true}
+                        );
+                    }
+                    updateTotals({skipAppliedPricingSync: true});
+                });
 
                 removeBtn.addEventListener('click', function () {
                     if (body.children.length > 1) {
@@ -2467,7 +2596,7 @@
             renderSaleCatalogList('');
             updateTotals();
             if (discountInput) {
-                discountInput.addEventListener('input', updateCalculator);
+                discountInput.addEventListener('input', updateTotals);
             }
             if (applyCashBtn) {
                 applyCashBtn.addEventListener('click', function () {
@@ -2478,11 +2607,17 @@
                     if (paymentType) {
                         paymentType.value = 'CASH';
                     }
-                    toggleCreditFields();
-                    updateTotals();
-                    if (calcAppliedPlan) {
-                        calcAppliedPlan.textContent = 'Modo aplicado: Contado ' + money(data.contado);
+                    if (paymentFrequency) {
+                        paymentFrequency.value = '';
                     }
+                    if (weeksCountInput) {
+                        weeksCountInput.value = '';
+                    }
+                    appliedPricingPreset = {kind: 'CASH'};
+                    toggleCreditFields();
+                    toggleFrequencyOptions();
+                    updateTotals({skipAppliedPricingSync: true});
+                    setAppliedPricingMessage('Modo aplicado: Contado ' + money(data.contado));
                     saveDraft();
                 });
             }
@@ -2495,11 +2630,17 @@
                     if (paymentType) {
                         paymentType.value = 'CASH';
                     }
-                    toggleCreditFields();
-                    updateTotals();
-                    if (calcAppliedPlan) {
-                        calcAppliedPlan.textContent = 'Modo aplicado: Debito/Transferencia ' + money(data.debito);
+                    if (paymentFrequency) {
+                        paymentFrequency.value = '';
                     }
+                    if (weeksCountInput) {
+                        weeksCountInput.value = '';
+                    }
+                    appliedPricingPreset = {kind: 'DEBIT'};
+                    toggleCreditFields();
+                    toggleFrequencyOptions();
+                    updateTotals({skipAppliedPricingSync: true});
+                    setAppliedPricingMessage('Modo aplicado: Debito/Transferencia ' + money(data.debito));
                     saveDraft();
                 });
             }
@@ -2695,7 +2836,18 @@
             window.addEventListener('beforeunload', stopBarcodeScanner);
 
             if (paymentType) {
-                paymentType.addEventListener('change', toggleCreditFields);
+                paymentType.addEventListener('change', function () {
+                    if (appliedPricingPreset && !appliedPricingInternalUpdate) {
+                        const expectedPaymentType = appliedPricingPreset.kind === 'PLAN' ? 'CREDIT' : 'CASH';
+                        if (paymentType.value !== expectedPaymentType) {
+                            invalidateAppliedPricingPreset(
+                                'Modo automatico desactivado al cambiar la forma de pago.',
+                                {clearCreditPlan: true}
+                            );
+                        }
+                    }
+                    toggleCreditFields();
+                });
             }
             if (firstDueDateInput) {
                 const markFirstDueDateManual = () => {
@@ -2959,6 +3111,7 @@
                     paymentFrequency: getFieldValue('input[name="paymentFrequency"]'),
                     discountAmount: getFieldValue('input[name="discountAmount"]'),
                     weeksCount: getFieldValue('input[name="weeksCount"]'),
+                    appliedPricingPreset,
                     rows
                 };
 
@@ -3000,6 +3153,7 @@
                 setFieldValue('input[name="paymentFrequency"]', draft.paymentFrequency);
                 setFieldValue('input[name="discountAmount"]', draft.discountAmount);
                 setFieldValue('input[name="weeksCount"]', draft.weeksCount);
+                appliedPricingPreset = draft.appliedPricingPreset || null;
                 firstDueDateManuallyEdited = Boolean(draft.firstDueDate);
                 if (quickClientToggle) {
                     quickClientToggle.checked = Boolean(draft.quickClientEnabled);

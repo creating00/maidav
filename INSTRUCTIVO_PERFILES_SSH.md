@@ -133,7 +133,7 @@ $env:SPRING_PROFILES_ACTIVE="prod"
 $env:MAIDAV_PROD_DB_PORT="5435"
 $env:MAIDAV_PROD_DB_NAME="sales_db"
 $env:MAIDAV_PROD_DB_USERNAME="sales"
-$env:MAIDAV_PROD_DB_PASSWORD="TU_PASSWORD_REAL_DE_PROD"
+$env:MAIDAV_PROD_DB_PASSWORD="sales123"
 mvn org.springframework.boot:spring-boot-maven-plugin:run
 ```
 
