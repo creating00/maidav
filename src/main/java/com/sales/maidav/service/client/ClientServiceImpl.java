@@ -111,8 +111,8 @@ public class ClientServiceImpl implements ClientService {
     }
 
     private void validateNationalId(String nationalId) {
-        if (!nationalId.matches("^(\\d{8}|\\d{11})$")) {
-            throw new InvalidNationalIdException("DNI debe tener 8 digitos o CUIT 11 digitos");
+        if (!nationalId.matches("^(\\d{7,8}|\\d{11})$")) {
+            throw new InvalidNationalIdException("DNI debe tener 7 u 8 digitos o CUIT 11 digitos");
         }
     }
 
