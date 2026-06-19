@@ -99,7 +99,7 @@
                 </select>
             </div>
 
-            <div th:if="${isAdmin}">
+            <div th:if="${isAdmin and !isEditing}">
                 <!-- SOLO ADMIN ASIGNAR VENDEDOR -->
                 <label class="block text-sm font-semibold mb-1">Asignar vendedor</label>
                 <select name="sellerId"
@@ -111,6 +111,14 @@
                             th:text="${seller.firstName != null && !seller.firstName.isBlank() ? seller.firstName + ' ' + seller.lastName + ' - ' + seller.email : seller.email}">
                     </option>
                 </select>
+            </div>
+
+            <div th:if="${isAdmin and isEditing}">
+                <label class="block text-sm font-semibold mb-1">Vendedor asignado</label>
+                <div class="w-full rounded border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-700">
+                    <span th:text="${sale != null and sale.seller != null ? sale.seller.email : '-'}"></span>
+                    <span class="ml-2 text-xs text-slate-500">Cambiar desde la accion exclusiva de ventas.</span>
+                </div>
             </div>
 
             <div>
