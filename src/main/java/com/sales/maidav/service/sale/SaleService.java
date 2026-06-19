@@ -4,6 +4,7 @@ import com.sales.maidav.model.client.Client;
 import com.sales.maidav.model.sale.PaymentFrequency;
 import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
+import com.sales.maidav.model.sale.SaleSellerChange;
 import com.sales.maidav.model.user.User;
 
 import java.math.BigDecimal;
@@ -34,6 +35,8 @@ public interface SaleService {
                     BigDecimal discountAmount,
                     Integer weeksCount,
                     List<SaleItemInput> items);
+    Sale changeSeller(Long saleId, User newSeller, User changedBy);
+    List<SaleSellerChange> findSellerChanges(Long saleId);
     void voidSale(Long id);
     long countActive();
     long countToday();

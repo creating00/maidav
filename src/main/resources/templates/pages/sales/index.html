@@ -84,6 +84,12 @@
                        class="text-amber-600 hover:underline">
                         Editar
                     </a>
+                    <a sec:authorize="hasRole('ADMIN')"
+                       th:if="${sale.status.name() != 'VOID'}"
+                       th:href="@{/sales/{id}/seller(id=${sale.id})}"
+                       class="text-indigo-600 hover:underline">
+                        Cambiar vendedor
+                    </a>
                     <a sec:authorize="hasAuthority('ARREARS_READ')"
                        th:if="${sale.paymentType.name() == 'CREDIT' and sale.status.name() != 'VOID'}"
                        th:href="@{/accounts/by-sale/{id}(id=${sale.id})}"
