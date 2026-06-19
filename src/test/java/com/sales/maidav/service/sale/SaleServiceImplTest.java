@@ -8,13 +8,16 @@ import com.sales.maidav.model.sale.InstallmentStatus;
 import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
+import com.sales.maidav.model.sale.SaleSellerChange;
 import com.sales.maidav.model.sale.SaleStatus;
+import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.product.ProductRepository;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.sale.SaleRepository;
+import com.sales.maidav.repository.sale.SaleSellerChangeRepository;
 import com.sales.maidav.repository.user.UserRepository;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -30,6 +33,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -51,6 +55,8 @@ class SaleServiceImplTest {
     @Mock
     private CreditPaymentRepository creditPaymentRepository;
     @Mock
+    private SaleSellerChangeRepository saleSellerChangeRepository;
+    @Mock
     private UserRepository userRepository;
     @Mock
     private EntityManager entityManager;
@@ -66,6 +72,7 @@ class SaleServiceImplTest {
                 creditAccountRepository,
                 creditInstallmentRepository,
                 creditPaymentRepository,
+                saleSellerChangeRepository,
                 userRepository,
                 entityManager
         );
@@ -244,5 +251,54 @@ class SaleServiceImplTest {
 
         verify(saleItemRepository, never()).findBySale_IdOrderByIdAsc(any());
         verify(productRepository, never()).save(any());
+    }
+
+    @Test
+    void changeSellerUpdatesSaleAndRegistersAuditEntry() {
+        Sale sale = new Sale();
+        sale.setId(11L);
+        sale.setStatus(SaleStatus.ACTIVE);
+
+        User previousSeller = new User();
+        previousSeller.setId(3L);
+        previousSeller.setEmail("old@maidav.com");
+        sale.setSeller(previousSeller);
+
+        User newSeller = new User();
+        newSeller.setId(5L);
+        newSeller.setEmail("new@maidav.com");
+
+        User changedBy = new User();
+        changedBy.setId(1L);
+        changedBy.setEmail("admin@maidav.com");
+
+        when(saleRepository.findById(11L)).thenReturn(Optional.of(sale));
+
+        Sale updatedSale = saleService.changeSeller(11L, newSeller, changedBy);
+
+        assertThat(updatedSale.getSeller()).isEqualTo(newSeller);
+        verify(saleRepository).save(sale);
+        verify(saleSellerChangeRepository).save(any(SaleSellerChange.class));
+    }
+
+    @Test
+    void changeSellerRejectsSameSeller() {
+        Sale sale = new Sale();
+        sale.setId(12L);
+        sale.setStatus(SaleStatus.ACTIVE);
+
+        User seller = new User();
+        seller.setId(8L);
+        seller.setEmail("seller@maidav.com");
+        sale.setSeller(seller);
+
+        User changedBy = new User();
+        changedBy.setId(1L);
+
+        when(saleRepository.findById(12L)).thenReturn(Optional.of(sale));
+
+        assertThatThrownBy(() -> saleService.changeSeller(12L, seller, changedBy))
+                .isInstanceOf(InvalidSaleException.class)
+                .hasMessage("La venta ya esta asignada a ese vendedor");
     }
 }

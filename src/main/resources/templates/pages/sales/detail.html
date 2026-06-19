@@ -31,6 +31,11 @@
         </div>
     </div>
 
+    <div th:if="${successMessage}"
+         class="mb-4 rounded border border-green-200 bg-green-50 px-4 py-3 text-green-700">
+        <span th:text="${successMessage}"></span>
+    </div>
+
     <div class="bg-white rounded shadow overflow-x-auto">
         <table class="min-w-full text-sm">
             <thead class="bg-gray-100 text-left">
@@ -80,6 +85,43 @@
            class="text-amber-600 hover:underline font-semibold">
             Editar venta
         </a>
+        <a sec:authorize="hasRole('ADMIN')"
+           th:if="${sale.status.name() != 'VOID'}"
+           th:href="@{/sales/{id}/seller(id=${sale.id})}"
+           class="text-indigo-600 hover:underline font-semibold">
+            Cambiar vendedor
+        </a>
+    </div>
+
+    <div class="mt-8 bg-white rounded shadow overflow-hidden">
+        <div class="border-b border-slate-200 px-4 py-3">
+            <h2 class="text-sm font-semibold text-slate-900">Historial de cambios de vendedor</h2>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-slate-50 text-left">
+                <tr>
+                    <th class="px-4 py-3">Fecha</th>
+                    <th class="px-4 py-3">Anterior</th>
+                    <th class="px-4 py-3">Actual</th>
+                    <th class="px-4 py-3">Modificado por</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="change : ${sellerChanges}" class="border-t">
+                    <td class="px-4 py-3" th:text="${#temporals.format(change.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                    <td class="px-4 py-3" th:text="${change.previousSeller.email}"></td>
+                    <td class="px-4 py-3" th:text="${change.newSeller.email}"></td>
+                    <td class="px-4 py-3" th:text="${change.changedBy.email}"></td>
+                </tr>
+                <tr th:if="${#lists.isEmpty(sellerChanges)}">
+                    <td colspan="4" class="px-4 py-6 text-center text-gray-500">
+                        No hay cambios de vendedor registrados
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
 
 </section>

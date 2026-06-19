@@ -37,6 +37,7 @@ public class SaleServiceImpl implements SaleService {
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final CreditPaymentRepository creditPaymentRepository;
+    private final SaleSellerChangeRepository saleSellerChangeRepository;
     private final UserRepository userRepository;
     private final EntityManager entityManager;
 
@@ -311,6 +312,44 @@ public class SaleServiceImpl implements SaleService {
             product.setStockAvailable(product.getStockAvailable() + item.getQuantity());
             productRepository.save(product);
         }
+    }
+
+    @Override
+    public Sale changeSeller(Long saleId, User newSeller, User changedBy) {
+        Sale sale = saleRepository.findById(saleId)
+                .orElseThrow(() -> new RuntimeException("Venta no encontrada"));
+        if (sale.getStatus() == SaleStatus.VOID) {
+            throw new InvalidSaleException("No se puede cambiar el vendedor de una venta anulada");
+        }
+        if (newSeller == null) {
+            throw new InvalidSaleException("Debe seleccionar un vendedor");
+        }
+        if (changedBy == null) {
+            throw new InvalidSaleException("No se pudo identificar al usuario que realiza el cambio");
+        }
+
+        User currentSeller = sale.getSeller();
+        if (currentSeller != null && currentSeller.getId() != null
+                && currentSeller.getId().equals(newSeller.getId())) {
+            throw new InvalidSaleException("La venta ya esta asignada a ese vendedor");
+        }
+
+        SaleSellerChange change = new SaleSellerChange();
+        change.setSale(sale);
+        change.setPreviousSeller(currentSeller);
+        change.setNewSeller(newSeller);
+        change.setChangedBy(changedBy);
+
+        sale.setSeller(newSeller);
+        saleRepository.save(sale);
+        saleSellerChangeRepository.save(change);
+        return sale;
+    }
+
+    @Override
+    public List<SaleSellerChange> findSellerChanges(Long saleId) {
+        findById(saleId);
+        return saleSellerChangeRepository.findBySale_IdOrderByCreatedAtDescIdDesc(saleId);
     }
 
     private void voidCreditAccountForSale(Sale sale) {

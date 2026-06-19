@@ -131,7 +131,18 @@ public class SaleController {
     public String detail(@PathVariable Long id, Model model) {
         model.addAttribute("sale", saleService.findById(id));
         model.addAttribute("items", saleItemRepository.findBySale_IdOrderByIdAsc(id));
+        model.addAttribute("sellerChanges", saleService.findSellerChanges(id));
         return "pages/sales/detail";
+    }
+
+    @GetMapping("/{id}/seller")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String changeSellerForm(@PathVariable Long id, Model model) {
+        Sale sale = saleService.findById(id);
+        model.addAttribute("sale", sale);
+        model.addAttribute("sellerChanges", saleService.findSellerChanges(id));
+        model.addAttribute("sellers", userService.findAll());
+        return "pages/sales/change-seller";
     }
 
     @GetMapping("/{id}/edit")
@@ -192,12 +203,11 @@ public class SaleController {
                          @RequestParam(required = false) String draftState,
                          Authentication authentication,
                          Model model,
-                         RedirectAttributes redirectAttributes) {
+        RedirectAttributes redirectAttributes) {
 
         try {
-            User loggedUser = userService.findByEmail(authentication.getName());
             boolean admin = isAdmin(authentication);
-            User seller = resolveSeller(loggedUser, sellerId, admin);
+            User seller = saleService.findById(id).getSeller();
             Client client = resolveClient(clientId, seller, quickClientNationalId, quickClientFirstName,
                     quickClientLastName, quickClientPhone, quickClientAddress);
             List<SaleItemInput> items = buildItems(productIds, quantities, unitPrices);
@@ -300,6 +310,29 @@ public class SaleController {
         saleService.voidSale(id);
         redirectAttributes.addFlashAttribute("successMessage", "Venta anulada correctamente");
         return "redirect:/sales";
+    }
+
+    @PostMapping("/{id}/seller")
+    @PreAuthorize("hasRole('ADMIN')")
+    public String changeSeller(@PathVariable Long id,
+                               @RequestParam Long sellerId,
+                               Authentication authentication,
+                               Model model,
+                               RedirectAttributes redirectAttributes) {
+        try {
+            User changedBy = userService.findByEmail(authentication.getName());
+            User newSeller = userService.findById(sellerId);
+            Sale sale = saleService.changeSeller(id, newSeller, changedBy);
+            redirectAttributes.addFlashAttribute("successMessage", "Vendedor actualizado correctamente");
+            return "redirect:/sales/" + sale.getId();
+        } catch (InvalidSaleException ex) {
+            Sale sale = saleService.findById(id);
+            model.addAttribute("sale", sale);
+            model.addAttribute("sellerChanges", saleService.findSellerChanges(id));
+            model.addAttribute("sellers", userService.findAll());
+            model.addAttribute("formError", ex.getMessage());
+            return "pages/sales/change-seller";
+        }
     }
 
     private void addCreateFormAttributes(Model model, Authentication authentication) {

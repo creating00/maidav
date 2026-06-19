@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="layout/main :: layout(~{::content}, 'Cambiar vendedor de venta')">
+
+<section th:fragment="content">
+
+    <div class="mb-6">
+        <h1 class="text-2xl font-bold">Cambiar vendedor</h1>
+        <p class="text-sm text-slate-500"
+           th:text="${'Venta ' + (sale.saleNumber != null ? sale.saleNumber : sale.id) + ' | Cliente: ' + sale.client.firstName + ' ' + sale.client.lastName}">
+        </p>
+    </div>
+
+    <div th:if="${formError}"
+         class="mb-4 rounded border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+        <span th:text="${formError}"></span>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-[minmax(0,28rem),1fr]">
+        <div class="rounded bg-white p-6 shadow">
+            <p class="mb-1 text-xs text-slate-500">Vendedor actual</p>
+            <p class="mb-4 text-sm font-semibold text-slate-900" th:text="${sale.seller.email}"></p>
+
+            <form method="post" th:action="@{/sales/{id}/seller(id=${sale.id})}" class="space-y-4">
+                <div>
+                    <label for="sellerId" class="mb-2 block text-sm font-semibold text-slate-800">Nuevo vendedor</label>
+                    <select id="sellerId" name="sellerId" class="w-full rounded border border-slate-300 px-4 py-3">
+                        <option value="">Seleccionar vendedor</option>
+                        <option th:each="seller : ${sellers}"
+                                th:value="${seller.id}"
+                                th:selected="${sale.seller != null and seller.id == sale.seller.id}"
+                                th:text="${seller.firstName != null && !seller.firstName.isBlank() ? seller.firstName + ' ' + seller.lastName + ' - ' + seller.email : seller.email}">
+                        </option>
+                    </select>
+                </div>
+
+                <div class="flex gap-3">
+                    <button class="rounded bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700">
+                        Guardar vendedor
+                    </button>
+                    <a th:href="@{/sales/{id}(id=${sale.id})}"
+                       class="rounded border border-slate-300 px-4 py-2 text-slate-700 hover:bg-slate-50">
+                        Cancelar
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <div class="rounded bg-white shadow overflow-hidden">
+            <div class="border-b border-slate-200 px-4 py-3">
+                <h2 class="text-sm font-semibold text-slate-900">Historial</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-left">
+                    <tr>
+                        <th class="px-4 py-3">Fecha</th>
+                        <th class="px-4 py-3">Anterior</th>
+                        <th class="px-4 py-3">Actual</th>
+                        <th class="px-4 py-3">Modificado por</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="change : ${sellerChanges}" class="border-t">
+                        <td class="px-4 py-3" th:text="${#temporals.format(change.createdAt, 'yyyy-MM-dd HH:mm')}"></td>
+                        <td class="px-4 py-3" th:text="${change.previousSeller.email}"></td>
+                        <td class="px-4 py-3" th:text="${change.newSeller.email}"></td>
+                        <td class="px-4 py-3" th:text="${change.changedBy.email}"></td>
+                    </tr>
+                    <tr th:if="${#lists.isEmpty(sellerChanges)}">
+                        <td colspan="4" class="px-4 py-6 text-center text-gray-500">
+                            No hay cambios de vendedor registrados
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</section>
+</html>
