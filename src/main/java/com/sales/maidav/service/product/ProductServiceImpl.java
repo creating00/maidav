@@ -118,7 +118,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public Page<Product> findPageForListing(boolean lowStock, String q, Long providerId, String updateAgeFilter, Pageable pageable) {
+    public Page<Product> findPageForListing(boolean lowStock, boolean includeOutOfStock, String q, Long providerId, String updateAgeFilter, Pageable pageable) {
         String normalizedTerm = (q == null || q.isBlank())
                 ? null
                 : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
@@ -141,6 +141,7 @@ public class ProductServiceImpl implements ProductService {
         boolean applyUpdatedBefore = updatedBefore != null;
         return productRepository.findPageForListing(
                 lowStock,
+                includeOutOfStock,
                 providerId,
                 normalizedTerm,
                 applyUpdatedAfter,

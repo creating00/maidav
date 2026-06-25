@@ -110,6 +110,7 @@ public class ProductController {
     @GetMapping
     @PreAuthorize("hasAuthority('PRODUCT_READ')")
     public String list(@RequestParam(required = false) Boolean lowStock,
+                       @RequestParam(required = false) Boolean includeOutOfStock,
                        @RequestParam(required = false) String q,
                        @RequestParam(required = false) Long providerId,
                        @RequestParam(required = false) String updateAgeFilter,
@@ -117,8 +118,10 @@ public class ProductController {
                        @RequestParam(required = false) Long productId,
                        Model model) {
         int safePage = page == null || page < 0 ? 0 : page;
+        boolean showOutOfStock = Boolean.TRUE.equals(includeOutOfStock);
         Page<Product> productsPage = productService.findPageForListing(
                 Boolean.TRUE.equals(lowStock),
+                showOutOfStock,
                 q,
                 providerId,
                 updateAgeFilter,
@@ -131,6 +134,7 @@ public class ProductController {
         if (Boolean.TRUE.equals(lowStock)) {
             model.addAttribute("lowStockOnly", true);
         }
+        model.addAttribute("includeOutOfStock", showOutOfStock);
         model.addAttribute("q", q);
         model.addAttribute("providerId", providerId);
         model.addAttribute("updateAgeFilter", updateAgeFilter);

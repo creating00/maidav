@@ -38,7 +38,7 @@
     <div th:if="${lowStockOnly}"
          class="mb-4 flex flex-col gap-2 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800 sm:flex-row sm:items-center sm:justify-between">
         <span>Mostrando productos con stock bajo</span>
-        <a th:href="@{/products}" class="text-sm text-amber-900 hover:underline">Ver todos</a>
+        <a th:href="@{/products(includeOutOfStock=${includeOutOfStock})}" class="text-sm text-amber-900 hover:underline">Ver todos</a>
     </div>
 
     <form method="get" th:action="@{/products}" class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -47,6 +47,14 @@
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Buscar</label>
                 <input type="text" name="q" th:value="${q}" placeholder="Codigo, barra, descripcion o proveedor"
                        class="w-full rounded border px-4 py-2"/>
+                <label class="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm">
+                    <input type="checkbox"
+                           name="includeOutOfStock"
+                           value="true"
+                           th:checked="${includeOutOfStock}"
+                           class="h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-400" />
+                    <span>Mostrar sin stock</span>
+                </label>
             </div>
             <div>
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Proveedor</label>
@@ -426,7 +434,7 @@
             </span>
             <div class="flex items-center gap-2">
                 <a th:if="${currentPage > 0}"
-                   th:href="@{/products(page=${currentPage - 1},lowStock=${lowStockOnly},q=${q},providerId=${providerId},updateAgeFilter=${updateAgeFilter},productId=${focusProductId})}"
+                   th:href="@{/products(page=${currentPage - 1},lowStock=${lowStockOnly},includeOutOfStock=${includeOutOfStock},q=${q},providerId=${providerId},updateAgeFilter=${updateAgeFilter},productId=${focusProductId})}"
                    class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
                     Anterior
                 </a>
@@ -435,7 +443,7 @@
                     Anterior
                 </span>
                 <a th:if="${currentPage + 1 < totalPages}"
-                   th:href="@{/products(page=${currentPage + 1},lowStock=${lowStockOnly},q=${q},providerId=${providerId},updateAgeFilter=${updateAgeFilter},productId=${focusProductId})}"
+                   th:href="@{/products(page=${currentPage + 1},lowStock=${lowStockOnly},includeOutOfStock=${includeOutOfStock},q=${q},providerId=${providerId},updateAgeFilter=${updateAgeFilter},productId=${focusProductId})}"
                    class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
                     Siguiente
                 </a>

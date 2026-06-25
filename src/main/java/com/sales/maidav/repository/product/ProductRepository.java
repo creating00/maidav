@@ -45,6 +45,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             select p from Product p
             join p.provider provider
             where (:lowStock = false or p.stockAvailable <= p.stockMin)
+              and ((:includeOutOfStock = true and p.stockAvailable <= 0)
+                   or (:includeOutOfStock = false and p.stockAvailable > 0))
               and (:providerId is null or provider.id = :providerId)
               and (:term is null
                    or lower(coalesce(p.productCode, '')) like :term
@@ -58,6 +60,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             select count(p) from Product p
             join p.provider provider
             where (:lowStock = false or p.stockAvailable <= p.stockMin)
+              and ((:includeOutOfStock = true and p.stockAvailable <= 0)
+                   or (:includeOutOfStock = false and p.stockAvailable > 0))
               and (:providerId is null or provider.id = :providerId)
               and (:term is null
                    or lower(coalesce(p.productCode, '')) like :term
@@ -68,6 +72,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
               and (:applyUpdatedBefore = false or coalesce(p.updatedAt, p.createdAt) <= :updatedBefore)
             """)
     Page<Product> findPageForListing(@Param("lowStock") boolean lowStock,
+                                     @Param("includeOutOfStock") boolean includeOutOfStock,
                                      @Param("providerId") Long providerId,
                                      @Param("term") String term,
                                      @Param("applyUpdatedAfter") boolean applyUpdatedAfter,
