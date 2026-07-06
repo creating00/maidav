@@ -5,6 +5,7 @@ import com.sales.maidav.model.product.ProductPriceAdjustment;
 import com.sales.maidav.model.product.PriceAdjustmentScope;
 import com.sales.maidav.model.product.PriceAdjustmentType;
 import com.sales.maidav.model.settings.CompanySettings;
+import com.sales.maidav.service.client.ClientService;
 import com.sales.maidav.service.product.DuplicateProductCodeException;
 import com.sales.maidav.service.product.InvalidProductException;
 import com.sales.maidav.service.product.ProductService;
@@ -28,6 +29,7 @@ import org.springframework.http.MediaType;
 import java.io.IOException;
 import java.beans.PropertyEditorSupport;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -104,6 +106,7 @@ public class ProductController {
     private final ProductService productService;
     private final ProviderService providerService;
     private final CompanySettingsService companySettingsService;
+    private final ClientService clientService;
     @Value("${app.upload-dir:uploads}")
     private String uploadDir;
 
@@ -144,6 +147,7 @@ public class ProductController {
         model.addAttribute("totalPages", productsPage.getTotalPages());
         model.addAttribute("pageSize", PRODUCT_PAGE_SIZE);
         model.addAttribute("providers", providerService.findAll());
+        model.addAttribute("clients", clientService.findAll());
         model.addAttribute("adjustmentTypes", PriceAdjustmentType.values());
         List<ProductPriceAdjustment> adjustments = productService.findRecentAdjustments();
         model.addAttribute("adjustments", adjustments);
@@ -297,8 +301,27 @@ public class ProductController {
         return Map.of(
                 "productId", product.getId(),
                 "barcode", product.getBarcode(),
-                "description", product.getDescription()
+                "productCode", product.getProductCode(),
+                "description", product.getDescription(),
+                "imagePath", product.getImagePath(),
+                "stockAvailable", product.getStockAvailable(),
+                "priceRetail", product.getPriceRetail(),
+                "baseAmount", resolveFinancingBase(product)
         );
+    }
+
+    private BigDecimal resolveFinancingBase(Product product) {
+        if (product.getCost() == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal vatMultiplier = BigDecimal.ONE.add(
+                product.getVatRate() == null
+                        ? BigDecimal.ZERO
+                        : product.getVatRate().divide(new BigDecimal("100"), 4, RoundingMode.HALF_UP)
+        );
+        return product.getCost()
+                .multiply(vatMultiplier)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     // RESTRICCION POR ROL

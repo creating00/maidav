@@ -97,6 +97,127 @@
             </button>
         </div>
         <div id="scanLookupResult" class="mt-3 hidden rounded-lg border border-sky-200 bg-white px-4 py-3 text-sm text-slate-700"></div>
+        <article id="scanProductCard"
+                 class="mt-4 hidden overflow-hidden rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top,_#17315f_0%,_#0c1d3d_45%,_#071327_100%)] text-white shadow-[0_24px_70px_rgba(7,19,39,0.35)]">
+            <div class="border-b border-white/10 px-5 py-5">
+                <div class="overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/5">
+                    <img id="scanProductImage"
+                         alt="Imagen del producto escaneado"
+                         class="hidden h-56 w-full object-contain bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))] p-5 sm:h-64"/>
+                    <div id="scanProductImageFallback"
+                         class="flex h-56 w-full items-center justify-center bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.01))] px-6 text-center text-2xl font-semibold tracking-[0.08em] text-white/70 sm:h-64">
+                        aqui va imagen del producto
+                    </div>
+                </div>
+                <p id="scanProductCode" class="mt-5 text-center text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200">Codigo</p>
+                <h3 id="scanProductDescription" class="mx-auto mt-2 max-w-xl text-center text-2xl font-black uppercase leading-tight text-white sm:text-[2rem]">
+                    Producto escaneado
+                </h3>
+            </div>
+
+            <div class="space-y-4 px-5 py-5">
+                <section class="rounded-[1.4rem] border border-emerald-300/40 bg-white/5 px-4 py-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+                    <p class="text-xs font-semibold uppercase tracking-[0.24em] text-emerald-100/90">Stock disponible ERP</p>
+                    <p id="scanProductStock" class="mt-2 text-3xl font-black uppercase tracking-[0.14em] text-emerald-300">0 unidades</p>
+                </section>
+
+                <section>
+                    <p class="mb-2 text-xs font-black uppercase tracking-[0.24em] text-amber-300">Pago de contado</p>
+                    <div class="space-y-2">
+                        <div class="flex items-center justify-between rounded-2xl border border-emerald-400/20 bg-white/6 px-4 py-3">
+                            <div>
+                                <p class="text-base font-semibold text-white">Efectivo</p>
+                            </div>
+                            <p id="scanProductCash" class="text-2xl font-black text-emerald-300">$0</p>
+                        </div>
+                        <div class="flex items-center justify-between rounded-2xl border border-white/10 bg-white/6 px-4 py-3">
+                            <div>
+                                <p class="text-base font-semibold text-white">Debito/Transf.</p>
+                            </div>
+                            <p id="scanProductDebit" class="text-2xl font-black text-white">$0</p>
+                        </div>
+                    </div>
+                </section>
+
+                <section>
+                    <p class="mb-2 text-xs font-black uppercase tracking-[0.24em] text-amber-300">Planes de financiacion</p>
+                    <div class="space-y-3">
+                        <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <p id="scanProductDailyLabel" class="text-lg font-semibold text-white">Diaria (144 dias)</p>
+                                <p id="scanProductDailyFee" class="text-2xl font-black text-white">$0</p>
+                            </div>
+                            <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
+                                Pagando la cuota en efectivo: <span id="scanProductDailyCash">$0</span>
+                            </div>
+                        </article>
+                        <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <p id="scanProductWeeklyLabel" class="text-lg font-semibold text-white">Semanal (13 semanas)</p>
+                                <p id="scanProductWeeklyFee" class="text-2xl font-black text-white">$0</p>
+                            </div>
+                            <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
+                                Pagando la cuota en efectivo: <span id="scanProductWeeklyCash">$0</span>
+                            </div>
+                        </article>
+                        <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <p id="scanProductMonthlyShortLabel" class="text-lg font-semibold text-white">Mensual (4 meses)</p>
+                                <p id="scanProductMonthlyShortFee" class="text-2xl font-black text-white">$0</p>
+                            </div>
+                            <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
+                                Pagando la cuota en efectivo: <span id="scanProductMonthlyShortCash">$0</span>
+                            </div>
+                        </article>
+                        <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
+                            <div class="flex items-center justify-between gap-3">
+                                <p id="scanProductMonthlyLongLabel" class="text-lg font-semibold text-white">Mensual (8 meses)</p>
+                                <p id="scanProductMonthlyLongFee" class="text-2xl font-black text-white">$0</p>
+                            </div>
+                            <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
+                                Pagando la cuota en efectivo: <span id="scanProductMonthlyLongCash">$0</span>
+                            </div>
+                        </article>
+                    </div>
+                </section>
+
+                <section class="rounded-[1.4rem] border border-white/10 bg-white/5 p-4">
+                    <label for="scanProductClientSelect" class="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-200">Cliente para envio</label>
+                    <select id="scanProductClientSelect"
+                            class="w-full rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm font-medium text-white outline-none transition focus:border-cyan-300">
+                        <option value="">Compartir sin cliente seleccionado</option>
+                        <option th:each="client : ${clients}"
+                                th:value="${client.id}"
+                                th:attr="data-name=${client.firstName + ' ' + client.lastName},data-phone=${client.phone}"
+                                th:text="${client.nationalId + ' - ' + client.firstName + ' ' + client.lastName + (client.phone != null and !client.phone.isBlank() ? ' (' + client.phone + ')' : ' (sin telefono)')}">
+                            Cliente
+                        </option>
+                    </select>
+                    <p id="scanProductClientHelp" class="mt-2 text-xs text-slate-300">Si el cliente tiene telefono, Compartir abre WhatsApp con el mensaje listo.</p>
+                </section>
+
+                <section class="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row sm:items-center">
+                    <button type="button"
+                            id="copyScanProductMessageBtn"
+                            class="min-h-14 flex-1 rounded-full border border-white/80 bg-white/5 px-5 py-3 text-sm font-black uppercase tracking-[0.16em] text-white transition hover:bg-white hover:text-slate-950">
+                        Copiar mensaje
+                    </button>
+                    <div class="flex items-center gap-3">
+                        <button type="button"
+                                id="shareScanProductBtn"
+                                class="inline-flex h-14 min-w-14 items-center justify-center rounded-full border border-white/80 bg-white/5 px-5 text-sm font-black uppercase tracking-[0.12em] text-white transition hover:bg-white hover:text-slate-950">
+                            Compartir
+                        </button>
+                        <button type="button"
+                                id="viewScannedProductInTableBtn"
+                                class="inline-flex h-14 min-w-14 items-center justify-center rounded-full border border-cyan-300/60 bg-cyan-400/10 px-5 text-sm font-black uppercase tracking-[0.12em] text-cyan-100 transition hover:bg-cyan-300 hover:text-slate-950">
+                            Ver ficha
+                        </button>
+                    </div>
+                </section>
+                <p id="scanProductShareStatus" class="min-h-5 text-sm text-slate-300"></p>
+            </div>
+        </article>
     </div>
 
     <form sec:authorize="hasAuthority('PRODUCT_UPDATE')"
@@ -268,7 +389,13 @@
             <tbody>
             <th:block th:each="product : ${products}">
                 <tr class="border-t hover:bg-gray-50 product-row"
-                    th:attr="data-product-id=${product.id},data-barcode=${product.barcode},data-description=${product.description},data-image=${product.imagePath}"
+                    th:attr="data-product-id=${product.id},
+                             data-barcode=${product.barcode},
+                             data-product-code=${product.productCode},
+                             data-description=${product.description},
+                             data-image=${product.imagePath},
+                             data-stock-available=${product.stockAvailable},
+                             data-base=${product.cost * (100 + product.vatRate) / 100}"
                     th:classappend="${focusProductId != null and product.id == focusProductId} ? ' bg-amber-50' : ''">
                     <td class="px-4 py-3 align-top">
                         <button type="button"
@@ -410,7 +537,7 @@
 
                             <div class="mt-3 flex flex-wrap items-center gap-3">
                                 <button type="button" class="copy-financing-btn rounded bg-emerald-600 px-3 py-2 text-white hover:bg-emerald-700">
-                                    Copiar
+                                    Copiar mensaje
                                 </button>
                                 <span class="copy-feedback text-xs text-emerald-700 hidden">Texto copiado</span>
                             </div>
@@ -502,6 +629,32 @@
             const productScanReader = document.getElementById('productScanReader');
             const productScanStatus = document.getElementById('productScanStatus');
             const scanLookupResult = document.getElementById('scanLookupResult');
+            const scanProductCard = document.getElementById('scanProductCard');
+            const scanProductImage = document.getElementById('scanProductImage');
+            const scanProductImageFallback = document.getElementById('scanProductImageFallback');
+            const scanProductCode = document.getElementById('scanProductCode');
+            const scanProductDescription = document.getElementById('scanProductDescription');
+            const scanProductStock = document.getElementById('scanProductStock');
+            const scanProductCash = document.getElementById('scanProductCash');
+            const scanProductDebit = document.getElementById('scanProductDebit');
+            const scanProductDailyLabel = document.getElementById('scanProductDailyLabel');
+            const scanProductDailyFee = document.getElementById('scanProductDailyFee');
+            const scanProductDailyCash = document.getElementById('scanProductDailyCash');
+            const scanProductWeeklyLabel = document.getElementById('scanProductWeeklyLabel');
+            const scanProductWeeklyFee = document.getElementById('scanProductWeeklyFee');
+            const scanProductWeeklyCash = document.getElementById('scanProductWeeklyCash');
+            const scanProductMonthlyShortLabel = document.getElementById('scanProductMonthlyShortLabel');
+            const scanProductMonthlyShortFee = document.getElementById('scanProductMonthlyShortFee');
+            const scanProductMonthlyShortCash = document.getElementById('scanProductMonthlyShortCash');
+            const scanProductMonthlyLongLabel = document.getElementById('scanProductMonthlyLongLabel');
+            const scanProductMonthlyLongFee = document.getElementById('scanProductMonthlyLongFee');
+            const scanProductMonthlyLongCash = document.getElementById('scanProductMonthlyLongCash');
+            const scanProductClientSelect = document.getElementById('scanProductClientSelect');
+            const scanProductClientHelp = document.getElementById('scanProductClientHelp');
+            const copyScanProductMessageBtn = document.getElementById('copyScanProductMessageBtn');
+            const shareScanProductBtn = document.getElementById('shareScanProductBtn');
+            const viewScannedProductInTableBtn = document.getElementById('viewScannedProductInTableBtn');
+            const scanProductShareStatus = document.getElementById('scanProductShareStatus');
             const productRows = Array.from(document.querySelectorAll('.product-row'));
             const productImageModal = document.getElementById('productImageModal');
             const closeProductImageModal = document.getElementById('closeProductImageModal');
@@ -515,6 +668,7 @@
             let lastProductScanAt = 0;
             let productHtml5QrCode = null;
             let productScannerMode = null;
+            let scannedProductState = null;
 
             function parseNumber(value) {
                 if (value === null || value === undefined || value === '') {
@@ -537,6 +691,10 @@
 
             function money(value) {
                 return '$' + parseNumber(value).toFixed(2);
+            }
+
+            function moneyCompact(value) {
+                return '$' + Math.round(parseNumber(value)).toLocaleString('es-AR');
             }
 
             function setPanelText(panel, selector, value) {
@@ -569,6 +727,45 @@
                 };
             }
 
+            function normalizeLineBreaks(value) {
+                return String(value || '').replace(/\r\n/g, '\n');
+            }
+
+            function selectedClientData() {
+                if (!scanProductClientSelect || scanProductClientSelect.selectedIndex < 0) {
+                    return null;
+                }
+                const option = scanProductClientSelect.options[scanProductClientSelect.selectedIndex];
+                if (!option || !option.value) {
+                    return null;
+                }
+                return {
+                    id: option.value,
+                    name: option.dataset.name || option.textContent || '',
+                    phone: option.dataset.phone || ''
+                };
+            }
+
+            function normalizeWhatsappPhone(phone) {
+                const digits = String(phone || '').replace(/\D/g, '');
+                if (!digits) {
+                    return '';
+                }
+                if (digits.startsWith('549')) {
+                    return digits;
+                }
+                if (digits.startsWith('54')) {
+                    return '549' + digits.slice(2);
+                }
+                if (digits.length >= 10) {
+                    return '549' + digits.slice(-10);
+                }
+                if (digits.length >= 8) {
+                    return '54' + digits;
+                }
+                return digits;
+            }
+
             function calculatePlans(base) {
                 const cfg = getCalcConfig();
                 const recargo = cfg.recargo > 0 ? cfg.recargo : 1;
@@ -591,33 +788,161 @@
                 };
             }
 
-            function buildWhatsAppText(panel, data) {
-                const code = panel.dataset.code || '';
-                const description = panel.dataset.description || '';
-                return [
-                    'PRODUCTO',
-                    (code ? code + ' - ' : '') + description,
-                    '',
-                    'OPCIONES DE PAGO',
-                    'Contado: ' + money(data.contado),
-                    'Debito/Transferencia: ' + money(data.debito),
-                    '',
-                    'PLAN DIARIO',
-                    data.plans.DAILY.count + ' dias de ' + money(data.plans.DAILY.fee),
-                    'Cuota en efectivo: No aplica',
-                    '',
-                    'PLAN SEMANAL',
-                    data.plans.WEEKLY.count + ' semanas de ' + money(data.plans.WEEKLY.fee),
-                    'Cuota en efectivo: ' + money(data.plans.WEEKLY.cashFee),
-                    '',
-                    'PLAN MENSUAL CORTO',
-                    data.plans.MONTHLY_SHORT.count + ' meses de ' + money(data.plans.MONTHLY_SHORT.fee),
-                    'Cuota en efectivo: ' + money(data.plans.MONTHLY_SHORT.cashFee),
-                    '',
-                    'PLAN MENSUAL LARGO',
-                    data.plans.MONTHLY_LONG.count + ' meses de ' + money(data.plans.MONTHLY_LONG.fee),
-                    'Cuota en efectivo: ' + money(data.plans.MONTHLY_LONG.cashFee)
-                ].join('\n');
+            function buildShareText(product, data, client) {
+                const code = String(product.productCode || product.code || '').trim();
+                const description = String(product.description || '').trim();
+                const lines = [];
+
+                if (client && client.name) {
+                    lines.push('Hola ' + client.name + ', te comparto la financiacion de este producto:');
+                    lines.push('');
+                }
+
+                lines.push('*' + (code ? code + ' - ' : '') + description.toUpperCase() + '*');
+                lines.push('');
+                lines.push('\uD83D\uDCB5 Efectivo: ' + moneyCompact(data.contado));
+                lines.push('\uD83D\uDCB3 Debito: ' + moneyCompact(data.debito));
+                lines.push('---------------------------');
+                lines.push('\uD83D\uDCC5 Diaria: ' + moneyCompact(data.plans.DAILY.fee) + ' (Efe: ' + moneyCompact(data.plans.DAILY.cashFee) + ')');
+                lines.push('\uD83D\uDCC6 Semanal: ' + moneyCompact(data.plans.WEEKLY.fee) + ' (Efe: ' + moneyCompact(data.plans.WEEKLY.cashFee) + ')');
+                lines.push('\uD83D\uDDD3 Mensual ' + data.cfg.mesesCorto + ': ' + moneyCompact(data.plans.MONTHLY_SHORT.fee) + ' (Efe: ' + moneyCompact(data.plans.MONTHLY_SHORT.cashFee) + ')');
+                lines.push('\uD83D\uDDD3 Mensual ' + data.cfg.mesesLargo + ': ' + moneyCompact(data.plans.MONTHLY_LONG.fee) + ' (Efe: ' + moneyCompact(data.plans.MONTHLY_LONG.cashFee) + ')');
+                return lines.join('\n');
+            }
+
+            function buildProductState(product) {
+                const base = parseNumber(product.baseAmount || product.base);
+                return {
+                    productId: product.productId || '',
+                    productCode: product.productCode || product.code || '',
+                    description: product.description || '',
+                    imagePath: product.imagePath || product.image || '',
+                    stockAvailable: parseNumber(product.stockAvailable),
+                    barcode: product.barcode || '',
+                    baseAmount: base,
+                    data: calculatePlans(base)
+                };
+            }
+
+            function setShareStatus(message, tone) {
+                if (!scanProductShareStatus) {
+                    return;
+                }
+                scanProductShareStatus.textContent = message || '';
+                scanProductShareStatus.className = 'min-h-5 text-sm ' + (tone === 'error'
+                    ? 'text-rose-300'
+                    : tone === 'success'
+                        ? 'text-emerald-300'
+                        : 'text-slate-300');
+            }
+
+            function updateScannedProductClientHelp() {
+                if (!scanProductClientHelp) {
+                    return;
+                }
+                const client = selectedClientData();
+                if (!client) {
+                    scanProductClientHelp.textContent = 'Si el cliente tiene telefono, Compartir abre WhatsApp con el mensaje listo.';
+                    return;
+                }
+                if (!normalizeWhatsappPhone(client.phone)) {
+                    scanProductClientHelp.textContent = 'El cliente seleccionado no tiene telefono utilizable. Compartir usara el selector del dispositivo.';
+                    return;
+                }
+                scanProductClientHelp.textContent = 'Se va a abrir WhatsApp con el mensaje listo para ' + client.name + '.';
+            }
+
+            function renderScannedProductCard(state) {
+                if (!scanProductCard || !state) {
+                    return;
+                }
+                scannedProductState = state;
+                scanProductCard.dataset.productId = state.productId || '';
+                scanProductCard.dataset.barcode = state.barcode || '';
+                scanProductCard.dataset.shareText = normalizeLineBreaks(buildShareText(state, state.data, selectedClientData()));
+                scanProductCard.classList.remove('hidden');
+
+                if (scanProductImage) {
+                    if (state.imagePath) {
+                        scanProductImage.src = state.imagePath;
+                        scanProductImage.classList.remove('hidden');
+                        scanProductImageFallback?.classList.add('hidden');
+                    } else {
+                        scanProductImage.src = '';
+                        scanProductImage.classList.add('hidden');
+                        scanProductImageFallback?.classList.remove('hidden');
+                    }
+                }
+                if (scanProductCode) {
+                    scanProductCode.textContent = state.productCode || state.barcode || 'Producto';
+                }
+                if (scanProductDescription) {
+                    scanProductDescription.textContent = state.description || 'Producto escaneado';
+                }
+                if (scanProductStock) {
+                    const units = Math.max(0, Math.round(state.stockAvailable));
+                    scanProductStock.textContent = units + (units === 1 ? ' unidad' : ' unidades');
+                }
+                if (scanProductCash) {
+                    scanProductCash.textContent = moneyCompact(state.data.contado);
+                }
+                if (scanProductDebit) {
+                    scanProductDebit.textContent = moneyCompact(state.data.debito);
+                }
+                if (scanProductDailyLabel) {
+                    scanProductDailyLabel.textContent = 'Diaria (' + state.data.cfg.dias + ' dias)';
+                }
+                if (scanProductDailyFee) {
+                    scanProductDailyFee.textContent = moneyCompact(state.data.plans.DAILY.fee);
+                }
+                if (scanProductDailyCash) {
+                    scanProductDailyCash.textContent = moneyCompact(state.data.plans.DAILY.cashFee);
+                }
+                if (scanProductWeeklyLabel) {
+                    scanProductWeeklyLabel.textContent = 'Semanal (' + state.data.cfg.semanas + ' semanas)';
+                }
+                if (scanProductWeeklyFee) {
+                    scanProductWeeklyFee.textContent = moneyCompact(state.data.plans.WEEKLY.fee);
+                }
+                if (scanProductWeeklyCash) {
+                    scanProductWeeklyCash.textContent = moneyCompact(state.data.plans.WEEKLY.cashFee);
+                }
+                if (scanProductMonthlyShortLabel) {
+                    scanProductMonthlyShortLabel.textContent = 'Mensual (' + state.data.cfg.mesesCorto + ' meses)';
+                }
+                if (scanProductMonthlyShortFee) {
+                    scanProductMonthlyShortFee.textContent = moneyCompact(state.data.plans.MONTHLY_SHORT.fee);
+                }
+                if (scanProductMonthlyShortCash) {
+                    scanProductMonthlyShortCash.textContent = moneyCompact(state.data.plans.MONTHLY_SHORT.cashFee);
+                }
+                if (scanProductMonthlyLongLabel) {
+                    scanProductMonthlyLongLabel.textContent = 'Mensual (' + state.data.cfg.mesesLargo + ' meses)';
+                }
+                if (scanProductMonthlyLongFee) {
+                    scanProductMonthlyLongFee.textContent = moneyCompact(state.data.plans.MONTHLY_LONG.fee);
+                }
+                if (scanProductMonthlyLongCash) {
+                    scanProductMonthlyLongCash.textContent = moneyCompact(state.data.plans.MONTHLY_LONG.cashFee);
+                }
+                setShareStatus('', null);
+                updateScannedProductClientHelp();
+            }
+
+            function extractProductDetailsFromRow(row) {
+                if (!row) {
+                    return null;
+                }
+                return {
+                    source: 'page',
+                    productId: row.dataset.productId || '',
+                    barcode: row.dataset.barcode || '',
+                    productCode: row.dataset.productCode || '',
+                    description: row.dataset.description || '',
+                    imagePath: row.dataset.image || '',
+                    stockAvailable: row.dataset.stockAvailable || 0,
+                    baseAmount: row.dataset.base || 0
+                };
             }
 
             async function copyText(text) {
@@ -651,12 +976,15 @@
                 setPanelText(panel, '.js-semanal', money(data.plans.WEEKLY.fee));
                 setPanelText(panel, '.js-mensual-corto', money(data.plans.MONTHLY_SHORT.fee));
                 setPanelText(panel, '.js-mensual-largo', money(data.plans.MONTHLY_LONG.fee));
-                setPanelText(panel, '.js-dia-ef', 'No aplica');
+                setPanelText(panel, '.js-dia-ef', money(data.plans.DAILY.cashFee));
                 setPanelText(panel, '.js-semanal-ef', money(data.plans.WEEKLY.cashFee));
                 setPanelText(panel, '.js-mensual-corto-ef', money(data.plans.MONTHLY_SHORT.cashFee));
                 setPanelText(panel, '.js-mensual-largo-ef', money(data.plans.MONTHLY_LONG.cashFee));
 
-                panel.dataset.whatsappText = buildWhatsAppText(panel, data);
+                panel.dataset.whatsappText = normalizeLineBreaks(buildShareText({
+                    code: panel.dataset.code || '',
+                    description: panel.dataset.description || ''
+                }, data, null));
             }
 
             function openImageModal(image, description) {
@@ -716,11 +1044,7 @@
                 }
                 const localRow = resolveProductByBarcode(normalized);
                 if (localRow) {
-                    return {
-                        source: 'page',
-                        productId: localRow.dataset.productId,
-                        description: localRow.dataset.description || normalized
-                    };
+                    return extractProductDetailsFromRow(localRow);
                 }
                 const response = await fetch('/products/barcode/lookup?barcode=' + encodeURIComponent(normalized), {
                     headers: {
@@ -793,11 +1117,11 @@
                 }
                 const description = lookup.description || code;
                 showLookupResult('Producto encontrado: ' + description, false);
+                renderScannedProductCard(buildProductState(lookup));
                 if (lookup.source === 'page') {
                     openFinancingRowByProductId(lookup.productId);
                     return true;
                 }
-                window.location.href = '/products?q=' + encodeURIComponent(code) + '&productId=' + encodeURIComponent(lookup.productId);
                 return true;
             }
 
@@ -964,6 +1288,70 @@
                 }
             }
 
+            async function copyScannedProductMessage() {
+                if (!scanProductCard || !scannedProductState) {
+                    return;
+                }
+                scanProductCard.dataset.shareText = normalizeLineBreaks(buildShareText(
+                    scannedProductState,
+                    scannedProductState.data,
+                    selectedClientData()
+                ));
+                try {
+                    await copyText(scanProductCard.dataset.shareText || '');
+                    setShareStatus('Mensaje copiado al portapapeles.', 'success');
+                } catch (_) {
+                    setShareStatus('No se pudo copiar el mensaje.', 'error');
+                }
+            }
+
+            async function shareScannedProduct() {
+                if (!scanProductCard || !scannedProductState) {
+                    return;
+                }
+                const client = selectedClientData();
+                const text = normalizeLineBreaks(buildShareText(scannedProductState, scannedProductState.data, client));
+                scanProductCard.dataset.shareText = text;
+                const whatsappPhone = client ? normalizeWhatsappPhone(client.phone) : '';
+
+                try {
+                    if (whatsappPhone) {
+                        window.open('https://wa.me/' + encodeURIComponent(whatsappPhone) + '?text=' + encodeURIComponent(text), '_blank', 'noopener');
+                        setShareStatus('WhatsApp abierto con el mensaje listo para enviar.', 'success');
+                        return;
+                    }
+                    if (navigator.share) {
+                        await navigator.share({
+                            title: scannedProductState.description || 'Producto Maidav',
+                            text
+                        });
+                        setShareStatus('Mensaje enviado al selector de apps.', 'success');
+                        return;
+                    }
+                    await copyText(text);
+                    setShareStatus('No hay selector para compartir. El mensaje quedo copiado.', 'success');
+                } catch (error) {
+                    if (error && error.name === 'AbortError') {
+                        setShareStatus('Se cancelo el envio.', null);
+                        return;
+                    }
+                    setShareStatus('No se pudo compartir el mensaje.', 'error');
+                }
+            }
+
+            function focusScannedProductInTable() {
+                if (!scannedProductState || !scannedProductState.productId) {
+                    return;
+                }
+                const row = document.querySelector('.product-row[data-product-id="' + scannedProductState.productId + '"]');
+                if (row) {
+                    openFinancingRowByProductId(scannedProductState.productId);
+                    return;
+                }
+                const term = scannedProductState.barcode || scannedProductState.productCode || scannedProductState.description || '';
+                window.location.href = '/products?q=' + encodeURIComponent(term) + '&productId=' + encodeURIComponent(scannedProductState.productId);
+            }
+
             document.querySelectorAll('.toggle-financing-btn').forEach(button => {
                 button.addEventListener('click', function () {
                     const targetId = button.dataset.target;
@@ -1014,6 +1402,35 @@
                     }
                 });
             });
+
+            if (scanProductClientSelect) {
+                scanProductClientSelect.addEventListener('change', function () {
+                    if (scannedProductState && scanProductCard) {
+                        scanProductCard.dataset.shareText = normalizeLineBreaks(buildShareText(
+                            scannedProductState,
+                            scannedProductState.data,
+                            selectedClientData()
+                        ));
+                    }
+                    updateScannedProductClientHelp();
+                    setShareStatus('', null);
+                });
+            }
+            if (copyScanProductMessageBtn) {
+                copyScanProductMessageBtn.addEventListener('click', function () {
+                    copyScannedProductMessage();
+                });
+            }
+            if (shareScanProductBtn) {
+                shareScanProductBtn.addEventListener('click', function () {
+                    shareScannedProduct();
+                });
+            }
+            if (viewScannedProductInTableBtn) {
+                viewScannedProductInTableBtn.addEventListener('click', function () {
+                    focusScannedProductInTable();
+                });
+            }
 
             if (scanProductLookupBtn) {
                 scanProductLookupBtn.addEventListener('click', openProductScanner);
