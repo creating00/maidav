@@ -97,8 +97,27 @@
             </button>
         </div>
         <div id="scanLookupResult" class="mt-3 hidden rounded-lg border border-sky-200 bg-white px-4 py-3 text-sm text-slate-700"></div>
-        <article id="scanProductCard"
-                 class="mt-4 hidden overflow-hidden rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top,_#17315f_0%,_#0c1d3d_45%,_#071327_100%)] text-white shadow-[0_24px_70px_rgba(7,19,39,0.35)]">
+    </div>
+
+    <div id="scanProductCardModal"
+         class="fixed inset-0 z-[60] hidden bg-slate-950/82 px-2 py-2 backdrop-blur-[2px] sm:px-4 sm:py-4">
+        <div class="flex h-full w-full items-center justify-center">
+            <article id="scanProductCard"
+                     class="hidden h-[96dvh] w-full max-w-3xl overflow-hidden rounded-[2rem] border border-slate-800 bg-[radial-gradient(circle_at_top,_#17315f_0%,_#0c1d3d_45%,_#071327_100%)] text-white shadow-[0_24px_70px_rgba(7,19,39,0.45)] sm:h-[94dvh]">
+                <div class="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+                    <div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-200">Vista rapida del producto</p>
+                        <p class="text-xs text-slate-300">Tarjeta flotante pensada para iPhone y Android.</p>
+                    </div>
+                    <button type="button"
+                            id="closeScanProductCardBtn"
+                            aria-label="Cerrar ficha escaneada"
+                            class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-white/10 text-2xl font-light leading-none text-white transition hover:bg-white hover:text-slate-950">
+                        ×
+                    </button>
+                </div>
+
+                <div class="h-[calc(96dvh-4.5rem)] overflow-y-auto overscroll-contain px-0 pb-5 [-webkit-overflow-scrolling:touch] sm:h-[calc(94dvh-4.5rem)]">
             <div class="border-b border-white/10 px-5 py-5">
                 <div class="overflow-hidden rounded-[1.6rem] border border-white/10 bg-white/5">
                     <img id="scanProductImage"
@@ -109,10 +128,24 @@
                         aqui va imagen del producto
                     </div>
                 </div>
-                <p id="scanProductCode" class="mt-5 text-center text-xs font-semibold uppercase tracking-[0.28em] text-cyan-200">Codigo</p>
-                <h3 id="scanProductDescription" class="mx-auto mt-2 max-w-xl text-center text-2xl font-black uppercase leading-tight text-white sm:text-[2rem]">
-                    Producto escaneado
-                </h3>
+                <div class="mx-auto mt-5 max-w-2xl rounded-[1.6rem] border border-white/10 bg-slate-950/28 px-4 py-4 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:px-6">
+                    <p id="scanProductCode" class="mx-auto inline-flex rounded-full border border-cyan-300/25 bg-cyan-400/10 px-4 py-1.5 text-[11px] font-bold uppercase tracking-[0.28em] text-cyan-100">Codigo</p>
+                    <h3 id="scanProductDescription"
+                        class="mx-auto mt-3 block max-w-xl rounded-[1.2rem] border border-white/12 bg-white/10 px-4 py-3 text-balance break-words text-center text-[1.95rem] font-black leading-[1.02] shadow-[0_10px_30px_rgba(4,10,24,0.28)] sm:px-5 sm:text-[2.4rem]"
+                        style="color:#f8fbff;text-shadow:0 2px 18px rgba(5,12,28,0.72);">
+                        Producto escaneado
+                    </h3>
+                    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div class="rounded-2xl border border-emerald-300/25 bg-emerald-400/10 px-4 py-3">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-emerald-100/85">Efectivo</p>
+                            <p id="scanProductCashHero" class="mt-2 text-3xl font-black leading-none text-emerald-300">$0</p>
+                        </div>
+                        <div class="rounded-2xl border border-white/10 bg-white/8 px-4 py-3">
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-200">Debito / Transf.</p>
+                            <p id="scanProductDebitHero" class="mt-2 text-3xl font-black leading-none text-white">$0</p>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="space-y-4 px-5 py-5">
@@ -122,7 +155,7 @@
                 </section>
 
                 <section>
-                    <p class="mb-2 text-xs font-black uppercase tracking-[0.24em] text-amber-300">Pago de contado</p>
+                    <p class="mb-2 text-xs font-black uppercase tracking-[0.24em] text-amber-300">Pago detallado</p>
                     <div class="space-y-2">
                         <div class="flex items-center justify-between rounded-2xl border border-emerald-400/20 bg-white/6 px-4 py-3">
                             <div>
@@ -217,7 +250,9 @@
                 </section>
                 <p id="scanProductShareStatus" class="min-h-5 text-sm text-slate-300"></p>
             </div>
-        </article>
+                </div>
+            </article>
+        </div>
     </div>
 
     <form sec:authorize="hasAuthority('PRODUCT_UPDATE')"
@@ -629,7 +664,9 @@
             const productScanReader = document.getElementById('productScanReader');
             const productScanStatus = document.getElementById('productScanStatus');
             const scanLookupResult = document.getElementById('scanLookupResult');
+            const scanProductCardModal = document.getElementById('scanProductCardModal');
             const scanProductCard = document.getElementById('scanProductCard');
+            const closeScanProductCardBtn = document.getElementById('closeScanProductCardBtn');
             const scanProductImage = document.getElementById('scanProductImage');
             const scanProductImageFallback = document.getElementById('scanProductImageFallback');
             const scanProductCode = document.getElementById('scanProductCode');
@@ -637,6 +674,8 @@
             const scanProductStock = document.getElementById('scanProductStock');
             const scanProductCash = document.getElementById('scanProductCash');
             const scanProductDebit = document.getElementById('scanProductDebit');
+            const scanProductCashHero = document.getElementById('scanProductCashHero');
+            const scanProductDebitHero = document.getElementById('scanProductDebitHero');
             const scanProductDailyLabel = document.getElementById('scanProductDailyLabel');
             const scanProductDailyFee = document.getElementById('scanProductDailyFee');
             const scanProductDailyCash = document.getElementById('scanProductDailyCash');
@@ -836,6 +875,24 @@
                         : 'text-slate-300');
             }
 
+            function openScannedProductCardModal() {
+                if (!scanProductCardModal || !scanProductCard) {
+                    return;
+                }
+                scanProductCardModal.classList.remove('hidden');
+                scanProductCard.classList.remove('hidden');
+                document.body.classList.add('overflow-hidden');
+            }
+
+            function closeScannedProductCardModal() {
+                if (!scanProductCardModal || !scanProductCard) {
+                    return;
+                }
+                scanProductCardModal.classList.add('hidden');
+                scanProductCard.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+            }
+
             function updateScannedProductClientHelp() {
                 if (!scanProductClientHelp) {
                     return;
@@ -860,7 +917,7 @@
                 scanProductCard.dataset.productId = state.productId || '';
                 scanProductCard.dataset.barcode = state.barcode || '';
                 scanProductCard.dataset.shareText = normalizeLineBreaks(buildShareText(state, state.data, selectedClientData()));
-                scanProductCard.classList.remove('hidden');
+                openScannedProductCardModal();
 
                 if (scanProductImage) {
                     if (state.imagePath) {
@@ -886,8 +943,14 @@
                 if (scanProductCash) {
                     scanProductCash.textContent = moneyCompact(state.data.contado);
                 }
+                if (scanProductCashHero) {
+                    scanProductCashHero.textContent = moneyCompact(state.data.contado);
+                }
                 if (scanProductDebit) {
                     scanProductDebit.textContent = moneyCompact(state.data.debito);
+                }
+                if (scanProductDebitHero) {
+                    scanProductDebitHero.textContent = moneyCompact(state.data.debito);
                 }
                 if (scanProductDailyLabel) {
                     scanProductDailyLabel.textContent = 'Diaria (' + state.data.cfg.dias + ' dias)';
@@ -1428,7 +1491,20 @@
             }
             if (viewScannedProductInTableBtn) {
                 viewScannedProductInTableBtn.addEventListener('click', function () {
+                    closeScannedProductCardModal();
                     focusScannedProductInTable();
+                });
+            }
+            if (closeScanProductCardBtn) {
+                closeScanProductCardBtn.addEventListener('click', function () {
+                    closeScannedProductCardModal();
+                });
+            }
+            if (scanProductCardModal) {
+                scanProductCardModal.addEventListener('click', function (event) {
+                    if (event.target === scanProductCardModal) {
+                        closeScannedProductCardModal();
+                    }
                 });
             }
 
@@ -1557,6 +1633,7 @@
                 if (event.key === 'Escape') {
                     closeHistoryPanel();
                     closeImageModal();
+                    closeScannedProductCardModal();
                 }
             });
             renderHistoryRows();

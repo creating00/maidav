@@ -129,6 +129,7 @@
                         <video id="catalogScannerVideo"
                                class="mt-3 hidden aspect-video w-full rounded-[1.35rem] border border-sky-200 bg-slate-950 object-cover"
                                autoplay playsinline muted></video>
+                        <div id="catalogScannerReader" class="mt-3 hidden aspect-video w-full overflow-hidden rounded-[1.35rem] border border-sky-200 bg-slate-950"></div>
                     </div>
                     <div id="catalogList" class="mt-4 grid gap-3 md:grid-cols-2">
                         <button type="button" th:each="product : ${products}" class="catalog-item quote-product-card flex w-full items-center gap-4 rounded-[1.6rem] p-3 text-left"
@@ -246,15 +247,11 @@
             const catalogSearch = $('catalogSearch');
             const catalogScannerPanel = $('catalogScannerPanel');
             const catalogScannerVideo = $('catalogScannerVideo');
+            const catalogScannerReader = $('catalogScannerReader');
             const catalogScannerStatus = $('catalogScannerStatus');
             const catalogScannerStartBtn = $('catalogScannerStartBtn');
             const catalogScannerStopBtn = $('catalogScannerStopBtn');
-            let catalogScannerStream = null;
-            let catalogScannerFrame = null;
-            let catalogBarcodeDetector = null;
-            let catalogScannerActive = false;
-            let lastCatalogScan = '';
-            let lastCatalogScanAt = 0;
+            let catalogScannerController = null;
 
             function escapeXml(value) {
                 return String(value ?? '').replace(/[&<>"']/g, character => ({
@@ -472,19 +469,9 @@
 
             function stopCatalogScanner(options) {
                 const settings = options || {};
-                catalogScannerActive = false;
-                if (catalogScannerFrame) {
-                    cancelAnimationFrame(catalogScannerFrame);
-                    catalogScannerFrame = null;
-                }
-                if (catalogScannerVideo) {
-                    catalogScannerVideo.pause();
-                    catalogScannerVideo.classList.add('hidden');
-                    catalogScannerVideo.srcObject = null;
-                }
-                if (catalogScannerStream) {
-                    catalogScannerStream.getTracks().forEach(track => track.stop());
-                    catalogScannerStream = null;
+                if (catalogScannerController) {
+                    catalogScannerController.stop().catch(() => {
+                    });
                 }
                 if (!settings.keepPanel && catalogScannerPanel) {
                     catalogScannerPanel.classList.add('hidden');
@@ -525,70 +512,36 @@
                 });
             }
 
-            function scanCatalogFrame() {
-                if (!catalogScannerActive || !catalogBarcodeDetector || !catalogScannerVideo) {
-                    return;
+            function getCatalogScannerController() {
+                if (catalogScannerController || !window.MaidavBarcodeScanner) {
+                    return catalogScannerController;
                 }
-                catalogBarcodeDetector.detect(catalogScannerVideo)
-                    .then(codes => {
-                        if (!catalogScannerActive || !Array.isArray(codes) || !codes.length) {
-                            return;
-                        }
-                        const rawValue = String(codes[0].rawValue || '').trim();
-                        if (!rawValue) {
-                            return;
-                        }
-                        const now = Date.now();
-                        if (rawValue === lastCatalogScan && (now - lastCatalogScanAt) < 2500) {
-                            return;
-                        }
-                        lastCatalogScan = rawValue;
-                        lastCatalogScanAt = now;
+                catalogScannerController = window.MaidavBarcodeScanner.create({
+                    videoElement: catalogScannerVideo,
+                    fallbackElement: catalogScannerReader,
+                    onStatus: function (message, isError) {
+                        setCatalogScannerStatus(message, isError);
+                    },
+                    onDetected: function (rawValue) {
                         handleCatalogScan(rawValue);
-                    })
-                    .catch(() => {
-                        setCatalogScannerStatus('No se pudo leer el codigo. Acerque mas la camara.', true);
-                    })
-                    .finally(() => {
-                        if (catalogScannerActive) {
-                            catalogScannerFrame = requestAnimationFrame(scanCatalogFrame);
-                        }
-                    });
+                    }
+                });
+                return catalogScannerController;
             }
 
             async function startCatalogScanner() {
-                if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.BarcodeDetector) {
-                    if (catalogScannerPanel) {
-                        catalogScannerPanel.classList.remove('hidden');
-                    }
-                    setCatalogScannerStatus('La camara no esta disponible en este navegador o contexto.', true);
-                    status('La camara no esta disponible en este navegador o contexto.', 'error');
+                const controller = getCatalogScannerController();
+                if (!controller) {
+                    setCatalogScannerStatus('No se pudo inicializar el lector.', true);
+                    status('No se pudo inicializar el lector.', 'error');
                     return;
                 }
 
                 try {
-                    if (!catalogBarcodeDetector) {
-                        catalogBarcodeDetector = new window.BarcodeDetector({
-                            formats: ['ean_13', 'ean_8', 'code_128', 'upc_a', 'upc_e']
-                        });
-                    }
-                    catalogScannerStream = await navigator.mediaDevices.getUserMedia({
-                        video: {
-                            facingMode: {ideal: 'environment'}
-                        },
-                        audio: false
-                    });
                     if (catalogScannerPanel) {
                         catalogScannerPanel.classList.remove('hidden');
                     }
-                    if (catalogScannerVideo) {
-                        catalogScannerVideo.srcObject = catalogScannerStream;
-                        catalogScannerVideo.classList.remove('hidden');
-                        await catalogScannerVideo.play();
-                    }
-                    catalogScannerActive = true;
-                    lastCatalogScan = '';
-                    lastCatalogScanAt = 0;
+                    await controller.start();
                     if (catalogScannerStartBtn) {
                         catalogScannerStartBtn.classList.add('hidden');
                     }
@@ -597,14 +550,16 @@
                     }
                     setCatalogScannerStatus('Apunte la camara al codigo del producto para buscarlo en el catalogo.', false);
                     status('Escaner listo para buscar productos en el catalogo.', null);
-                    scanCatalogFrame();
-                } catch (_) {
+                } catch (error) {
                     stopCatalogScanner({preserveStatus: true});
                     if (catalogScannerPanel) {
                         catalogScannerPanel.classList.remove('hidden');
                     }
-                    setCatalogScannerStatus('No se pudo abrir la camara. Revise permisos del navegador.', true);
-                    status('No se pudo abrir la camara. Revise permisos del navegador.', 'error');
+                    const message = error && error.message
+                        ? error.message
+                        : 'No se pudo abrir la camara. Revise permisos del navegador.';
+                    setCatalogScannerStatus(message, true);
+                    status(message, 'error');
                 }
             }
 
