@@ -33,6 +33,7 @@ public class MorosityController {
         Long effectiveSellerId = resolveSellerFilter(authentication, sellerId);
         model.addAttribute("level", level == null ? "" : level);
         model.addAttribute("sellerId", effectiveSellerId);
+        model.addAttribute("showSellerColumn", effectiveSellerId != null);
         // FILTRO POR VENDEDOR
         // FILTRO VENDEDOR FRONTEND
         model.addAttribute("sellerOptions", sellerOptions(authentication));

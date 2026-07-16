@@ -1065,6 +1065,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         for (CreditAccount account : accounts) {
             Long clientId = account.getClient().getId();
             aggregates.putIfAbsent(clientId, new ClientAggregate(account.getClient()));
+            aggregates.get(clientId).registerSeller(sellerDisplay(account));
         }
 
         creditInstallmentRepository
@@ -1076,19 +1077,21 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                     if (!isVisibleAccount(installment.getAccount())) {
                         return;
                     }
-                    if (!admin) {
-                        Long installmentSellerId = installment.getAccount().getSale() == null
-                                || installment.getAccount().getSale().getSeller() == null
-                                ? null
-                                : installment.getAccount().getSale().getSeller().getId();
-                        if (sellerId == null || !sellerId.equals(installmentSellerId)) {
-                            return;
-                        }
+                    Long installmentSellerId = installment.getAccount().getSale() == null
+                            || installment.getAccount().getSale().getSeller() == null
+                            ? null
+                            : installment.getAccount().getSale().getSeller().getId();
+                    if (sellerId != null && !sellerId.equals(installmentSellerId)) {
+                        return;
+                    }
+                    if (!admin && sellerId == null) {
+                        return;
                     }
                     Long clientId = installment.getAccount().getClient().getId();
                     ClientAggregate agg = aggregates.computeIfAbsent(
                             clientId, id -> new ClientAggregate(installment.getAccount().getClient())
                     );
+                    agg.registerSeller(sellerDisplay(installment.getAccount()));
                     long days = ChronoUnit.DAYS.between(installment.getDueDate(), today);
                     if (days > agg.maxDaysOverdue) {
                         agg.maxDaysOverdue = days;
@@ -1109,6 +1112,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             }
             result.add(new MorositySummary(
                     agg.client,
+                    agg.sellerDisplay(),
                     agg.maxDaysOverdue,
                     agg.amountDue.setScale(2, RoundingMode.HALF_UP),
                     level
@@ -1121,6 +1125,21 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     private Long normalizeFilterId(Long value) {
         return value == null || value <= 0 ? null : value;
+    }
+
+    private String sellerDisplay(CreditAccount account) {
+        if (account == null || account.getSale() == null || account.getSale().getSeller() == null) {
+            return "-";
+        }
+        String firstName = account.getSale().getSeller().getFirstName();
+        String lastName = account.getSale().getSeller().getLastName();
+        String fullName = ((firstName == null ? "" : firstName.trim()) + " "
+                + (lastName == null ? "" : lastName.trim())).trim();
+        if (!fullName.isEmpty()) {
+            return fullName;
+        }
+        String email = account.getSale().getSeller().getEmail();
+        return email == null || email.isBlank() ? "-" : email;
     }
 
     private CreditAccount requireVisibleAccount(CreditAccount account) {
@@ -1167,11 +1186,22 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     private static class ClientAggregate {
         private final com.sales.maidav.model.client.Client client;
+        private final java.util.Set<String> sellerNames = new java.util.LinkedHashSet<>();
         private long maxDaysOverdue = 0;
         private BigDecimal amountDue = BigDecimal.ZERO;
 
         private ClientAggregate(com.sales.maidav.model.client.Client client) {
             this.client = client;
+        }
+
+        private void registerSeller(String sellerName) {
+            if (sellerName != null && !sellerName.isBlank()) {
+                sellerNames.add(sellerName);
+            }
+        }
+
+        private String sellerDisplay() {
+            return sellerNames.isEmpty() ? "-" : String.join(", ", sellerNames);
         }
     }
 

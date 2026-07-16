@@ -42,6 +42,7 @@
             <thead class="bg-gray-100 text-left">
             <tr>
                 <th class="px-4 py-3">Cliente</th>
+                <th th:if="${showSellerColumn}" class="px-4 py-3">Vendedor</th>
                 <th class="px-4 py-3">Nivel</th>
                 <th class="px-4 py-3">Días de atraso</th>
                 <th class="px-4 py-3">Monto adeudado</th>
@@ -53,6 +54,7 @@
                 <td class="px-4 py-3"
                     th:text="${row.client.nationalId + ' - ' + row.client.firstName + ' ' + row.client.lastName}">
                 </td>
+                <td th:if="${showSellerColumn}" class="px-4 py-3" th:text="${row.sellerDisplay}"></td>
                 <td class="px-4 py-3">
                     <span th:if="${row.level.name() == 'BUENO'}"
                           class="inline-flex items-center gap-2 text-green-700 font-semibold">
@@ -78,7 +80,7 @@
             </tr>
 
             <tr th:if="${#lists.isEmpty(rows)}">
-                <td colspan="5" class="px-4 py-6 text-center text-gray-500">
+                <td th:attr="colspan=${showSellerColumn ? 6 : 5}" class="px-4 py-6 text-center text-gray-500">
                     No hay datos de morosidad
                 </td>
             </tr>
