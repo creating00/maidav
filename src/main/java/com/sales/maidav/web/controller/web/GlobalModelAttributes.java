@@ -5,6 +5,7 @@ import com.sales.maidav.service.user.UserService;
 import com.sales.maidav.web.dto.CurrentUserView;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.core.env.Environment;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
@@ -23,6 +24,7 @@ public class GlobalModelAttributes {
 
     private final ObjectProvider<ProductService> productServiceProvider;
     private final ObjectProvider<UserService> userServiceProvider;
+    private final Environment environment;
 
     @ModelAttribute("lowStockCount")
     public long lowStockCount(Authentication authentication) {
@@ -45,6 +47,16 @@ public class GlobalModelAttributes {
     @ModelAttribute("currentPath")
     public String currentPath(HttpServletRequest request) {
         return request == null ? "" : request.getRequestURI();
+    }
+
+    @ModelAttribute("isTestingEnvironment")
+    public boolean isTestingEnvironment() {
+        for (String profile : environment.getActiveProfiles()) {
+            if ("testing".equalsIgnoreCase(profile)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isAuthenticated(Authentication authentication) {
