@@ -50,13 +50,17 @@ public class GlobalModelAttributes {
     }
 
     @ModelAttribute("isTestingEnvironment")
-    public boolean isTestingEnvironment() {
+    public boolean isTestingEnvironment(HttpServletRequest request) {
         for (String profile : environment.getActiveProfiles()) {
             if ("testing".equalsIgnoreCase(profile)) {
                 return true;
             }
         }
-        return false;
+        if (request == null) {
+            return false;
+        }
+        String serverName = request.getServerName();
+        return serverName != null && serverName.toLowerCase().contains("testingmaidav");
     }
 
     private boolean isAuthenticated(Authentication authentication) {
