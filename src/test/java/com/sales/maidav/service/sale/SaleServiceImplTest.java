@@ -1,10 +1,12 @@
 package com.sales.maidav.service.sale;
 
+import com.sales.maidav.model.client.Client;
 import com.sales.maidav.model.product.Product;
 import com.sales.maidav.model.sale.AccountStatus;
 import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.model.sale.CreditInstallment;
 import com.sales.maidav.model.sale.InstallmentStatus;
+import com.sales.maidav.model.sale.PaymentFrequency;
 import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
@@ -24,10 +26,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +41,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -300,5 +307,98 @@ class SaleServiceImplTest {
         assertThatThrownBy(() -> saleService.changeSeller(12L, seller, changedBy))
                 .isInstanceOf(InvalidSaleException.class)
                 .hasMessage("La venta ya esta asignada a ese vendedor");
+    }
+
+    @Test
+    void createSaleAllowsMonthlyFirstDueDateOnDayThirty() {
+        Client client = new Client();
+        client.setId(3L);
+        User seller = new User();
+        seller.setId(9L);
+        Product product = new Product();
+        product.setId(5L);
+        product.setDescription("Tensiometro de muneca");
+        product.setStockAvailable(10);
+        when(productRepository.findById(5L)).thenReturn(Optional.of(product));
+        when(saleRepository.save(any(Sale.class))).thenAnswer(invocation -> {
+            Sale saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(115L);
+            }
+            return saved;
+        });
+        when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        Sale sale = saleService.createSale(
+                client,
+                seller,
+                PaymentType.CREDIT,
+                LocalDate.of(2026, 7, 20),
+                LocalDate.of(2026, 7, 30),
+                PaymentFrequency.MONTHLY,
+                List.of("30"),
+                BigDecimal.ZERO,
+                4,
+                List.of(new SaleItemInput(5L, 1, new BigDecimal("100000.00")))
+        );
+        assertThat(sale.getSaleNumber()).isEqualTo("V-000115");
+        assertThat(product.getStockAvailable()).isEqualTo(9);
+        ArgumentCaptor<CreditInstallment> installmentsCaptor = ArgumentCaptor.forClass(CreditInstallment.class);
+        verify(creditInstallmentRepository, times(4)).save(installmentsCaptor.capture());
+        assertThat(installmentsCaptor.getAllValues())
+                .extracting(CreditInstallment::getDueDate)
+                .containsExactly(
+                        LocalDate.of(2026, 7, 30),
+                        LocalDate.of(2026, 8, 30),
+                        LocalDate.of(2026, 9, 30),
+                        LocalDate.of(2026, 10, 30)
+                );
+    }
+    @Test
+    void createSaleKeepsMonthlyDueDayAfterShortMonth() {
+        Client client = new Client();
+        client.setId(4L);
+        User seller = new User();
+        seller.setId(10L);
+        Product product = new Product();
+        product.setId(6L);
+        product.setDescription("Colchon");
+        product.setStockAvailable(5);
+        when(productRepository.findById(6L)).thenReturn(Optional.of(product));
+        when(saleRepository.save(any(Sale.class))).thenAnswer(invocation -> {
+            Sale saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(116L);
+            }
+            return saved;
+        });
+        when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        saleService.createSale(
+                client,
+                seller,
+                PaymentType.CREDIT,
+                LocalDate.of(2026, 12, 20),
+                LocalDate.of(2026, 12, 30),
+                PaymentFrequency.MONTHLY,
+                List.of("30"),
+                BigDecimal.ZERO,
+                4,
+                List.of(new SaleItemInput(6L, 1, new BigDecimal("80000.00")))
+        );
+        ArgumentCaptor<CreditInstallment> installmentsCaptor = ArgumentCaptor.forClass(CreditInstallment.class);
+        verify(creditInstallmentRepository, times(4)).save(installmentsCaptor.capture());
+        assertThat(installmentsCaptor.getAllValues())
+                .extracting(CreditInstallment::getDueDate)
+                .containsExactly(
+                        LocalDate.of(2026, 12, 30),
+                        LocalDate.of(2027, 1, 30),
+                        LocalDate.of(2027, 2, 28),
+                        LocalDate.of(2027, 3, 30)
+                );
     }
 }

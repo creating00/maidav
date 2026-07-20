@@ -483,7 +483,7 @@ public class SaleController {
         if (day < 1) {
             return 1;
         }
-        return Math.min(day, 28);
+        return Math.min(day, 31);
     }
 
     private boolean isAdmin(Authentication authentication) {
@@ -523,4 +523,3 @@ public class SaleController {
         return value != null && value.toLowerCase(Locale.ROOT).contains(term);
     }
 }
-

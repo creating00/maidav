@@ -526,7 +526,7 @@ public class SaleServiceImpl implements SaleService {
                 }
                 while (dates.size() < count) {
                     dates.add(cursor);
-                    cursor = cursor.plusMonths(1).withDayOfMonth(day);
+                    cursor = withDayOfMonthSafe(cursor.plusMonths(1), day);
                 }
             }
         }
@@ -574,12 +574,12 @@ public class SaleServiceImpl implements SaleService {
     private int parseDayOfMonth(String raw) {
         try {
             int day = Integer.parseInt(raw.trim());
-            if (day < 1 || day > 28) {
-                throw new InvalidSaleException("Dia de vencimiento invalido (1-28)");
+            if (day < 1 || day > 31) {
+                throw new InvalidSaleException("Dia de vencimiento invalido (1-31)");
             }
             return day;
         } catch (NumberFormatException ex) {
-            throw new InvalidSaleException("Dia de vencimiento invalido (1-28)");
+            throw new InvalidSaleException("Dia de vencimiento invalido (1-31)");
         }
     }
 
@@ -587,11 +587,15 @@ public class SaleServiceImpl implements SaleService {
         int monthDay = from.getDayOfMonth();
         for (int day : days) {
             if (day >= monthDay) {
-                return from.withDayOfMonth(day);
+                return withDayOfMonthSafe(from, day);
             }
         }
         LocalDate nextMonth = from.plusMonths(1);
-        return nextMonth.withDayOfMonth(days.get(0));
+        return withDayOfMonthSafe(nextMonth, days.get(0));
+    }
+
+    private LocalDate withDayOfMonthSafe(LocalDate baseDate, int desiredDay) {
+        return baseDate.withDayOfMonth(Math.min(desiredDay, baseDate.lengthOfMonth()));
     }
 
     private String formatNumber(String prefix, Long id) {
