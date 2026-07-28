@@ -105,7 +105,11 @@ public class SaleController {
                                          @RequestParam(required = false) PaymentType paymentType,
                                          @RequestParam(required = false, defaultValue = "false") boolean showVoided,
                                          @RequestParam ExportDocumentService.ExportFormat format) {
-        byte[] document = exportDocumentService.sales(filteredSales(q, paymentType, showVoided), format);
+        List<Sale> sales = filteredSales(q, paymentType, showVoided);
+        Map<Long, List<SaleItem>> itemsBySale = sales.isEmpty() ? Map.of()
+                : saleItemRepository.findBySale_IdInOrderBySale_IdAscIdAsc(sales.stream().map(Sale::getId).toList())
+                .stream().collect(java.util.stream.Collectors.groupingBy(item -> item.getSale().getId(), java.util.LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        byte[] document = exportDocumentService.sales(sales, itemsBySale, format);
         String extension = format == ExportDocumentService.ExportFormat.PDF ? "pdf" : "xlsx";
         String mediaType = format == ExportDocumentService.ExportFormat.PDF ? MediaType.APPLICATION_PDF_VALUE
                 : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";

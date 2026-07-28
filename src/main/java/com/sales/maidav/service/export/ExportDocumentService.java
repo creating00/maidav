@@ -10,6 +10,7 @@ import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import com.sales.maidav.model.product.Product;
 import com.sales.maidav.model.sale.Sale;
+import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.settings.CompanySettings;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
@@ -27,6 +28,7 @@ import java.math.RoundingMode;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -41,8 +43,8 @@ public class ExportDocumentService {
         return generate(title, headers, rows, format);
     }
 
-    public byte[] sales(List<Sale> sales, ExportFormat format) {
-        List<String> headers = List.of("Número", "Fecha", "Cliente", "DNI", "Vendedor", "Forma de pago", "Estado", "Descuento", "Total");
+    public byte[] sales(List<Sale> sales, Map<Long, List<SaleItem>> saleItems, ExportFormat format) {
+        List<String> headers = List.of("Número", "Fecha", "Cliente", "DNI", "Vendedor", "Forma de pago", "Estado", "Productos", "Descuento", "Total");
         List<List<String>> rows = sales.stream().map(sale -> List.of(
                 value(sale.getSaleNumber(), String.valueOf(sale.getId())),
                 sale.getSaleDate() == null ? "" : DATE_FORMAT.format(sale.getSaleDate()),
@@ -51,6 +53,7 @@ public class ExportDocumentService {
                 sale.getSeller() == null ? "" : value(sale.getSeller().getEmail(), ""),
                 sale.getPaymentType() == null ? "" : (sale.getPaymentType().name().equals("CREDIT") ? "Crédito" : "Contado"),
                 sale.getStatus() == null ? "" : (sale.getStatus().name().equals("VOID") ? "Anulada" : "Activa"),
+                products(saleItems.getOrDefault(sale.getId(), List.of())),
                 money(sale.getDiscountAmount()),
                 money(sale.getTotalAmount())
         )).toList();
@@ -174,6 +177,14 @@ public class ExportDocumentService {
     private String money(BigDecimal value) { return "$ " + value(value).setScale(2, RoundingMode.HALF_UP).toPlainString(); }
     private String value(String value, String fallback) { return value == null || value.isBlank() ? fallback : value; }
     private String clientName(Sale sale) { return sale.getClient() == null ? "" : (value(sale.getClient().getLastName(), "") + ", " + value(sale.getClient().getFirstName(), "")).replaceAll("^, |, $", ""); }
+    private String products(List<SaleItem> items) {
+        if (items.isEmpty()) return "Sin productos";
+        return items.stream().map(item -> {
+            String product = item.getProduct() == null ? "Producto sin detalle"
+                    : value(item.getProduct().getProductCode(), "") + " - " + value(item.getProduct().getDescription(), "");
+            return item.getQuantity() + " x " + product + " (" + money(item.getLineTotal()) + ")";
+        }).collect(java.util.stream.Collectors.joining(" | "));
+    }
 
     public enum ExportFormat { PDF, EXCEL }
     public enum PriceListType {
