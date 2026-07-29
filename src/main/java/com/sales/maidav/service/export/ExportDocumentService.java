@@ -135,7 +135,7 @@ public class ExportDocumentService {
     }
 
     private List<String> productHeaders(PriceListType type, CompanySettings settings) {
-        List<String> headers = new ArrayList<>(List.of("Código", "Descripción", "Proveedor"));
+        List<String> headers = new ArrayList<>(List.of("Código", "Descripción", "Proveedor", "Stock"));
         if (type == PriceListType.WHOLESALE) headers.add("Precio mayorista");
         if (type == PriceListType.RETAIL) headers.add("Precio minorista");
         if (type == PriceListType.FINANCING) {
@@ -150,7 +150,12 @@ public class ExportDocumentService {
     }
 
     private List<String> productRow(Product product, PriceListType type, CompanySettings settings) {
-        List<String> row = new ArrayList<>(List.of(value(product.getProductCode(), ""), value(product.getDescription(), ""), product.getProvider() == null ? "" : value(product.getProvider().getName(), "")));
+        List<String> row = new ArrayList<>(List.of(
+                value(product.getProductCode(), ""),
+                value(product.getDescription(), ""),
+                product.getProvider() == null ? "" : value(product.getProvider().getName(), ""),
+                String.valueOf(product.getStockAvailable() == null ? 0 : product.getStockAvailable())
+        ));
         if (type == PriceListType.WHOLESALE) row.add(money(product.getPriceWholesale()));
         if (type == PriceListType.RETAIL) row.add(money(product.getPriceRetail()));
         if (type == PriceListType.FINANCING) {
