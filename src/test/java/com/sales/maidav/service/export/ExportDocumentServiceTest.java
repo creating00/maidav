@@ -20,7 +20,7 @@ class ExportDocumentServiceTest {
     private final ExportDocumentService exportDocumentService = new ExportDocumentService();
 
     @Test
-    void generatesPdfAndExcelPriceLists() {
+    void generatesPdfAndExcelPriceLists() throws Exception {
         Product product = new Product();
         Provider provider = new Provider();
         provider.setName("Proveedor demo");
@@ -31,6 +31,7 @@ class ExportDocumentServiceTest {
         product.setVatRate(new BigDecimal("21.00"));
         product.setPriceWholesale(new BigDecimal("150.00"));
         product.setPriceRetail(new BigDecimal("200.00"));
+        product.setStockAvailable(18);
 
         CompanySettings settings = new CompanySettings();
         byte[] pdf = exportDocumentService.productPrices(List.of(product), ExportDocumentService.PriceListType.FINANCING,
@@ -40,6 +41,11 @@ class ExportDocumentServiceTest {
 
         assertThat(pdf).startsWith("%PDF".getBytes());
         assertThat(excel).startsWith(new byte[]{'P', 'K'});
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(3).getStringCellValue()).isEqualTo("Stock");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(3).getStringCellValue()).isEqualTo("18");
+        }
     }
 
     @Test
