@@ -12,6 +12,14 @@
         </div>
 
         <div class="app-page-toolbar__actions">
+            <div sec:authorize="hasAuthority('PRODUCT_READ')" class="flex flex-wrap gap-2">
+                <a th:href="@{/products/price-list/export(type='WHOLESALE',format='PDF')}" class="rounded bg-slate-700 px-3 py-2 text-sm text-white hover:bg-slate-800">Mayorista PDF</a>
+                <a th:href="@{/products/price-list/export(type='WHOLESALE',format='EXCEL')}" class="rounded border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50">Mayorista Excel</a>
+                <a th:href="@{/products/price-list/export(type='RETAIL',format='PDF')}" class="rounded bg-slate-700 px-3 py-2 text-sm text-white hover:bg-slate-800">Minorista PDF</a>
+                <a th:href="@{/products/price-list/export(type='RETAIL',format='EXCEL')}" class="rounded border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50">Minorista Excel</a>
+                <a th:href="@{/products/price-list/export(type='FINANCING',format='PDF')}" class="rounded bg-emerald-700 px-3 py-2 text-sm text-white hover:bg-emerald-800">Financiados PDF</a>
+                <a th:href="@{/products/price-list/export(type='FINANCING',format='EXCEL')}" class="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 hover:bg-emerald-100">Financiados Excel</a>
+            </div>
             <button sec:authorize="hasAuthority('PRODUCT_UPDATE')"
                     type="button"
                     id="open-adjustments-history"

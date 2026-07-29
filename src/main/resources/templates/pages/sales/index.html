@@ -7,12 +7,11 @@
 
     <div class="flex justify-between items-center mb-6">
         <h1 class="text-2xl font-bold">Ventas</h1>
-
-        <a sec:authorize="hasAuthority('SALES_CREATE')"
-           th:href="@{/sales/new}"
-           class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
-            + Nueva Venta
-        </a>
+        <div class="flex flex-wrap gap-2">
+            <a sec:authorize="hasAuthority('SALES_READ')" th:href="@{/sales/export(q=${q},paymentType=${paymentType},showVoided=${showVoided},format='PDF')}" class="rounded bg-slate-700 px-3 py-2 text-sm text-white hover:bg-slate-800">Exportar PDF</a>
+            <a sec:authorize="hasAuthority('SALES_READ')" th:href="@{/sales/export(q=${q},paymentType=${paymentType},showVoided=${showVoided},format='EXCEL')}" class="rounded border border-slate-300 bg-white px-3 py-2 text-sm hover:bg-slate-50">Exportar Excel</a>
+            <a sec:authorize="hasAuthority('SALES_CREATE')" th:href="@{/sales/new}" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">+ Nueva Venta</a>
+        </div>
     </div>
 
     <div th:if="${successMessage}"

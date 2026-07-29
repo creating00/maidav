@@ -11,6 +11,7 @@ import com.sales.maidav.service.product.InvalidProductException;
 import com.sales.maidav.service.product.ProductService;
 import com.sales.maidav.service.product.ProviderService;
 import com.sales.maidav.service.settings.CompanySettingsService;
+import com.sales.maidav.service.export.ExportDocumentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -25,6 +26,8 @@ import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
 
 import java.io.IOException;
 import java.beans.PropertyEditorSupport;
@@ -107,6 +110,7 @@ public class ProductController {
     private final ProviderService providerService;
     private final CompanySettingsService companySettingsService;
     private final ClientService clientService;
+    private final ExportDocumentService exportDocumentService;
     @Value("${app.upload-dir:uploads}")
     private String uploadDir;
 
@@ -157,6 +161,27 @@ public class ProductController {
         model.addAttribute("focusProductId", productId);
         model.addAttribute("calculatorConfig", buildCalculatorConfig());
         return "pages/products/index";
+    }
+
+    @GetMapping("/price-list/export")
+    @PreAuthorize("hasAuthority('PRODUCT_READ')")
+    public ResponseEntity<byte[]> exportPriceList(@RequestParam ExportDocumentService.PriceListType type,
+                                                  @RequestParam ExportDocumentService.ExportFormat format) {
+        byte[] document = exportDocumentService.productPrices(
+                productService.findAll().stream()
+                        .sorted(java.util.Comparator.comparing(Product::getProductCode, java.util.Comparator.nullsLast(String::compareToIgnoreCase)))
+                        .toList(),
+                type,
+                format,
+                companySettingsService.getSettings()
+        );
+        String extension = format == ExportDocumentService.ExportFormat.PDF ? "pdf" : "xlsx";
+        String mediaType = format == ExportDocumentService.ExportFormat.PDF ? MediaType.APPLICATION_PDF_VALUE
+                : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=lista-precios-" + type.label() + "." + extension)
+                .contentType(MediaType.parseMediaType(mediaType))
+                .body(document);
     }
 
     private Map<String, Object> buildCalculatorConfig() {

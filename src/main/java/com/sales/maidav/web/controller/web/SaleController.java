@@ -21,11 +21,15 @@ import com.sales.maidav.service.sale.InvalidSaleException;
 import com.sales.maidav.service.sale.SaleItemInput;
 import com.sales.maidav.service.sale.SaleService;
 import com.sales.maidav.service.settings.CompanySettingsService;
+import com.sales.maidav.service.export.ExportDocumentService;
 import com.sales.maidav.service.user.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -56,6 +60,7 @@ public class SaleController {
     private final SaleRepository saleRepository;
     private final SaleItemRepository saleItemRepository;
     private final CreditAccountRepository creditAccountRepository;
+    private final ExportDocumentService exportDocumentService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('SALES_READ')")
@@ -65,33 +70,8 @@ public class SaleController {
                        @RequestParam(required = false, defaultValue = "0") int page,
                        Model model) {
         final int pageSize = 20;
-        List<Sale> sales = saleService.findAll();
-        if (!showVoided) {
-            sales = sales.stream()
-                    .filter(sale -> sale.getStatus() != com.sales.maidav.model.sale.SaleStatus.VOID)
-                    .toList();
-        }
-        if (paymentType != null) {
-            sales = sales.stream()
-                    .filter(sale -> paymentType == sale.getPaymentType())
-                    .toList();
-        }
+        List<Sale> sales = filteredSales(q, paymentType, showVoided);
         Map<Long, String> displayNumbers = buildDisplayNumbers(sales);
-        if (q != null && !q.isBlank()) {
-            String term = q.trim().toLowerCase(Locale.ROOT);
-            Map<Long, String> visibleNumbers = displayNumbers;
-            sales = sales.stream()
-                    .filter(s -> contains(visibleNumbers.get(s.getId()), term)
-                            || contains(s.getSaleNumber(), term)
-                            || contains(s.getClient() != null ? s.getClient().getNationalId() : null, term)
-                            || contains(s.getClient() != null ? s.getClient().getFirstName() : null, term)
-                            || contains(s.getClient() != null ? s.getClient().getLastName() : null, term)
-                            || contains(s.getSeller() != null ? s.getSeller().getEmail() : null, term)
-                            || contains(s.getPaymentType() != null ? s.getPaymentType().name() : null, term)
-                            || contains(s.getStatus() != null ? s.getStatus().name() : null, term))
-                    .toList();
-            displayNumbers = buildDisplayNumbers(sales);
-        }
 
         int safePage = Math.max(page, 0);
         int totalItems = sales.size();
@@ -117,6 +97,47 @@ public class SaleController {
         model.addAttribute("hasPrevious", safePage > 0);
         model.addAttribute("hasNext", safePage + 1 < totalPages);
         return "pages/sales/index";
+    }
+
+    @GetMapping("/export")
+    @PreAuthorize("hasAuthority('SALES_READ')")
+    public ResponseEntity<byte[]> export(@RequestParam(required = false) String q,
+                                         @RequestParam(required = false) PaymentType paymentType,
+                                         @RequestParam(required = false, defaultValue = "false") boolean showVoided,
+                                         @RequestParam ExportDocumentService.ExportFormat format) {
+        List<Sale> sales = filteredSales(q, paymentType, showVoided);
+        Map<Long, List<SaleItem>> itemsBySale = sales.isEmpty() ? Map.of()
+                : saleItemRepository.findBySale_IdInOrderBySale_IdAscIdAsc(sales.stream().map(Sale::getId).toList())
+                .stream().collect(java.util.stream.Collectors.groupingBy(item -> item.getSale().getId(), java.util.LinkedHashMap::new, java.util.stream.Collectors.toList()));
+        byte[] document = exportDocumentService.sales(sales, itemsBySale, format);
+        String extension = format == ExportDocumentService.ExportFormat.PDF ? "pdf" : "xlsx";
+        String mediaType = format == ExportDocumentService.ExportFormat.PDF ? MediaType.APPLICATION_PDF_VALUE
+                : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=ventas." + extension)
+                .contentType(MediaType.parseMediaType(mediaType))
+                .body(document);
+    }
+
+    private List<Sale> filteredSales(String q, PaymentType paymentType, boolean showVoided) {
+        List<Sale> sales = saleService.findAll();
+        if (!showVoided) {
+            sales = sales.stream().filter(sale -> sale.getStatus() != SaleStatus.VOID).toList();
+        }
+        if (paymentType != null) {
+            sales = sales.stream().filter(sale -> paymentType == sale.getPaymentType()).toList();
+        }
+        if (q == null || q.isBlank()) return sales;
+        String term = q.trim().toLowerCase(Locale.ROOT);
+        Map<Long, String> displayNumbers = buildDisplayNumbers(sales);
+        return sales.stream().filter(s -> contains(displayNumbers.get(s.getId()), term)
+                || contains(s.getSaleNumber(), term)
+                || contains(s.getClient() != null ? s.getClient().getNationalId() : null, term)
+                || contains(s.getClient() != null ? s.getClient().getFirstName() : null, term)
+                || contains(s.getClient() != null ? s.getClient().getLastName() : null, term)
+                || contains(s.getSeller() != null ? s.getSeller().getEmail() : null, term)
+                || contains(s.getPaymentType() != null ? s.getPaymentType().name() : null, term)
+                || contains(s.getStatus() != null ? s.getStatus().name() : null, term)).toList();
     }
 
     @GetMapping("/new")

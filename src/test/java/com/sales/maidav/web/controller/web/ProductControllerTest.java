@@ -6,6 +6,7 @@ import com.sales.maidav.service.client.ClientService;
 import com.sales.maidav.service.product.ProductService;
 import com.sales.maidav.service.product.ProviderService;
 import com.sales.maidav.service.settings.CompanySettingsService;
+import com.sales.maidav.service.export.ExportDocumentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,12 +37,14 @@ class ProductControllerTest {
     private CompanySettingsService companySettingsService;
     @Mock
     private ClientService clientService;
+    @Mock
+    private ExportDocumentService exportDocumentService;
 
     private ProductController productController;
 
     @BeforeEach
     void setUp() {
-        productController = new ProductController(productService, providerService, companySettingsService, clientService);
+        productController = new ProductController(productService, providerService, companySettingsService, clientService, exportDocumentService);
     }
 
     @Test
