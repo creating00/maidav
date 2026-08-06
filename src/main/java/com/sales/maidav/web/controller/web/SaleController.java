@@ -23,6 +23,7 @@ import com.sales.maidav.service.sale.SaleService;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import com.sales.maidav.service.export.ExportDocumentService;
 import com.sales.maidav.service.user.UserService;
+import com.sales.maidav.util.SearchTextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -128,7 +129,7 @@ public class SaleController {
             sales = sales.stream().filter(sale -> paymentType == sale.getPaymentType()).toList();
         }
         if (q == null || q.isBlank()) return sales;
-        String term = q.trim().toLowerCase(Locale.ROOT);
+        String term = SearchTextNormalizer.normalize(q);
         Map<Long, String> displayNumbers = buildDisplayNumbers(sales);
         return sales.stream().filter(s -> contains(displayNumbers.get(s.getId()), term)
                 || contains(s.getSaleNumber(), term)
@@ -541,6 +542,6 @@ public class SaleController {
     }
 
     private boolean contains(String value, String term) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(term);
+        return SearchTextNormalizer.contains(value, term);
     }
 }

@@ -291,7 +291,7 @@
             }
 
             function normalizeTerm(value) {
-                return String(value || '').trim().toLowerCase();
+                return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
             }
 
             function setCatalogScannerStatus(message, isError) {

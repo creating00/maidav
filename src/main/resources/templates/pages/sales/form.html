@@ -869,7 +869,11 @@
                     option.dataset.description || '',
                     option.dataset.barcode || '',
                     option.textContent || ''
-                ].join(' ').toLowerCase();
+                ].join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+            }
+
+            function normalizeSearchTerm(value) {
+                return String(value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
             }
 
             function getProductOptionInitials(option) {
@@ -1037,7 +1041,7 @@
                 if (!saleCatalogList || !saleCatalogEmpty) {
                     return;
                 }
-                const normalized = (term || '').trim().toLowerCase();
+                const normalized = normalizeSearchTerm(term);
                 const items = buildProductCatalogCache().filter(item => !normalized || item.searchText.includes(normalized));
                 saleCatalogList.innerHTML = '';
                 saleCatalogEmpty.classList.toggle('hidden', items.length > 0);
@@ -1222,7 +1226,7 @@
                     return [];
                 }
                 const activeSearchTerm = searchTerm === undefined ? getProductComboboxSearchValue(row) : searchTerm;
-                const normalized = (activeSearchTerm || '').trim().toLowerCase();
+                const normalized = normalizeSearchTerm(activeSearchTerm);
                 const selectedValue = select.value;
                 const matchingOptions = getVisibleProductCatalogItems(row, normalized);
 
@@ -2216,16 +2220,16 @@
             }
 
             function applyProductSearchFilter(term) {
-                const normalized = (term || '').toLowerCase().trim();
+                const normalized = normalizeSearchTerm(term);
                 body.querySelectorAll('.product-select').forEach(select => {
                     Array.from(select.options).forEach(option => {
                         if (!option.value) {
                             option.hidden = false;
                             return;
                         }
-                        const barcode = (option.dataset.barcode || '').toLowerCase();
-                        const productCode = (option.dataset.productCode || '').toLowerCase();
-                        const description = (option.dataset.description || '').toLowerCase();
+                        const barcode = normalizeSearchTerm(option.dataset.barcode);
+                        const productCode = normalizeSearchTerm(option.dataset.productCode);
+                        const description = normalizeSearchTerm(option.dataset.description);
                         option.hidden = normalized.length > 0 && !(barcode.includes(normalized) || productCode.includes(normalized) || description.includes(normalized));
                     });
                 });
@@ -2658,14 +2662,14 @@
 
             if (clientSearch && clientSelect) {
                 clientSearch.addEventListener('input', function () {
-                    const term = clientSearch.value.toLowerCase().trim();
+                    const term = normalizeSearchTerm(clientSearch.value);
                     Array.from(clientSelect.options).forEach(option => {
                         if (!option.value) {
                             option.hidden = false;
                             return;
                         }
-                        const dni = (option.dataset.dni || '').toLowerCase();
-                        const name = (option.dataset.name || '').toLowerCase();
+                        const dni = normalizeSearchTerm(option.dataset.dni);
+                        const name = normalizeSearchTerm(option.dataset.name);
                         option.hidden = term.length > 0 && !(dni.includes(term) || name.includes(term));
                     });
                 });
