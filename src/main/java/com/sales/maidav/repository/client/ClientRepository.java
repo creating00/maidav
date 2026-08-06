@@ -3,6 +3,8 @@ package com.sales.maidav.repository.client;
 import com.sales.maidav.model.client.Client;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,24 +13,28 @@ public interface ClientRepository extends JpaRepository<Client, Long> {
     @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
     List<Client> findAll();
 
-    List<Client> findByNationalIdContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
-            String nationalId,
-            String firstName,
-            String lastName
-    );
+    @Query(value = """
+            select c.id from clients c
+            where lower(unaccent(c.national_id)) like :term
+               or lower(unaccent(c.first_name)) like :term
+               or lower(unaccent(c.last_name)) like :term
+            """, nativeQuery = true)
+    List<Long> searchIdsByTerm(@Param("term") String term);
 
     @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
     List<Client> findBySeller_Id(Long sellerId);
 
+    @Query(value = """
+            select c.id from clients c
+            where c.seller_id = :sellerId
+              and (lower(unaccent(c.national_id)) like :term
+                   or lower(unaccent(c.first_name)) like :term
+                   or lower(unaccent(c.last_name)) like :term)
+            """, nativeQuery = true)
+    List<Long> searchIdsBySellerIdAndTerm(@Param("sellerId") Long sellerId, @Param("term") String term);
+
     @EntityGraph(attributePaths = {"zone", "seller", "recommendedBy"})
-    List<Client> findBySeller_IdAndNationalIdContainingIgnoreCaseOrSeller_IdAndFirstNameContainingIgnoreCaseOrSeller_IdAndLastNameContainingIgnoreCase(
-            Long sellerIdForNationalId,
-            String nationalId,
-            Long sellerIdForFirstName,
-            String firstName,
-            Long sellerIdForLastName,
-            String lastName
-    );
+    List<Client> findByIdIn(List<Long> ids);
 
     boolean existsByNationalId(String nationalId);
 

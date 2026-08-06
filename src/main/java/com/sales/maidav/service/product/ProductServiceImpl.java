@@ -8,9 +8,11 @@ import com.sales.maidav.model.product.PriceAdjustmentType;
 import com.sales.maidav.repository.product.ProductPriceAdjustmentItemRepository;
 import com.sales.maidav.repository.product.ProductPriceAdjustmentRepository;
 import com.sales.maidav.repository.product.ProductRepository;
+import com.sales.maidav.util.SearchTextNormalizer;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -121,7 +123,7 @@ public class ProductServiceImpl implements ProductService {
     public Page<Product> findPageForListing(boolean lowStock, boolean includeOutOfStock, String q, Long providerId, String updateAgeFilter, Pageable pageable) {
         String normalizedTerm = (q == null || q.isBlank())
                 ? null
-                : "%" + q.trim().toLowerCase(Locale.ROOT) + "%";
+                : "%" + SearchTextNormalizer.normalize(q) + "%";
         LocalDateTime updatedAfter = null;
         LocalDateTime updatedBefore = null;
         LocalDateTime now = LocalDateTime.now();
@@ -139,7 +141,7 @@ public class ProductServiceImpl implements ProductService {
         }
         boolean applyUpdatedAfter = updatedAfter != null;
         boolean applyUpdatedBefore = updatedBefore != null;
-        return productRepository.findPageForListing(
+        Page<Long> productIds = productRepository.findIdsPageForListing(
                 lowStock,
                 includeOutOfStock,
                 providerId,
@@ -150,6 +152,18 @@ public class ProductServiceImpl implements ProductService {
                 applyUpdatedBefore ? updatedBefore : now,
                 pageable
         );
+        if (productIds.isEmpty()) {
+            return new PageImpl<>(List.of(), pageable, productIds.getTotalElements());
+        }
+        Map<Long, Product> productsById = productRepository.findByIdIn(productIds.getContent())
+                .stream()
+                .collect(Collectors.toMap(Product::getId, product -> product));
+        List<Product> products = productIds.getContent()
+                .stream()
+                .map(productsById::get)
+                .filter(product -> product != null)
+                .toList();
+        return new PageImpl<>(products, pageable, productIds.getTotalElements());
     }
 
     @Override

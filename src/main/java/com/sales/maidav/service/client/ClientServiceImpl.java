@@ -3,6 +3,7 @@ package com.sales.maidav.service.client;
 import com.sales.maidav.model.client.Client;
 import com.sales.maidav.repository.client.ClientRepository;
 import com.sales.maidav.repository.user.UserRepository;
+import com.sales.maidav.util.SearchTextNormalizer;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -10,6 +11,9 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -89,20 +93,27 @@ public class ClientServiceImpl implements ClientService {
             return findAll();
         }
 
+        String normalizedTerm = "%" + SearchTextNormalizer.normalize(term) + "%";
+        List<Long> clientIds;
         if (isCurrentUserAdmin()) {
-            return clientRepository
-                    .findByNationalIdContainingIgnoreCaseOrFirstNameContainingIgnoreCaseOrLastNameContainingIgnoreCase(
-                            term, term, term
-                    );
+            clientIds = clientRepository.searchIdsByTerm(normalizedTerm);
+        } else {
+            Long sellerId = currentUserId();
+            if (sellerId == null) {
+                return List.of();
+            }
+            clientIds = clientRepository.searchIdsBySellerIdAndTerm(sellerId, normalizedTerm);
         }
-        Long sellerId = currentUserId();
-        if (sellerId == null) {
+        if (clientIds.isEmpty()) {
             return List.of();
         }
-        return clientRepository
-                .findBySeller_IdAndNationalIdContainingIgnoreCaseOrSeller_IdAndFirstNameContainingIgnoreCaseOrSeller_IdAndLastNameContainingIgnoreCase(
-                        sellerId, term, sellerId, term, sellerId, term
-                );
+        Map<Long, Client> clientsById = clientRepository.findByIdIn(clientIds)
+                .stream()
+                .collect(Collectors.toMap(Client::getId, Function.identity()));
+        return clientIds.stream()
+                .map(clientsById::get)
+                .filter(client -> client != null)
+                .toList();
     }
 
     @Override

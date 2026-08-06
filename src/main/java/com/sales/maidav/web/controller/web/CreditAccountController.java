@@ -16,6 +16,7 @@ import com.sales.maidav.service.sale.InvalidSaleException;
 import com.sales.maidav.service.sale.MoraWarningInfo;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import com.sales.maidav.service.user.UserService;
+import com.sales.maidav.util.SearchTextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -67,7 +68,7 @@ public class CreditAccountController {
                     .toList();
         }
         if (q != null && !q.isBlank()) {
-            String term = q.trim().toLowerCase(Locale.ROOT);
+            String term = SearchTextNormalizer.normalize(q);
             accounts = accounts.stream()
                     .filter(a -> contains(String.valueOf(a.getId()), term)
                             || contains(a.getAccountNumber(), term)
@@ -409,7 +410,7 @@ public class CreditAccountController {
     }
 
     private boolean contains(String value, String term) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(term);
+        return SearchTextNormalizer.contains(value, term);
     }
 
     private List<ClientGroupView> buildClientGroups(List<CreditAccount> accounts,

@@ -1581,9 +1581,9 @@
             }
 
             function filterHistoryRows() {
-                const query = (historySearchInput?.value || '').trim().toLowerCase();
+                const query = String(historySearchInput?.value || '').trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
                 historyFilteredRows = historyRows.filter(row => {
-                    const haystack = (row.dataset.search || '').toLowerCase();
+                    const haystack = String(row.dataset.search || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
                     return haystack.includes(query);
                 });
                 historyCurrentPage = 1;

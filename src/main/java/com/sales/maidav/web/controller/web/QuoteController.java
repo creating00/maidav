@@ -9,6 +9,7 @@ import com.sales.maidav.service.quote.QuoteCalculator;
 import com.sales.maidav.service.quote.QuoteItemInput;
 import com.sales.maidav.service.quote.QuoteService;
 import com.sales.maidav.service.settings.CompanySettingsService;
+import com.sales.maidav.util.SearchTextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -44,7 +45,7 @@ public class QuoteController {
     public String list(@RequestParam(required = false) String q, Model model) {
         List<Quote> quotes = quoteService.findAll();
         if (q != null && !q.isBlank()) {
-            String term = q.trim().toLowerCase(Locale.ROOT);
+            String term = SearchTextNormalizer.normalize(q);
             quotes = quotes.stream()
                     .filter(quote -> contains(quote.getQuoteNumber(), term)
                             || contains(quote.getProductSummary(), term))
@@ -151,7 +152,7 @@ public class QuoteController {
     }
 
     private boolean contains(String value, String term) {
-        return value != null && value.toLowerCase(Locale.ROOT).contains(term);
+        return SearchTextNormalizer.contains(value, term);
     }
 
     private String pdfFileName(Quote quote) {

@@ -40,38 +40,37 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @EntityGraph(attributePaths = "provider")
     List<Product> findByProvider_Id(Long providerId);
 
-    @EntityGraph(attributePaths = "provider")
     @Query(value = """
-            select p from Product p
-            join p.provider provider
-            where (:lowStock = false or p.stockAvailable <= p.stockMin)
-              and ((:includeOutOfStock = true and p.stockAvailable <= 0)
-                   or (:includeOutOfStock = false and p.stockAvailable > 0))
+            select p.id from products p
+            join providers provider on provider.id = p.provider_id
+            where (:lowStock = false or p.stock_available <= p.stock_min)
+              and ((:includeOutOfStock = true and p.stock_available <= 0)
+                   or (:includeOutOfStock = false and p.stock_available > 0))
               and (:providerId is null or provider.id = :providerId)
               and (:term is null
-                   or lower(coalesce(p.productCode, '')) like :term
-                   or lower(coalesce(p.barcode, '')) like :term
-                   or lower(p.description) like :term
-                   or lower(provider.name) like :term)
-              and (:applyUpdatedAfter = false or coalesce(p.updatedAt, p.createdAt) >= :updatedAfter)
-              and (:applyUpdatedBefore = false or coalesce(p.updatedAt, p.createdAt) <= :updatedBefore)
+                   or lower(unaccent(coalesce(p.product_code, ''))) like :term
+                   or lower(unaccent(coalesce(p.barcode, ''))) like :term
+                   or lower(unaccent(p.description)) like :term
+                   or lower(unaccent(provider.name)) like :term)
+              and (:applyUpdatedAfter = false or coalesce(p.updated_at, p.created_at) >= :updatedAfter)
+              and (:applyUpdatedBefore = false or coalesce(p.updated_at, p.created_at) <= :updatedBefore)
             """,
             countQuery = """
-            select count(p) from Product p
-            join p.provider provider
-            where (:lowStock = false or p.stockAvailable <= p.stockMin)
-              and ((:includeOutOfStock = true and p.stockAvailable <= 0)
-                   or (:includeOutOfStock = false and p.stockAvailable > 0))
+            select count(*) from products p
+            join providers provider on provider.id = p.provider_id
+            where (:lowStock = false or p.stock_available <= p.stock_min)
+              and ((:includeOutOfStock = true and p.stock_available <= 0)
+                   or (:includeOutOfStock = false and p.stock_available > 0))
               and (:providerId is null or provider.id = :providerId)
               and (:term is null
-                   or lower(coalesce(p.productCode, '')) like :term
-                   or lower(coalesce(p.barcode, '')) like :term
-                   or lower(p.description) like :term
-                   or lower(provider.name) like :term)
-              and (:applyUpdatedAfter = false or coalesce(p.updatedAt, p.createdAt) >= :updatedAfter)
-              and (:applyUpdatedBefore = false or coalesce(p.updatedAt, p.createdAt) <= :updatedBefore)
-            """)
-    Page<Product> findPageForListing(@Param("lowStock") boolean lowStock,
+                   or lower(unaccent(coalesce(p.product_code, ''))) like :term
+                   or lower(unaccent(coalesce(p.barcode, ''))) like :term
+                   or lower(unaccent(p.description)) like :term
+                   or lower(unaccent(provider.name)) like :term)
+              and (:applyUpdatedAfter = false or coalesce(p.updated_at, p.created_at) >= :updatedAfter)
+              and (:applyUpdatedBefore = false or coalesce(p.updated_at, p.created_at) <= :updatedBefore)
+            """, nativeQuery = true)
+    Page<Long> findIdsPageForListing(@Param("lowStock") boolean lowStock,
                                      @Param("includeOutOfStock") boolean includeOutOfStock,
                                      @Param("providerId") Long providerId,
                                      @Param("term") String term,
@@ -80,4 +79,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
                                      @Param("applyUpdatedBefore") boolean applyUpdatedBefore,
                                      @Param("updatedBefore") LocalDateTime updatedBefore,
                                      Pageable pageable);
+
+    @EntityGraph(attributePaths = "provider")
+    List<Product> findByIdIn(List<Long> ids);
 }
