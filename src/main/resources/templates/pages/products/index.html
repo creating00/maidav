@@ -625,23 +625,6 @@
         </div>
     </div>
 
-    <div id="productImageModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 px-4">
-        <div class="w-full max-w-3xl rounded-2xl bg-white p-4 shadow-2xl">
-            <div class="mb-3 flex items-center justify-between gap-3">
-                <div>
-                    <h2 class="text-lg font-semibold text-slate-900">Imagen del producto</h2>
-                    <p id="productImageCaption" class="text-sm text-slate-500">Detalle ampliado</p>
-                </div>
-                <button type="button" id="closeProductImageModal" class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
-                    Cerrar
-                </button>
-            </div>
-            <div class="overflow-hidden rounded-2xl bg-slate-100">
-                <img id="productImageModalContent" src="" alt="Imagen ampliada" class="max-h-[75vh] w-full object-contain"/>
-            </div>
-        </div>
-    </div>
-
     <div id="productScanModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/80 px-4">
         <div class="w-full max-w-lg rounded-2xl bg-white p-4 shadow-2xl">
             <div class="flex items-center justify-between gap-3">
@@ -703,10 +686,6 @@
             const viewScannedProductInTableBtn = document.getElementById('viewScannedProductInTableBtn');
             const scanProductShareStatus = document.getElementById('scanProductShareStatus');
             const productRows = Array.from(document.querySelectorAll('.product-row'));
-            const productImageModal = document.getElementById('productImageModal');
-            const closeProductImageModal = document.getElementById('closeProductImageModal');
-            const productImageModalContent = document.getElementById('productImageModalContent');
-            const productImageCaption = document.getElementById('productImageCaption');
             let productScanStream = null;
             let productScanFrame = null;
             let productScanActive = false;
@@ -1056,32 +1035,6 @@
                     code: panel.dataset.code || '',
                     description: panel.dataset.description || ''
                 }, data, null));
-            }
-
-            function openImageModal(image, description) {
-                if (!productImageModal || !productImageModalContent) {
-                    return;
-                }
-                productImageModalContent.src = image || '';
-                productImageModalContent.alt = description || 'Imagen del producto';
-                if (productImageCaption) {
-                    productImageCaption.textContent = description || 'Imagen ampliada';
-                }
-                productImageModal.classList.remove('hidden');
-                productImageModal.classList.add('flex');
-                document.body.classList.add('overflow-hidden');
-            }
-
-            function closeImageModal() {
-                if (!productImageModal) {
-                    return;
-                }
-                productImageModal.classList.add('hidden');
-                productImageModal.classList.remove('flex');
-                document.body.classList.remove('overflow-hidden');
-                if (productImageModalContent) {
-                    productImageModalContent.src = '';
-                }
             }
 
             function openFinancingRowByProductId(productId) {
@@ -1447,7 +1400,11 @@
 
             document.querySelectorAll('.product-image-trigger').forEach(button => {
                 button.addEventListener('click', function () {
-                    openImageModal(button.dataset.image || '', button.dataset.description || 'Imagen del producto');
+                    const row = button.closest('.product-row');
+                    const product = extractProductDetailsFromRow(row);
+                    if (product) {
+                        renderScannedProductCard(buildProductState(product));
+                    }
                 });
             });
 
@@ -1529,17 +1486,6 @@
                     }
                 });
             }
-            if (closeProductImageModal) {
-                closeProductImageModal.addEventListener('click', closeImageModal);
-            }
-            if (productImageModal) {
-                productImageModal.addEventListener('click', function (event) {
-                    if (event.target === productImageModal) {
-                        closeImageModal();
-                    }
-                });
-            }
-
             const openHistoryButton = document.getElementById('open-adjustments-history');
             const closeHistoryButton = document.getElementById('close-adjustments-history');
             const historyPanel = document.getElementById('adjustments-history-panel');
@@ -1640,7 +1586,6 @@
             document.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape') {
                     closeHistoryPanel();
-                    closeImageModal();
                     closeScannedProductCardModal();
                 }
             });
