@@ -829,8 +829,8 @@
                 lines.push('\uD83D\uDCB5 Efectivo: ' + moneyCompact(data.contado));
                 lines.push('\uD83D\uDCB3 Debito: ' + moneyCompact(data.debito));
                 lines.push('---------------------------');
-                lines.push('\uD83D\uDCC5 Diaria: ' + moneyCompact(data.plans.DAILY.fee) + ' (Efe: ' + moneyCompact(data.plans.DAILY.cashFee) + ')');
-                lines.push('\uD83D\uDCC6 Semanal: ' + moneyCompact(data.plans.WEEKLY.fee) + ' (Efe: ' + moneyCompact(data.plans.WEEKLY.cashFee) + ')');
+                lines.push('\uD83D\uDDD3 Diaria (' + data.plans.DAILY.count + ' dias): ' + moneyCompact(data.plans.DAILY.fee) + ' (Efe: ' + moneyCompact(data.plans.DAILY.cashFee) + ')');
+                lines.push('\uD83D\uDDD3 Semanal (' + data.plans.WEEKLY.count + ' semanas): ' + moneyCompact(data.plans.WEEKLY.fee) + ' (Efe: ' + moneyCompact(data.plans.WEEKLY.cashFee) + ')');
                 lines.push('\uD83D\uDDD3 Mensual ' + data.cfg.mesesCorto + ': ' + moneyCompact(data.plans.MONTHLY_SHORT.fee) + ' (Efe: ' + moneyCompact(data.plans.MONTHLY_SHORT.cashFee) + ')');
                 lines.push('\uD83D\uDDD3 Mensual ' + data.cfg.mesesLargo + ': ' + moneyCompact(data.plans.MONTHLY_LONG.fee) + ' (Efe: ' + moneyCompact(data.plans.MONTHLY_LONG.cashFee) + ')');
                 return lines.join('\n');
