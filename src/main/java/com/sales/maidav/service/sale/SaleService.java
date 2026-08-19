@@ -24,6 +24,17 @@ public interface SaleService {
                     BigDecimal discountAmount,
                     Integer weeksCount,
                     List<SaleItemInput> items);
+    Sale createSale(Client client,
+                    User seller,
+                    PaymentType paymentType,
+                    LocalDate saleDate,
+                    LocalDate firstDueDate,
+                    PaymentFrequency paymentFrequency,
+                    List<String> dueDays,
+                    BigDecimal discountAmount,
+                    Integer weeksCount,
+                    List<BigDecimal> manualInstallmentAmounts,
+                    List<SaleItemInput> items);
     Sale updateSale(Long saleId,
                     Client client,
                     User seller,
@@ -34,6 +45,18 @@ public interface SaleService {
                     List<String> dueDays,
                     BigDecimal discountAmount,
                     Integer weeksCount,
+                    List<SaleItemInput> items);
+    Sale updateSale(Long saleId,
+                    Client client,
+                    User seller,
+                    PaymentType paymentType,
+                    LocalDate saleDate,
+                    LocalDate firstDueDate,
+                    PaymentFrequency paymentFrequency,
+                    List<String> dueDays,
+                    BigDecimal discountAmount,
+                    Integer weeksCount,
+                    List<BigDecimal> manualInstallmentAmounts,
                     List<SaleItemInput> items);
     Sale changeSeller(Long saleId, User newSeller, User changedBy);
     List<SaleSellerChange> findSellerChanges(Long saleId);

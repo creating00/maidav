@@ -213,6 +213,8 @@ public class SaleController {
                          @RequestParam(required = false) PaymentFrequency paymentFrequency,
                          @RequestParam(required = false) BigDecimal discountAmount,
                          @RequestParam(required = false) Integer weeksCount,
+                         @RequestParam(required = false, defaultValue = "false") boolean manualInstallmentsEnabled,
+                         @RequestParam(required = false, name = "manualInstallmentAmounts") List<BigDecimal> manualInstallmentAmounts,
                          @RequestParam(required = false) Long sellerId,
                          @RequestParam(name = "productIds") List<Long> productIds,
                          @RequestParam(name = "quantities") List<Integer> quantities,
@@ -235,9 +237,12 @@ public class SaleController {
             List<SaleItemInput> items = buildItems(productIds, quantities, unitPrices);
             BigDecimal effectiveDiscount = admin ? discountAmount : BigDecimal.ZERO;
             List<String> dueDays = resolveDueDays(paymentFrequency, firstDueDate);
+            List<BigDecimal> effectiveManualInstallments = admin && manualInstallmentsEnabled
+                    ? (manualInstallmentAmounts == null ? List.of() : manualInstallmentAmounts)
+                    : null;
 
             Sale sale = saleService.updateSale(id, client, seller, paymentType, saleDate, firstDueDate,
-                    paymentFrequency, dueDays, effectiveDiscount, weeksCount, items);
+                    paymentFrequency, dueDays, effectiveDiscount, weeksCount, effectiveManualInstallments, items);
             redirectAttributes.addFlashAttribute("saleNumber", sale.getSaleNumber());
             if (paymentType == PaymentType.CREDIT) {
                 CreditAccount account = creditAccountService.findBySaleId(sale.getId());
@@ -273,6 +278,8 @@ public class SaleController {
                          @RequestParam(required = false) PaymentFrequency paymentFrequency,
                          @RequestParam(required = false) BigDecimal discountAmount,
                          @RequestParam(required = false) Integer weeksCount,
+                         @RequestParam(required = false, defaultValue = "false") boolean manualInstallmentsEnabled,
+                         @RequestParam(required = false, name = "manualInstallmentAmounts") List<BigDecimal> manualInstallmentAmounts,
                          @RequestParam(required = false) Long sellerId,
                          @RequestParam(name = "productIds") List<Long> productIds,
                          @RequestParam(name = "quantities") List<Integer> quantities,
@@ -300,9 +307,12 @@ public class SaleController {
             List<String> dueDays = resolveDueDays(paymentFrequency, firstDueDate);
             // SOLO ADMIN DESCUENTO
             BigDecimal effectiveDiscount = admin ? discountAmount : BigDecimal.ZERO;
+            List<BigDecimal> effectiveManualInstallments = admin && manualInstallmentsEnabled
+                    ? (manualInstallmentAmounts == null ? List.of() : manualInstallmentAmounts)
+                    : null;
 
             Sale sale = saleService.createSale(client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
-                    effectiveDiscount, weeksCount, items);
+                    effectiveDiscount, weeksCount, effectiveManualInstallments, items);
             redirectAttributes.addFlashAttribute("saleNumber", sale.getSaleNumber());
             if (paymentType == PaymentType.CREDIT) {
                 CreditAccount account = creditAccountService.findBySaleId(sale.getId());

@@ -401,4 +401,90 @@ class SaleServiceImplTest {
                         LocalDate.of(2027, 3, 30)
                 );
     }
+
+    @Test
+    void createSaleUsesManualInstallmentAmountsWhenProvided() {
+        Client client = new Client();
+        client.setId(5L);
+        User seller = new User();
+        seller.setId(11L);
+        Product product = new Product();
+        product.setId(7L);
+        product.setDescription("Sillon");
+        product.setStockAvailable(3);
+        when(productRepository.findById(7L)).thenReturn(Optional.of(product));
+        when(saleRepository.save(any(Sale.class))).thenAnswer(invocation -> {
+            Sale saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(117L);
+            }
+            return saved;
+        });
+        when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        saleService.createSale(
+                client,
+                seller,
+                PaymentType.CREDIT,
+                LocalDate.of(2026, 8, 19),
+                LocalDate.of(2026, 8, 26),
+                PaymentFrequency.WEEKLY,
+                List.of("WEDNESDAY"),
+                BigDecimal.ZERO,
+                3,
+                List.of(new BigDecimal("1200.00"), new BigDecimal("1500.00"), new BigDecimal("2300.00")),
+                List.of(new SaleItemInput(7L, 1, new BigDecimal("5000.00")))
+        );
+
+        ArgumentCaptor<CreditInstallment> installmentsCaptor = ArgumentCaptor.forClass(CreditInstallment.class);
+        verify(creditInstallmentRepository, times(3)).save(installmentsCaptor.capture());
+        assertThat(installmentsCaptor.getAllValues())
+                .extracting(CreditInstallment::getAmount)
+                .containsExactly(
+                        new BigDecimal("1200.00"),
+                        new BigDecimal("1500.00"),
+                        new BigDecimal("2300.00")
+                );
+    }
+
+    @Test
+    void createSaleRejectsManualInstallmentsWhenTotalDoesNotMatchSaleTotal() {
+        Client client = new Client();
+        client.setId(6L);
+        User seller = new User();
+        seller.setId(12L);
+        Product product = new Product();
+        product.setId(8L);
+        product.setDescription("Mesa");
+        product.setStockAvailable(2);
+        when(productRepository.findById(8L)).thenReturn(Optional.of(product));
+        when(saleRepository.save(any(Sale.class))).thenAnswer(invocation -> {
+            Sale saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(118L);
+            }
+            return saved;
+        });
+        when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatThrownBy(() -> saleService.createSale(
+                client,
+                seller,
+                PaymentType.CREDIT,
+                LocalDate.of(2026, 8, 19),
+                LocalDate.of(2026, 8, 26),
+                PaymentFrequency.WEEKLY,
+                List.of("WEDNESDAY"),
+                BigDecimal.ZERO,
+                2,
+                List.of(new BigDecimal("1000.00"), new BigDecimal("1200.00")),
+                List.of(new SaleItemInput(8L, 1, new BigDecimal("2500.00")))
+        ))
+                .isInstanceOf(InvalidSaleException.class)
+                .hasMessage("La suma de las cuotas manuales debe coincidir con el total de la venta");
+    }
 }
