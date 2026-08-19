@@ -72,6 +72,22 @@ public class SaleServiceImpl implements SaleService {
                            BigDecimal discountAmount,
                            Integer weeksCount,
                            List<SaleItemInput> items) {
+        return createSale(client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
+                discountAmount, weeksCount, null, items);
+    }
+
+    @Override
+    public Sale createSale(Client client,
+                           User seller,
+                           PaymentType paymentType,
+                           LocalDate saleDate,
+                           LocalDate firstDueDate,
+                           PaymentFrequency paymentFrequency,
+                           List<String> dueDays,
+                           BigDecimal discountAmount,
+                           Integer weeksCount,
+                           List<BigDecimal> manualInstallmentAmounts,
+                           List<SaleItemInput> items) {
 
         if (client == null) {
             throw new InvalidSaleException("Debe seleccionar un cliente");
@@ -163,7 +179,7 @@ public class SaleServiceImpl implements SaleService {
         }
 
         if (paymentType == PaymentType.CREDIT) {
-            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount);
+            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount, manualInstallmentAmounts);
         }
 
         return sale;
@@ -180,6 +196,23 @@ public class SaleServiceImpl implements SaleService {
                            List<String> dueDays,
                            BigDecimal discountAmount,
                            Integer weeksCount,
+                           List<SaleItemInput> items) {
+        return updateSale(saleId, client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
+                discountAmount, weeksCount, null, items);
+    }
+
+    @Override
+    public Sale updateSale(Long saleId,
+                           Client client,
+                           User seller,
+                           PaymentType paymentType,
+                           LocalDate saleDate,
+                           LocalDate firstDueDate,
+                           PaymentFrequency paymentFrequency,
+                           List<String> dueDays,
+                           BigDecimal discountAmount,
+                           Integer weeksCount,
+                           List<BigDecimal> manualInstallmentAmounts,
                            List<SaleItemInput> items) {
 
         Sale sale = findById(saleId);
@@ -291,7 +324,7 @@ public class SaleServiceImpl implements SaleService {
 
         // Create credit account if needed
         if (paymentType == PaymentType.CREDIT) {
-            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount);
+            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount, manualInstallmentAmounts);
         }
 
         return sale;
@@ -418,13 +451,20 @@ public class SaleServiceImpl implements SaleService {
                                        PaymentFrequency paymentFrequency,
                                        List<String> dueDays,
                                        LocalDate firstDueDate,
-                                       Integer weeksCount) {
+                                       Integer weeksCount,
+                                       List<BigDecimal> manualInstallmentAmounts) {
         if (weeksCount == null || weeksCount < 1 || weeksCount > 365) {
             throw new InvalidSaleException("Cantidad de cuotas invalida (1-365)");
         }
         if (firstDueDate == null) {
             throw new InvalidSaleException("Fecha de primer vencimiento invalida");
         }
+
+        List<BigDecimal> installmentAmounts = resolveInstallmentAmounts(
+                sale.getTotalAmount(),
+                weeksCount,
+                manualInstallmentAmounts
+        );
 
         CreditAccount account = new CreditAccount();
         account.setSale(sale);
@@ -443,17 +483,12 @@ public class SaleServiceImpl implements SaleService {
             creditAccountRepository.save(account);
         }
 
-        BigDecimal weekly = sale.getTotalAmount()
-                .divide(BigDecimal.valueOf(weeksCount), 2, RoundingMode.HALF_UP);
         BigDecimal accumulated = BigDecimal.ZERO;
 
         List<LocalDate> schedule = buildSchedule(paymentFrequency, dueDays, firstDueDate, weeksCount);
 
         for (int i = 1; i <= weeksCount; i++) {
-            BigDecimal amount = weekly;
-            if (i == weeksCount) {
-                amount = sale.getTotalAmount().subtract(accumulated);
-            }
+            BigDecimal amount = installmentAmounts.get(i - 1);
             accumulated = accumulated.add(amount);
 
             CreditInstallment installment = new CreditInstallment();
@@ -465,6 +500,49 @@ public class SaleServiceImpl implements SaleService {
             installment.setStatus(InstallmentStatus.PENDING);
             creditInstallmentRepository.save(installment);
         }
+    }
+
+    private List<BigDecimal> resolveInstallmentAmounts(BigDecimal totalAmount,
+                                                       int installmentsCount,
+                                                       List<BigDecimal> manualInstallmentAmounts) {
+        BigDecimal total = totalAmount.setScale(2, RoundingMode.HALF_UP);
+        if (manualInstallmentAmounts == null) {
+            BigDecimal regularAmount = total.divide(BigDecimal.valueOf(installmentsCount), 2, RoundingMode.HALF_UP);
+            BigDecimal accumulated = BigDecimal.ZERO;
+            List<BigDecimal> automaticAmounts = new ArrayList<>();
+            for (int i = 1; i <= installmentsCount; i++) {
+                BigDecimal amount = regularAmount;
+                if (i == installmentsCount) {
+                    amount = total.subtract(accumulated).setScale(2, RoundingMode.HALF_UP);
+                }
+                accumulated = accumulated.add(amount);
+                automaticAmounts.add(amount);
+            }
+            return automaticAmounts;
+        }
+
+        if (manualInstallmentAmounts.size() != installmentsCount) {
+            throw new InvalidSaleException("La cantidad de importes manuales debe coincidir con la cantidad de cuotas");
+        }
+
+        List<BigDecimal> normalizedAmounts = new ArrayList<>();
+        BigDecimal manualTotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        for (BigDecimal rawAmount : manualInstallmentAmounts) {
+            if (rawAmount == null) {
+                throw new InvalidSaleException("Debe completar todos los importes manuales de las cuotas");
+            }
+            BigDecimal amount = rawAmount.setScale(2, RoundingMode.HALF_UP);
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidSaleException("Los importes manuales de las cuotas deben ser mayores a cero");
+            }
+            normalizedAmounts.add(amount);
+            manualTotal = manualTotal.add(amount);
+        }
+
+        if (manualTotal.compareTo(total) != 0) {
+            throw new InvalidSaleException("La suma de las cuotas manuales debe coincidir con el total de la venta");
+        }
+        return normalizedAmounts;
     }
 
     private Integer resolvePrimaryDueDay(PaymentFrequency frequency, List<String> dueDays) {
