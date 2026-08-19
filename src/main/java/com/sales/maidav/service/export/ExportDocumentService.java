@@ -136,11 +136,17 @@ public class ExportDocumentService {
 
     private List<String> productHeaders(PriceListType type, CompanySettings settings) {
         List<String> headers = new ArrayList<>(List.of("Código", "Descripción", "Proveedor", "Stock"));
-        if (type == PriceListType.WHOLESALE) headers.add("Precio mayorista");
-        if (type == PriceListType.RETAIL) headers.add("Precio minorista");
+        if (type == PriceListType.WHOLESALE) {
+            headers.add("Precio mayorista efectivo");
+            headers.add("Precio mayorista transferencia");
+        }
+        if (type == PriceListType.RETAIL) {
+            headers.add("Precio minorista efectivo");
+            headers.add("Precio minorista transferencia");
+        }
         if (type == PriceListType.FINANCING) {
             headers.add("Efectivo");
-            headers.add("Débito");
+            headers.add("Débito/Transferencia");
             headers.add("Diaria (" + whole(settings.getCalcDias(), 144) + ")");
             headers.add("Semanal (" + whole(settings.getCalcSemanas(), 13) + ")");
             headers.add("Mensual (" + whole(settings.getCalcMesesCorto(), 4) + ")");
@@ -156,12 +162,18 @@ public class ExportDocumentService {
                 product.getProvider() == null ? "" : value(product.getProvider().getName(), ""),
                 String.valueOf(product.getStockAvailable() == null ? 0 : product.getStockAvailable())
         ));
-        if (type == PriceListType.WHOLESALE) row.add(money(product.getPriceWholesale()));
-        if (type == PriceListType.RETAIL) row.add(money(product.getPriceRetail()));
+        if (type == PriceListType.WHOLESALE) {
+            row.add(money(cashPrice(product, settings)));
+            row.add(money(product.getPriceWholesale()));
+        }
+        if (type == PriceListType.RETAIL) {
+            row.add(money(cashPrice(product, settings)));
+            row.add(money(product.getPriceRetail()));
+        }
         if (type == PriceListType.FINANCING) {
-            BigDecimal base = value(product.getCost()).multiply(BigDecimal.ONE.add(value(product.getVatRate()).movePointLeft(2)));
-            BigDecimal recargo = positive(settings.getCalcRecargo(), "1.26");
-            row.add(money(round50(base.multiply(positive(settings.getCalcMultContado(), "1.30")))));
+            BigDecimal base = baseWithVat(product);
+            BigDecimal recargo = financingSurcharge(settings);
+            row.add(money(cashPrice(base, settings)));
             row.add(money(round50(base.multiply(positive(settings.getCalcMultDebito(), "1.50")))));
             row.add(money(installment(base, settings.getCalcIntDia(), recargo, whole(settings.getCalcDias(), 144))));
             row.add(money(installment(base, settings.getCalcIntSem(), recargo, whole(settings.getCalcSemanas(), 13))));
@@ -169,6 +181,22 @@ public class ExportDocumentService {
             row.add(money(installment(base, settings.getCalcIntMesLargo(), recargo, whole(settings.getCalcMesesLargo(), 8))));
         }
         return row;
+    }
+
+    private BigDecimal cashPrice(Product product, CompanySettings settings) {
+        return cashPrice(baseWithVat(product), settings);
+    }
+
+    private BigDecimal cashPrice(BigDecimal base, CompanySettings settings) {
+        return round50(base.multiply(positive(settings.getCalcMultContado(), "1.30")));
+    }
+
+    private BigDecimal baseWithVat(Product product) {
+        return value(product.getCost()).multiply(BigDecimal.ONE.add(value(product.getVatRate()).movePointLeft(2)));
+    }
+
+    private BigDecimal financingSurcharge(CompanySettings settings) {
+        return positive(settings.getCalcRecargo(), "1.26");
     }
 
     private BigDecimal installment(BigDecimal base, BigDecimal interest, BigDecimal recargo, int count) {

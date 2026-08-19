@@ -34,6 +34,7 @@ class ExportDocumentServiceTest {
         product.setStockAvailable(18);
 
         CompanySettings settings = new CompanySettings();
+        settings.setCalcMultContado(new BigDecimal("1.70"));
         byte[] pdf = exportDocumentService.productPrices(List.of(product), ExportDocumentService.PriceListType.FINANCING,
                 ExportDocumentService.ExportFormat.PDF, settings);
         byte[] excel = exportDocumentService.productPrices(List.of(product), ExportDocumentService.PriceListType.WHOLESALE,
@@ -44,7 +45,51 @@ class ExportDocumentServiceTest {
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
             assertThat(workbook.getSheetAt(0).getRow(1).getCell(3).getStringCellValue()).isEqualTo("Stock");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue()).isEqualTo("Precio mayorista efectivo");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(5).getStringCellValue()).isEqualTo("Precio mayorista transferencia");
             assertThat(workbook.getSheetAt(0).getRow(2).getCell(3).getStringCellValue()).isEqualTo("18");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(4).getStringCellValue()).isEqualTo("$ 200.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(5).getStringCellValue()).isEqualTo("$ 150.00");
+        }
+    }
+
+    @Test
+    void includesRetailCashAndTransferPricesInExcelExport() throws Exception {
+        Product product = new Product();
+        product.setProductCode("P-003");
+        product.setDescription("Mesa auxiliar");
+        product.setCost(new BigDecimal("200.00"));
+        product.setVatRate(new BigDecimal("21.00"));
+        product.setPriceRetail(new BigDecimal("410.00"));
+
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcMultContado(new BigDecimal("1.30"));
+
+        byte[] excel = exportDocumentService.productPrices(List.of(product), ExportDocumentService.PriceListType.RETAIL,
+                ExportDocumentService.ExportFormat.EXCEL, settings);
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue()).isEqualTo("Precio minorista efectivo");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(5).getStringCellValue()).isEqualTo("Precio minorista transferencia");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(4).getStringCellValue()).isEqualTo("$ 300.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(5).getStringCellValue()).isEqualTo("$ 410.00");
+        }
+    }
+
+    @Test
+    void labelsFinancingDebitPriceAsTransferInExcelExport() throws Exception {
+        Product product = new Product();
+        product.setProductCode("P-004");
+        product.setDescription("Placard");
+        product.setCost(new BigDecimal("100.00"));
+        product.setVatRate(new BigDecimal("21.00"));
+
+        byte[] excel = exportDocumentService.productPrices(List.of(product), ExportDocumentService.PriceListType.FINANCING,
+                ExportDocumentService.ExportFormat.EXCEL, new CompanySettings());
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue()).isEqualTo("Efectivo");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(5).getStringCellValue()).isEqualTo("Débito/Transferencia");
         }
     }
 
