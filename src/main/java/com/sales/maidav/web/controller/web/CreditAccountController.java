@@ -789,6 +789,15 @@ public class CreditAccountController {
                                            BigDecimal remaining,
                                            LocalDate paymentDate,
                                            BigDecimal cashRecargo) {
+        if (installment.getCashAmount() != null
+                && installment.getCashAmount().compareTo(BigDecimal.ZERO) > 0
+                && CreditPaymentPricingSupport.usesCashValue(
+                account.getPaymentFrequency(),
+                installment.getDueDate(),
+                paymentDate
+        )) {
+            return prorateManualCashAmount(installment, remaining);
+        }
         return CreditPaymentPricingSupport.resolveCollectedAmountDue(
                 remaining,
                 cashRecargo,
@@ -801,11 +810,27 @@ public class CreditAccountController {
     private BigDecimal resolveFullCashAmount(CreditAccount account,
                                              CreditInstallment installment,
                                              BigDecimal cashRecargo) {
+        if (installment.getCashAmount() != null && installment.getCashAmount().compareTo(BigDecimal.ZERO) > 0) {
+            return installment.getCashAmount().setScale(2, RoundingMode.HALF_UP);
+        }
         return CreditPaymentPricingSupport.resolveInstallmentCashValue(
                 installment.getAmount(),
                 cashRecargo,
                 account.getPaymentFrequency()
         );
+    }
+
+    private BigDecimal prorateManualCashAmount(CreditInstallment installment, BigDecimal remaining) {
+        BigDecimal financedAmount = installment.getAmount() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : installment.getAmount().setScale(2, RoundingMode.HALF_UP);
+        if (financedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return installment.getCashAmount()
+                .setScale(2, RoundingMode.HALF_UP)
+                .multiply(remaining)
+                .divide(financedAmount, 2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal normalizeAmount(BigDecimal amount) {

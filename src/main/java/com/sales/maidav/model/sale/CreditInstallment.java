@@ -24,6 +24,9 @@ public class CreditInstallment extends BaseEntity {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "cash_amount", precision = 12, scale = 2)
+    private BigDecimal cashAmount;
+
     @Column(name = "paid_amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal paidAmount = BigDecimal.ZERO;
 
@@ -62,6 +65,9 @@ public class CreditInstallment extends BaseEntity {
 
     public BigDecimal getAmount() { return amount; }
     public void setAmount(BigDecimal amount) { this.amount = amount; }
+
+    public BigDecimal getCashAmount() { return cashAmount; }
+    public void setCashAmount(BigDecimal cashAmount) { this.cashAmount = cashAmount; }
 
     public BigDecimal getPaidAmount() { return paidAmount; }
     public void setPaidAmount(BigDecimal paidAmount) { this.paidAmount = paidAmount; }

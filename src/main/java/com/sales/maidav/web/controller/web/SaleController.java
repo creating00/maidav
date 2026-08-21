@@ -2,6 +2,8 @@ package com.sales.maidav.web.controller.web;
 
 import com.sales.maidav.model.client.Client;
 import com.sales.maidav.model.sale.CreditAccount;
+import com.sales.maidav.model.sale.CreditInstallment;
+import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import com.sales.maidav.model.sale.PaymentFrequency;
 import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
@@ -10,6 +12,7 @@ import com.sales.maidav.model.sale.SaleStatus;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
+import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.sale.SaleRepository;
 import com.sales.maidav.service.client.ClientService;
@@ -61,6 +64,7 @@ public class SaleController {
     private final SaleRepository saleRepository;
     private final SaleItemRepository saleItemRepository;
     private final CreditAccountRepository creditAccountRepository;
+    private final CreditInstallmentRepository creditInstallmentRepository;
     private final ExportDocumentService exportDocumentService;
 
     @GetMapping
@@ -197,8 +201,27 @@ public class SaleController {
                 ? sale.getDiscountAmount()
                 : BigDecimal.ZERO);
         model.addAttribute("formPaymentType", sale.getPaymentType());
+        model.addAttribute("formPaymentCollectionMethod", sale.getPaymentCollectionMethod());
         model.addAttribute("formSellerId", sale.getSeller() != null ? sale.getSeller().getId() : null);
         model.addAttribute("formClientId", sale.getClient() != null ? sale.getClient().getId() : null);
+        if (sale.getPaymentType() == PaymentType.CREDIT) {
+            creditAccountRepository.findBySale_Id(sale.getId()).ifPresent(account -> {
+                List<CreditInstallment> installments =
+                        creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId()).stream()
+                                .filter(installment -> !installment.isVoided())
+                                .toList();
+                model.addAttribute("formPaymentFrequency", account.getPaymentFrequency());
+                model.addAttribute("formWeeksCount", account.getWeeksCount());
+                model.addAttribute("editManualInstallmentAmounts",
+                        installments.stream()
+                                .map(installment -> amountText(installment.getAmount()))
+                                .toList());
+                model.addAttribute("editManualCashInstallmentAmounts",
+                        installments.stream()
+                                .map(installment -> amountText(installment.getCashAmount()))
+                                .toList());
+            });
+        }
 
         return "pages/sales/form";
     }
@@ -208,6 +231,7 @@ public class SaleController {
     public String update(@PathVariable Long id,
                          @RequestParam(required = false) Long clientId,
                          @RequestParam PaymentType paymentType,
+                         @RequestParam(required = false) PaymentCollectionMethod paymentCollectionMethod,
                          @RequestParam(required = false) LocalDate saleDate,
                          @RequestParam(required = false) LocalDate firstDueDate,
                          @RequestParam(required = false) PaymentFrequency paymentFrequency,
@@ -215,6 +239,7 @@ public class SaleController {
                          @RequestParam(required = false) Integer weeksCount,
                          @RequestParam(required = false, defaultValue = "false") boolean manualInstallmentsEnabled,
                          @RequestParam(required = false, name = "manualInstallmentAmounts") List<BigDecimal> manualInstallmentAmounts,
+                         @RequestParam(required = false, name = "manualCashInstallmentAmounts") List<BigDecimal> manualCashInstallmentAmounts,
                          @RequestParam(required = false) Long sellerId,
                          @RequestParam(name = "productIds") List<Long> productIds,
                          @RequestParam(name = "quantities") List<Integer> quantities,
@@ -240,9 +265,13 @@ public class SaleController {
             List<BigDecimal> effectiveManualInstallments = admin && manualInstallmentsEnabled
                     ? (manualInstallmentAmounts == null ? List.of() : manualInstallmentAmounts)
                     : null;
+            List<BigDecimal> effectiveManualCashInstallments = admin && manualInstallmentsEnabled
+                    ? (manualCashInstallmentAmounts == null ? null : manualCashInstallmentAmounts)
+                    : null;
 
-            Sale sale = saleService.updateSale(id, client, seller, paymentType, saleDate, firstDueDate,
-                    paymentFrequency, dueDays, effectiveDiscount, weeksCount, effectiveManualInstallments, items);
+            Sale sale = saleService.updateSale(id, client, seller, paymentType, paymentCollectionMethod, saleDate, firstDueDate,
+                    paymentFrequency, dueDays, effectiveDiscount, weeksCount, effectiveManualInstallments,
+                    effectiveManualCashInstallments, items);
             redirectAttributes.addFlashAttribute("saleNumber", sale.getSaleNumber());
             if (paymentType == PaymentType.CREDIT) {
                 CreditAccount account = creditAccountService.findBySaleId(sale.getId());
@@ -273,6 +302,7 @@ public class SaleController {
     @PreAuthorize("hasAuthority('SALES_CREATE')")
     public String create(@RequestParam(required = false) Long clientId,
                          @RequestParam PaymentType paymentType,
+                         @RequestParam(required = false) PaymentCollectionMethod paymentCollectionMethod,
                          @RequestParam(required = false) LocalDate saleDate,
                          @RequestParam(required = false) LocalDate firstDueDate,
                          @RequestParam(required = false) PaymentFrequency paymentFrequency,
@@ -280,6 +310,7 @@ public class SaleController {
                          @RequestParam(required = false) Integer weeksCount,
                          @RequestParam(required = false, defaultValue = "false") boolean manualInstallmentsEnabled,
                          @RequestParam(required = false, name = "manualInstallmentAmounts") List<BigDecimal> manualInstallmentAmounts,
+                         @RequestParam(required = false, name = "manualCashInstallmentAmounts") List<BigDecimal> manualCashInstallmentAmounts,
                          @RequestParam(required = false) Long sellerId,
                          @RequestParam(name = "productIds") List<Long> productIds,
                          @RequestParam(name = "quantities") List<Integer> quantities,
@@ -310,9 +341,12 @@ public class SaleController {
             List<BigDecimal> effectiveManualInstallments = admin && manualInstallmentsEnabled
                     ? (manualInstallmentAmounts == null ? List.of() : manualInstallmentAmounts)
                     : null;
+            List<BigDecimal> effectiveManualCashInstallments = admin && manualInstallmentsEnabled
+                    ? (manualCashInstallmentAmounts == null ? null : manualCashInstallmentAmounts)
+                    : null;
 
-            Sale sale = saleService.createSale(client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
-                    effectiveDiscount, weeksCount, effectiveManualInstallments, items);
+            Sale sale = saleService.createSale(client, seller, paymentType, paymentCollectionMethod, saleDate, firstDueDate, paymentFrequency, dueDays,
+                    effectiveDiscount, weeksCount, effectiveManualInstallments, effectiveManualCashInstallments, items);
             redirectAttributes.addFlashAttribute("saleNumber", sale.getSaleNumber());
             if (paymentType == PaymentType.CREDIT) {
                 CreditAccount account = creditAccountService.findBySaleId(sale.getId());
@@ -545,6 +579,10 @@ public class SaleController {
 
     private BigDecimal getDecimal(BigDecimal value, String fallback) {
         return value == null ? new BigDecimal(fallback) : value;
+    }
+
+    private String amountText(BigDecimal value) {
+        return value == null ? "" : value.toPlainString();
     }
 
     private Integer getInt(Integer value, int fallback) {

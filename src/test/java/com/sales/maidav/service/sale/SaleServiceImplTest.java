@@ -43,6 +43,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -451,7 +452,7 @@ class SaleServiceImplTest {
     }
 
     @Test
-    void createSaleRejectsManualInstallmentsWhenTotalDoesNotMatchSaleTotal() {
+    void createSaleUsesManualInstallmentsAsFinalCreditTotal() {
         Client client = new Client();
         client.setId(6L);
         User seller = new User();
@@ -470,8 +471,10 @@ class SaleServiceImplTest {
         });
         when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThatThrownBy(() -> saleService.createSale(
+        Sale sale = saleService.createSale(
                 client,
                 seller,
                 PaymentType.CREDIT,
@@ -483,8 +486,14 @@ class SaleServiceImplTest {
                 2,
                 List.of(new BigDecimal("1000.00"), new BigDecimal("1200.00")),
                 List.of(new SaleItemInput(8L, 1, new BigDecimal("2500.00")))
-        ))
-                .isInstanceOf(InvalidSaleException.class)
-                .hasMessage("La suma de las cuotas manuales debe coincidir con el total de la venta");
+        );
+
+        assertThat(sale.getTotalAmount()).isEqualByComparingTo("2200.00");
+        ArgumentCaptor<SaleItem> itemCaptor = ArgumentCaptor.forClass(SaleItem.class);
+        verify(saleItemRepository).save(itemCaptor.capture());
+        assertThat(itemCaptor.getValue().getUnitPrice()).isEqualByComparingTo("2200.00");
+        ArgumentCaptor<CreditAccount> accountCaptor = ArgumentCaptor.forClass(CreditAccount.class);
+        verify(creditAccountRepository, atLeastOnce()).save(accountCaptor.capture());
+        assertThat(accountCaptor.getValue().getTotalAmount()).isEqualByComparingTo("2200.00");
     }
 }
