@@ -26,6 +26,10 @@ public class Sale extends BaseEntity {
     private PaymentType paymentType;
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "payment_collection_method", length = 20)
+    private PaymentCollectionMethod paymentCollectionMethod;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private SaleStatus status = SaleStatus.ACTIVE;
 
@@ -54,6 +58,9 @@ public class Sale extends BaseEntity {
 
     public PaymentType getPaymentType() { return paymentType; }
     public void setPaymentType(PaymentType paymentType) { this.paymentType = paymentType; }
+
+    public PaymentCollectionMethod getPaymentCollectionMethod() { return paymentCollectionMethod; }
+    public void setPaymentCollectionMethod(PaymentCollectionMethod paymentCollectionMethod) { this.paymentCollectionMethod = paymentCollectionMethod; }
 
     public SaleStatus getStatus() { return status; }
     public void setStatus(SaleStatus status) { this.status = status; }

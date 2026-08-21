@@ -2,6 +2,7 @@ package com.sales.maidav.service.sale;
 
 import com.sales.maidav.model.client.Client;
 import com.sales.maidav.model.sale.PaymentFrequency;
+import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleSellerChange;
@@ -27,6 +28,19 @@ public interface SaleService {
     Sale createSale(Client client,
                     User seller,
                     PaymentType paymentType,
+                    PaymentCollectionMethod paymentCollectionMethod,
+                    LocalDate saleDate,
+                    LocalDate firstDueDate,
+                    PaymentFrequency paymentFrequency,
+                    List<String> dueDays,
+                    BigDecimal discountAmount,
+                    Integer weeksCount,
+                    List<BigDecimal> manualInstallmentAmounts,
+                    List<BigDecimal> manualCashInstallmentAmounts,
+                    List<SaleItemInput> items);
+    Sale createSale(Client client,
+                    User seller,
+                    PaymentType paymentType,
                     LocalDate saleDate,
                     LocalDate firstDueDate,
                     PaymentFrequency paymentFrequency,
@@ -45,6 +59,20 @@ public interface SaleService {
                     List<String> dueDays,
                     BigDecimal discountAmount,
                     Integer weeksCount,
+                    List<SaleItemInput> items);
+    Sale updateSale(Long saleId,
+                    Client client,
+                    User seller,
+                    PaymentType paymentType,
+                    PaymentCollectionMethod paymentCollectionMethod,
+                    LocalDate saleDate,
+                    LocalDate firstDueDate,
+                    PaymentFrequency paymentFrequency,
+                    List<String> dueDays,
+                    BigDecimal discountAmount,
+                    Integer weeksCount,
+                    List<BigDecimal> manualInstallmentAmounts,
+                    List<BigDecimal> manualCashInstallmentAmounts,
                     List<SaleItemInput> items);
     Sale updateSale(Long saleId,
                     Client client,

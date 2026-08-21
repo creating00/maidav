@@ -61,11 +61,7 @@ public class CollectionWorkbenchService {
         if (currentInstallment != null) {
             installmentNumber = currentInstallment.getInstallmentNumber();
             BigDecimal remaining = remainingAmount(currentInstallment.getAmount(), currentInstallment.getPaidAmount());
-            BigDecimal fullCashAmount = CreditPaymentPricingSupport.resolveInstallmentCashValue(
-                    currentInstallment.getAmount(),
-                    resolveCashRecargo(),
-                    account.getPaymentFrequency()
-            );
+            BigDecimal fullCashAmount = resolveFullCashAmount(account, currentInstallment);
             financedAmount = normalize(remaining);
             cashPricingAvailable = CreditPaymentPricingSupport.usesCashValue(
                     account.getPaymentFrequency(),
@@ -75,13 +71,7 @@ public class CollectionWorkbenchService {
             cashAmount = cashPricingAvailable
                     ? resolveCashAmount(account, currentInstallment, remaining)
                     : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            chargeAmount = CreditPaymentPricingSupport.resolveCollectedAmountDue(
-                    remaining,
-                    resolveCashRecargo(),
-                    account.getPaymentFrequency(),
-                    currentInstallment.getDueDate(),
-                    LocalDate.now()
-            );
+            chargeAmount = resolveCashAmount(account, currentInstallment, remaining);
             chargeModeLabel = cashPricingAvailable ? "Valor contado" : "Valor financiado";
             appliedCreditAmount = cashPricingAvailable
                     ? normalize(fullCashAmount.subtract(chargeAmount))
@@ -193,6 +183,15 @@ public class CollectionWorkbenchService {
     private BigDecimal resolveCashAmount(CreditAccount account,
                                          CreditInstallment installment,
                                          BigDecimal financedAmount) {
+        if (installment.getCashAmount() != null
+                && installment.getCashAmount().compareTo(BigDecimal.ZERO) > 0
+                && CreditPaymentPricingSupport.usesCashValue(
+                account.getPaymentFrequency(),
+                installment.getDueDate(),
+                LocalDate.now()
+        )) {
+            return prorateManualCashAmount(installment, financedAmount);
+        }
         return CreditPaymentPricingSupport.resolveCollectedAmountDue(
                 financedAmount,
                 resolveCashRecargo(),
@@ -200,6 +199,29 @@ public class CollectionWorkbenchService {
                 installment.getDueDate(),
                 LocalDate.now()
         );
+    }
+
+    private BigDecimal resolveFullCashAmount(CreditAccount account, CreditInstallment installment) {
+        if (installment.getCashAmount() != null && installment.getCashAmount().compareTo(BigDecimal.ZERO) > 0) {
+            return normalize(installment.getCashAmount());
+        }
+        return CreditPaymentPricingSupport.resolveInstallmentCashValue(
+                installment.getAmount(),
+                resolveCashRecargo(),
+                account.getPaymentFrequency()
+        );
+    }
+
+    private BigDecimal prorateManualCashAmount(CreditInstallment installment, BigDecimal financedAmount) {
+        BigDecimal fullFinancedAmount = installment.getAmount() == null
+                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
+                : installment.getAmount().setScale(2, RoundingMode.HALF_UP);
+        if (fullFinancedAmount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return normalize(installment.getCashAmount())
+                .multiply(financedAmount)
+                .divide(fullFinancedAmount, 2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal resolveCashRecargo() {

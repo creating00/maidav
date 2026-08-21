@@ -72,8 +72,8 @@ public class SaleServiceImpl implements SaleService {
                            BigDecimal discountAmount,
                            Integer weeksCount,
                            List<SaleItemInput> items) {
-        return createSale(client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
-                discountAmount, weeksCount, null, items);
+        return createSale(client, seller, paymentType, null, saleDate, firstDueDate, paymentFrequency, dueDays,
+                discountAmount, weeksCount, null, null, items);
     }
 
     @Override
@@ -87,6 +87,24 @@ public class SaleServiceImpl implements SaleService {
                            BigDecimal discountAmount,
                            Integer weeksCount,
                            List<BigDecimal> manualInstallmentAmounts,
+                           List<SaleItemInput> items) {
+        return createSale(client, seller, paymentType, null, saleDate, firstDueDate, paymentFrequency, dueDays,
+                discountAmount, weeksCount, manualInstallmentAmounts, null, items);
+    }
+
+    @Override
+    public Sale createSale(Client client,
+                           User seller,
+                           PaymentType paymentType,
+                           PaymentCollectionMethod paymentCollectionMethod,
+                           LocalDate saleDate,
+                           LocalDate firstDueDate,
+                           PaymentFrequency paymentFrequency,
+                           List<String> dueDays,
+                           BigDecimal discountAmount,
+                           Integer weeksCount,
+                           List<BigDecimal> manualInstallmentAmounts,
+                           List<BigDecimal> manualCashInstallmentAmounts,
                            List<SaleItemInput> items) {
 
         if (client == null) {
@@ -149,6 +167,11 @@ public class SaleServiceImpl implements SaleService {
             total = total.add(lineTotal);
         }
 
+        total = resolveManualSaleTotal(total, paymentType, manualInstallmentAmounts);
+        if (paymentType == PaymentType.CREDIT && manualInstallmentAmounts != null) {
+            applyTargetTotalToSaleItems(saleItems, total);
+        }
+
         total = total.subtract(discount);
         if (total.compareTo(BigDecimal.ZERO) < 0) {
             throw new InvalidSaleException("El total no puede ser negativo");
@@ -158,6 +181,7 @@ public class SaleServiceImpl implements SaleService {
         sale.setClient(client);
         sale.setSeller(seller);
         sale.setPaymentType(paymentType);
+        sale.setPaymentCollectionMethod(resolvePaymentCollectionMethod(paymentType, paymentCollectionMethod));
         sale.setStatus(SaleStatus.ACTIVE);
         sale.setDiscountAmount(discount.setScale(2, RoundingMode.HALF_UP));
         sale.setTotalAmount(total.setScale(2, RoundingMode.HALF_UP));
@@ -179,7 +203,8 @@ public class SaleServiceImpl implements SaleService {
         }
 
         if (paymentType == PaymentType.CREDIT) {
-            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount, manualInstallmentAmounts);
+            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount,
+                    manualInstallmentAmounts, manualCashInstallmentAmounts);
         }
 
         return sale;
@@ -197,8 +222,8 @@ public class SaleServiceImpl implements SaleService {
                            BigDecimal discountAmount,
                            Integer weeksCount,
                            List<SaleItemInput> items) {
-        return updateSale(saleId, client, seller, paymentType, saleDate, firstDueDate, paymentFrequency, dueDays,
-                discountAmount, weeksCount, null, items);
+        return updateSale(saleId, client, seller, paymentType, null, saleDate, firstDueDate, paymentFrequency, dueDays,
+                discountAmount, weeksCount, null, null, items);
     }
 
     @Override
@@ -213,6 +238,25 @@ public class SaleServiceImpl implements SaleService {
                            BigDecimal discountAmount,
                            Integer weeksCount,
                            List<BigDecimal> manualInstallmentAmounts,
+                           List<SaleItemInput> items) {
+        return updateSale(saleId, client, seller, paymentType, null, saleDate, firstDueDate, paymentFrequency, dueDays,
+                discountAmount, weeksCount, manualInstallmentAmounts, null, items);
+    }
+
+    @Override
+    public Sale updateSale(Long saleId,
+                           Client client,
+                           User seller,
+                           PaymentType paymentType,
+                           PaymentCollectionMethod paymentCollectionMethod,
+                           LocalDate saleDate,
+                           LocalDate firstDueDate,
+                           PaymentFrequency paymentFrequency,
+                           List<String> dueDays,
+                           BigDecimal discountAmount,
+                           Integer weeksCount,
+                           List<BigDecimal> manualInstallmentAmounts,
+                           List<BigDecimal> manualCashInstallmentAmounts,
                            List<SaleItemInput> items) {
 
         Sale sale = findById(saleId);
@@ -298,6 +342,11 @@ public class SaleServiceImpl implements SaleService {
             total = total.add(lineTotal);
         }
 
+        total = resolveManualSaleTotal(total, paymentType, manualInstallmentAmounts);
+        if (paymentType == PaymentType.CREDIT && manualInstallmentAmounts != null) {
+            applyTargetTotalToSaleItems(saleItems, total);
+        }
+
         total = total.subtract(discount);
         if (total.compareTo(BigDecimal.ZERO) < 0) {
             throw new InvalidSaleException("El total no puede ser negativo");
@@ -307,6 +356,7 @@ public class SaleServiceImpl implements SaleService {
         sale.setClient(client);
         sale.setSeller(seller);
         sale.setPaymentType(paymentType);
+        sale.setPaymentCollectionMethod(resolvePaymentCollectionMethod(paymentType, paymentCollectionMethod));
         sale.setDiscountAmount(discount.setScale(2, RoundingMode.HALF_UP));
         sale.setTotalAmount(total.setScale(2, RoundingMode.HALF_UP));
         sale.setSaleDate(saleDate == null ? LocalDateTime.now() : saleDate.atStartOfDay());
@@ -324,7 +374,8 @@ public class SaleServiceImpl implements SaleService {
 
         // Create credit account if needed
         if (paymentType == PaymentType.CREDIT) {
-            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount, manualInstallmentAmounts);
+            createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount,
+                    manualInstallmentAmounts, manualCashInstallmentAmounts);
         }
 
         return sale;
@@ -452,7 +503,8 @@ public class SaleServiceImpl implements SaleService {
                                        List<String> dueDays,
                                        LocalDate firstDueDate,
                                        Integer weeksCount,
-                                       List<BigDecimal> manualInstallmentAmounts) {
+                                       List<BigDecimal> manualInstallmentAmounts,
+                                       List<BigDecimal> manualCashInstallmentAmounts) {
         if (weeksCount == null || weeksCount < 1 || weeksCount > 365) {
             throw new InvalidSaleException("Cantidad de cuotas invalida (1-365)");
         }
@@ -464,6 +516,10 @@ public class SaleServiceImpl implements SaleService {
                 sale.getTotalAmount(),
                 weeksCount,
                 manualInstallmentAmounts
+        );
+        List<BigDecimal> cashInstallmentAmounts = resolveManualCashInstallmentAmounts(
+                weeksCount,
+                manualCashInstallmentAmounts
         );
 
         CreditAccount account = new CreditAccount();
@@ -496,10 +552,93 @@ public class SaleServiceImpl implements SaleService {
             installment.setInstallmentNumber(i);
             installment.setDueDate(schedule.get(i - 1));
             installment.setAmount(amount);
+            if (cashInstallmentAmounts != null) {
+                installment.setCashAmount(cashInstallmentAmounts.get(i - 1));
+            }
             installment.setPaidAmount(BigDecimal.ZERO);
             installment.setStatus(InstallmentStatus.PENDING);
             creditInstallmentRepository.save(installment);
         }
+    }
+
+    private PaymentCollectionMethod resolvePaymentCollectionMethod(PaymentType paymentType,
+                                                                   PaymentCollectionMethod paymentCollectionMethod) {
+        if (paymentType == PaymentType.CREDIT) {
+            return null;
+        }
+        return paymentCollectionMethod == null ? PaymentCollectionMethod.BANK : paymentCollectionMethod;
+    }
+
+    private BigDecimal resolveManualSaleTotal(BigDecimal currentTotal,
+                                              PaymentType paymentType,
+                                              List<BigDecimal> manualInstallmentAmounts) {
+        if (paymentType != PaymentType.CREDIT || manualInstallmentAmounts == null) {
+            return currentTotal;
+        }
+        BigDecimal manualTotal = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        for (BigDecimal rawAmount : manualInstallmentAmounts) {
+            if (rawAmount == null) {
+                throw new InvalidSaleException("Debe completar todos los importes manuales de las cuotas");
+            }
+            BigDecimal amount = rawAmount.setScale(2, RoundingMode.HALF_UP);
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidSaleException("Los importes manuales de las cuotas deben ser mayores a cero");
+            }
+            manualTotal = manualTotal.add(amount);
+        }
+        return manualTotal.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void applyTargetTotalToSaleItems(List<SaleItem> saleItems, BigDecimal targetTotal) {
+        if (saleItems == null || saleItems.isEmpty()) {
+            return;
+        }
+        BigDecimal originalTotal = saleItems.stream()
+                .map(SaleItem::getLineTotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .setScale(2, RoundingMode.HALF_UP);
+        if (originalTotal.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal accumulated = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        for (int i = 0; i < saleItems.size(); i++) {
+            SaleItem item = saleItems.get(i);
+            BigDecimal lineTotal;
+            if (i == saleItems.size() - 1) {
+                lineTotal = targetTotal.subtract(accumulated).setScale(2, RoundingMode.HALF_UP);
+            } else {
+                lineTotal = targetTotal
+                        .multiply(item.getLineTotal())
+                        .divide(originalTotal, 2, RoundingMode.HALF_UP);
+                accumulated = accumulated.add(lineTotal).setScale(2, RoundingMode.HALF_UP);
+            }
+            BigDecimal unitPrice = lineTotal
+                    .divide(BigDecimal.valueOf(item.getQuantity()), 2, RoundingMode.HALF_UP);
+            item.setUnitPrice(unitPrice);
+            item.setLineTotal(lineTotal);
+        }
+    }
+
+    private List<BigDecimal> resolveManualCashInstallmentAmounts(int installmentsCount,
+                                                                 List<BigDecimal> manualCashInstallmentAmounts) {
+        if (manualCashInstallmentAmounts == null) {
+            return null;
+        }
+        if (manualCashInstallmentAmounts.size() != installmentsCount) {
+            throw new InvalidSaleException("La cantidad de importes efectivo debe coincidir con la cantidad de cuotas");
+        }
+        List<BigDecimal> normalizedAmounts = new ArrayList<>();
+        for (BigDecimal rawAmount : manualCashInstallmentAmounts) {
+            if (rawAmount == null) {
+                throw new InvalidSaleException("Debe completar todos los importes efectivo de las cuotas");
+            }
+            BigDecimal amount = rawAmount.setScale(2, RoundingMode.HALF_UP);
+            if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new InvalidSaleException("Los importes efectivo de las cuotas deben ser mayores a cero");
+            }
+            normalizedAmounts.add(amount);
+        }
+        return normalizedAmounts;
     }
 
     private List<BigDecimal> resolveInstallmentAmounts(BigDecimal totalAmount,
@@ -539,9 +678,6 @@ public class SaleServiceImpl implements SaleService {
             manualTotal = manualTotal.add(amount);
         }
 
-        if (manualTotal.compareTo(total) != 0) {
-            throw new InvalidSaleException("La suma de las cuotas manuales debe coincidir con el total de la venta");
-        }
         return normalizedAmounts;
     }
 

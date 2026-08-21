@@ -36,6 +36,11 @@
                       data-meses-largo=${calculatorConfig.mesesLargo},
                       data-int-mes-largo=${calculatorConfig.intMesLargo}"
              class="hidden"></div>
+        <div id="editManualInstallmentsData"
+             th:if="${isEditing and editManualInstallmentAmounts != null}"
+             th:attr="data-amounts=${#strings.listJoin(editManualInstallmentAmounts, ',')},
+                      data-cash-amounts=${#strings.listJoin(editManualCashInstallmentAmounts, ',')}"
+             class="hidden"></div>
 
         <div class="sale-form-grid grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
@@ -87,6 +92,15 @@
                         class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
                     <option value="CASH" th:selected="${isEditing and sale != null and sale.paymentType?.name() == 'CASH'}">Contado</option>
                     <option value="CREDIT" th:selected="${isEditing and sale != null and sale.paymentType?.name() == 'CREDIT'}">Credito</option>
+                </select>
+            </div>
+
+            <div id="paymentCollectionMethodField">
+                <label class="block text-sm font-semibold mb-1">Metodo contado</label>
+                <select name="paymentCollectionMethod" id="paymentCollectionMethod"
+                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="CASH" th:selected="${isEditing and sale != null and sale.paymentCollectionMethod != null and sale.paymentCollectionMethod.name() == 'CASH'}">Efectivo</option>
+                    <option value="BANK" th:selected="${!isEditing or sale == null or sale.paymentCollectionMethod == null or sale.paymentCollectionMethod.name() == 'BANK'}">Debito / Transferencia</option>
                 </select>
             </div>
 
@@ -144,8 +158,10 @@
                        class="w-full border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
             </div>
 
-            <input type="hidden" name="paymentFrequency" id="paymentFrequency"/>
-            <input type="hidden" name="weeksCount" value="4"/>
+            <input type="hidden" name="paymentFrequency" id="paymentFrequency"
+                   th:value="${formPaymentFrequency != null ? formPaymentFrequency.name() : ''}"/>
+            <input type="hidden" name="weeksCount"
+                   th:value="${formWeeksCount != null ? formWeeksCount : 4}"/>
 
             <div th:if="${isAdmin}">
                 <!-- SOLO ADMIN DESCUENTO -->
@@ -274,7 +290,7 @@
                     <div id="manualInstallmentsEditor" class="mt-4 hidden">
                         <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                             <div class="text-sm text-slate-600">
-                                La suma debe coincidir con el total de la venta.
+                                La suma financiada define el total final de la venta.
                             </div>
                             <button type="button"
                                     id="regenerateManualInstallmentsBtn"
@@ -288,7 +304,8 @@
                                 <tr>
                                     <th class="px-3 py-2">Cuota</th>
                                     <th class="px-3 py-2">Vencimiento estimado</th>
-                                    <th class="px-3 py-2">Importe</th>
+                                    <th class="px-3 py-2">Importe financiado</th>
+                                    <th class="px-3 py-2">Importe efectivo</th>
                                 </tr>
                                 </thead>
                                 <tbody id="manualInstallmentsBody"></tbody>
@@ -296,7 +313,7 @@
                         </div>
                         <div id="manualInstallmentsSummary"
                              class="mt-3 rounded border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
-                            Total manual: $0 | Diferencia: $0
+                            Total financiado: $0 | Total efectivo: $0
                         </div>
                     </div>
                 </div>
@@ -700,6 +717,8 @@
             const quickClientLastName = document.getElementById('quickClientLastName');
             const priceMode = document.getElementById('priceMode');
             const paymentType = document.getElementById('paymentType');
+            const paymentCollectionMethod = document.getElementById('paymentCollectionMethod');
+            const paymentCollectionMethodField = document.getElementById('paymentCollectionMethodField');
             const paymentFrequency = document.getElementById('paymentFrequency');
             const creditFields = document.querySelectorAll('.credit-field');
             const planSelectionHelp = document.getElementById('planSelectionHelp');
@@ -711,6 +730,7 @@
             const formErrorBox = document.getElementById('formErrorBox');
             const draftKey = 'sales-form-draft-v1';
             const draftStateInput = document.getElementById('draftStateInput');
+            const editManualInstallmentsData = document.getElementById('editManualInstallmentsData');
             const firstRowTemplate = body.querySelector('tr') ? body.querySelector('tr').cloneNode(true) : null;
             const calcConfigEl = document.getElementById('calcConfig');
             const applyCashBtn = document.getElementById('applyCashBtn');
@@ -747,6 +767,7 @@
             let productActionToastTimer = null;
             let appliedPricingPreset = null;
             let appliedPricingInternalUpdate = false;
+            let manualInstallmentSyncing = false;
             let confirmedSubmit = false;
             let pendingProductOption = null;
             let pendingProductSource = 'manual';
@@ -2007,6 +2028,16 @@
                 return getManualInstallmentInputs().map(input => input.value || '');
             }
 
+            function getManualCashInstallmentInputs() {
+                return manualInstallmentsBody
+                    ? Array.from(manualInstallmentsBody.querySelectorAll('input[name="manualCashInstallmentAmounts"]'))
+                    : [];
+            }
+
+            function getManualCashInstallmentValues() {
+                return getManualCashInstallmentInputs().map(input => input.value || '');
+            }
+
             function nextManualDueDate(baseDate, frequency, index) {
                 const date = new Date(baseDate);
                 if (index <= 0) {
@@ -2047,7 +2078,12 @@
                 const totalAmountEl = document.getElementById('totalAmount');
                 const total = totalAmountEl ? parseNumber(totalAmountEl.textContent) : 0;
                 const existingValues = Array.isArray(opts.values) ? opts.values : [];
-                const regularAmount = count > 0 ? Number((total / count).toFixed(2)) : 0;
+                const existingCashValues = Array.isArray(opts.cashValues) ? opts.cashValues : [];
+                const plan = appliedPricingPreset && appliedPricingPreset.kind === 'PLAN'
+                    ? calculatePlans(getBaseCartTotal()).plans[appliedPricingPreset.planKey]
+                    : null;
+                const regularAmount = plan ? plan.fee : (count > 0 ? Number((total / count).toFixed(2)) : 0);
+                const regularCashAmount = plan ? plan.cashFee : regularAmount;
                 let accumulated = 0;
                 const firstDue = toDateOnly(firstDueDateInput ? firstDueDateInput.value : '');
                 const frequency = paymentFrequency ? paymentFrequency.value : '';
@@ -2055,11 +2091,12 @@
                 for (let i = 0; i < count; i++) {
                     let amount = existingValues[i];
                     if (amount === undefined || amount === null || amount === '') {
-                        amount = i === count - 1
-                            ? Number((total - accumulated).toFixed(2))
-                            : regularAmount;
+                        amount = regularAmount;
                     }
                     const numericAmount = parseNumber(amount);
+                    const cashAmount = existingCashValues[i] !== undefined && existingCashValues[i] !== null && existingCashValues[i] !== ''
+                        ? parseNumber(existingCashValues[i])
+                        : regularCashAmount;
                     accumulated += numericAmount;
                     const tr = document.createElement('tr');
                     tr.className = 'border-t bg-white';
@@ -2070,36 +2107,60 @@
                         '<input type="number" step="0.01" min="0.01" name="manualInstallmentAmounts" ' +
                         'class="manual-installment-amount w-full rounded border border-slate-300 px-3 py-2" ' +
                         'value="' + Number(numericAmount).toFixed(2) + '"/>' +
+                        '</td>' +
+                        '<td class="px-3 py-2">' +
+                        '<input type="number" step="0.01" min="0.01" name="manualCashInstallmentAmounts" ' +
+                        'class="manual-cash-installment-amount w-full rounded border border-slate-300 px-3 py-2" ' +
+                        'value="' + Number(cashAmount > 0 ? cashAmount : numericAmount).toFixed(2) + '"/>' +
                         '</td>';
                     manualInstallmentsBody.appendChild(tr);
                 }
 
-                getManualInstallmentInputs().forEach(input => {
+                getManualInstallmentInputs().concat(getManualCashInstallmentInputs()).forEach(input => {
                     input.disabled = !isManualInstallmentsEnabled();
                     input.addEventListener('input', function () {
+                        syncCartTotalFromManualInstallments();
                         updateManualInstallmentsSummary();
                         saveDraft();
                     });
                 });
+                syncCartTotalFromManualInstallments();
                 updateManualInstallmentsSummary();
+            }
+
+            function syncCartTotalFromManualInstallments() {
+                if (!isManualInstallmentsEnabled() || manualInstallmentSyncing) {
+                    return;
+                }
+                const manualTotal = getManualInstallmentInputs()
+                    .reduce((sum, input) => sum + parseNumber(input.value), 0);
+                if (manualTotal <= 0) {
+                    return;
+                }
+                manualInstallmentSyncing = true;
+                try {
+                    applyTargetTotal(manualTotal);
+                    updateTotals({skipAppliedPricingSync: true});
+                } finally {
+                    manualInstallmentSyncing = false;
+                }
             }
 
             function updateManualInstallmentsSummary() {
                 if (!manualInstallmentsSummary) {
                     return;
                 }
-                const totalAmountEl = document.getElementById('totalAmount');
-                const saleTotal = totalAmountEl ? parseNumber(totalAmountEl.textContent) : 0;
                 const manualTotal = getManualInstallmentInputs()
                     .reduce((sum, input) => sum + parseNumber(input.value), 0);
-                const difference = Number((saleTotal - manualTotal).toFixed(2));
-                manualInstallmentsSummary.textContent = 'Total manual: ' + money(manualTotal) + ' | Diferencia: ' + money(difference);
-                manualInstallmentsSummary.classList.toggle('border-red-200', isManualInstallmentsEnabled() && Math.abs(difference) >= 0.01);
-                manualInstallmentsSummary.classList.toggle('bg-red-50', isManualInstallmentsEnabled() && Math.abs(difference) >= 0.01);
-                manualInstallmentsSummary.classList.toggle('text-red-700', isManualInstallmentsEnabled() && Math.abs(difference) >= 0.01);
-                manualInstallmentsSummary.classList.toggle('border-emerald-200', isManualInstallmentsEnabled() && Math.abs(difference) < 0.01);
-                manualInstallmentsSummary.classList.toggle('bg-emerald-50', isManualInstallmentsEnabled() && Math.abs(difference) < 0.01);
-                manualInstallmentsSummary.classList.toggle('text-emerald-700', isManualInstallmentsEnabled() && Math.abs(difference) < 0.01);
+                const manualCashTotal = getManualCashInstallmentInputs()
+                    .reduce((sum, input) => sum + parseNumber(input.value), 0);
+                manualInstallmentsSummary.textContent = 'Total financiado: ' + money(manualTotal) + ' | Total efectivo: ' + money(manualCashTotal);
+                manualInstallmentsSummary.classList.toggle('border-red-200', false);
+                manualInstallmentsSummary.classList.toggle('bg-red-50', false);
+                manualInstallmentsSummary.classList.toggle('text-red-700', false);
+                manualInstallmentsSummary.classList.toggle('border-emerald-200', isManualInstallmentsEnabled());
+                manualInstallmentsSummary.classList.toggle('bg-emerald-50', isManualInstallmentsEnabled());
+                manualInstallmentsSummary.classList.toggle('text-emerald-700', isManualInstallmentsEnabled());
             }
 
             function syncManualInstallmentsEditor(options) {
@@ -2108,7 +2169,7 @@
                 }
                 const enabled = isManualInstallmentsEnabled();
                 manualInstallmentsEditor.classList.toggle('hidden', !enabled);
-                getManualInstallmentInputs().forEach(input => {
+                getManualInstallmentInputs().concat(getManualCashInstallmentInputs()).forEach(input => {
                     input.disabled = !enabled;
                 });
                 if (enabled && (options && options.rebuild || getManualInstallmentInputs().length === 0)) {
@@ -2751,6 +2812,9 @@
                     if (paymentType) {
                         paymentType.value = 'CASH';
                     }
+                    if (paymentCollectionMethod) {
+                        paymentCollectionMethod.value = 'CASH';
+                    }
                     if (paymentFrequency) {
                         paymentFrequency.value = '';
                     }
@@ -2777,6 +2841,9 @@
                     }
                     if (paymentType) {
                         paymentType.value = 'CASH';
+                    }
+                    if (paymentCollectionMethod) {
+                        paymentCollectionMethod.value = 'BANK';
                     }
                     if (paymentFrequency) {
                         paymentFrequency.value = '';
@@ -2816,6 +2883,9 @@
 
             function toggleCreditFields() {
                 const isCredit = paymentType && paymentType.value === 'CREDIT';
+                if (paymentCollectionMethodField) {
+                    paymentCollectionMethodField.classList.toggle('hidden', isCredit);
+                }
                 creditFields.forEach(field => {
                     field.classList.toggle('hidden', !isCredit);
                 });
@@ -3119,14 +3189,15 @@
                     if (manualInputs.length !== installments) {
                         return 'Debe regenerar las cuotas manuales para que coincidan con el plan activo';
                     }
-                    const manualTotal = manualInputs.reduce((sum, input) => sum + parseNumber(input.value), 0);
-                    const totalAmountEl = document.getElementById('totalAmount');
-                    const saleTotal = totalAmountEl ? parseNumber(totalAmountEl.textContent) : 0;
+                    const manualCashInputs = getManualCashInstallmentInputs();
                     if (manualInputs.some(input => parseNumber(input.value) <= 0)) {
                         return 'Todos los importes manuales de cuotas deben ser mayores a cero';
                     }
-                    if (Math.abs(saleTotal - manualTotal) >= 0.01) {
-                        return 'La suma de cuotas manuales debe coincidir con el total de la venta';
+                    if (manualCashInputs.length && manualCashInputs.length !== installments) {
+                        return 'Debe regenerar las cuotas efectivo para que coincidan con el plan activo';
+                    }
+                    if (manualCashInputs.some(input => input.value && parseNumber(input.value) <= 0)) {
+                        return 'Los importes efectivo deben ser mayores a cero';
                     }
                 }
 
@@ -3292,6 +3363,7 @@
                     quickClientPhone: getFieldValue('input[name="quickClientPhone"]'),
                     quickClientAddress: getFieldValue('input[name="quickClientAddress"]'),
                     paymentType: getFieldValue('select[name="paymentType"]'),
+                    paymentCollectionMethod: getFieldValue('select[name="paymentCollectionMethod"]'),
                     priceMode: getFieldValue('#priceMode'),
                     saleDate: getFieldValue('input[name="saleDate"]'),
                     firstDueDate: getFieldValue('input[name="firstDueDate"]'),
@@ -3300,6 +3372,7 @@
                     weeksCount: getFieldValue('input[name="weeksCount"]'),
                     manualInstallmentsEnabled: isManualInstallmentsEnabled(),
                     manualInstallmentAmounts: getManualInstallmentValues(),
+                    manualCashInstallmentAmounts: getManualCashInstallmentValues(),
                     appliedPricingPreset,
                     rows
                 };
@@ -3336,6 +3409,7 @@
                 setFieldValue('input[name="quickClientPhone"]', draft.quickClientPhone);
                 setFieldValue('input[name="quickClientAddress"]', draft.quickClientAddress);
                 setFieldValue('select[name="paymentType"]', draft.paymentType);
+                setFieldValue('select[name="paymentCollectionMethod"]', draft.paymentCollectionMethod);
                 setFieldValue('#priceMode', draft.priceMode);
                 setFieldValue('input[name="saleDate"]', draft.saleDate);
                 setFieldValue('input[name="firstDueDate"]', draft.firstDueDate);
@@ -3380,10 +3454,18 @@
                 toggleFrequencyOptions();
                 syncManualInstallmentsEditor({
                     rebuild: Boolean(draft.manualInstallmentsEnabled),
-                    values: Array.isArray(draft.manualInstallmentAmounts) ? draft.manualInstallmentAmounts : []
+                    values: Array.isArray(draft.manualInstallmentAmounts) ? draft.manualInstallmentAmounts : [],
+                    cashValues: Array.isArray(draft.manualCashInstallmentAmounts) ? draft.manualCashInstallmentAmounts : []
                 });
                 updateTotals();
                 saveDraft();
+            }
+
+            function parseCsvAmounts(value) {
+                if (!value) {
+                    return [];
+                }
+                return value.split(',').map(item => item.trim());
             }
 
             if (hasSuccessMessage) {
@@ -3394,6 +3476,17 @@
                 restoreDraft(serverDraft);
             } else if (hasFormError && localStorage.getItem(draftKey)) {
                 restoreDraft(localStorage.getItem(draftKey));
+            } else if (editManualInstallmentsData && manualInstallmentsEnabled) {
+                manualInstallmentsEnabled.checked = true;
+                toggleCreditFields();
+                toggleFrequencyOptions();
+                syncManualInstallmentsEditor({
+                    rebuild: true,
+                    values: parseCsvAmounts(editManualInstallmentsData.dataset.amounts),
+                    cashValues: parseCsvAmounts(editManualInstallmentsData.dataset.cashAmounts)
+                });
+                updateTotals();
+                saveDraft();
             } else if (!hasSuccessMessage && localStorage.getItem(draftKey)) {
                 restoreDraft(localStorage.getItem(draftKey));
             }
