@@ -198,6 +198,50 @@ class CreditAccountServiceImplTest {
     }
 
     @Test
+    void cashPaymentAcrossSelectedManualCashInstallmentsUsesEachManualValue() {
+        CreditAccount account = account(25L, PaymentFrequency.WEEKLY, "60000.00");
+        CreditInstallment overdueInstallment = installment(account, 251L, 1, "15000.00", LocalDate.now().minusDays(1));
+        CreditInstallment secondInstallment = installment(account, 252L, 2, "15000.00", LocalDate.now());
+        CreditInstallment thirdInstallment = installment(account, 253L, 3, "15000.00", LocalDate.now().plusWeeks(1));
+        CreditInstallment fourthInstallment = installment(account, 254L, 4, "15000.00", LocalDate.now().plusWeeks(2));
+        secondInstallment.setCashAmount(new BigDecimal("100.00"));
+        thirdInstallment.setCashAmount(new BigDecimal("100.00"));
+        fourthInstallment.setCashAmount(new BigDecimal("100.00"));
+        List<CreditInstallment> installments = List.of(
+                overdueInstallment,
+                secondInstallment,
+                thirdInstallment,
+                fourthInstallment
+        );
+
+        mockAccount(account, installments, new BigDecimal("1.20"));
+
+        CreditPayment payment = service.registerPayment(
+                25L,
+                new BigDecimal("300.00"),
+                List.of(252L, 253L, 254L),
+                "tester",
+                PaymentCollectionMethod.CASH,
+                null
+        );
+
+        assertThat(overdueInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
+        assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("15000.00");
+        assertThat(thirdInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(thirdInstallment.getPaidAmount()).isEqualByComparingTo("15000.00");
+        assertThat(fourthInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(fourthInstallment.getPaidAmount()).isEqualByComparingTo("15000.00");
+        assertThat(account.getBalance()).isEqualByComparingTo("15000.00");
+        assertThat(payment.getAmount()).isEqualByComparingTo("300.00");
+        assertThat(payment.getImpactAmount()).isEqualByComparingTo("45000.00");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #2: se aplican $ 100,00 y queda saldada");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #3: se aplican $ 100,00 y queda saldada");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #4: se aplican $ 100,00 y queda saldada");
+        assertThat(payment.getAllocationSummary()).doesNotContain("saldo a favor");
+    }
+
+    @Test
     void dailyPlanNeverUsesCashValue() {
         CreditAccount account = account(3L, PaymentFrequency.DAILY, "1200.00");
         CreditInstallment installment = installment(account, 31L, 1, "1200.00", LocalDate.now().plusDays(1));

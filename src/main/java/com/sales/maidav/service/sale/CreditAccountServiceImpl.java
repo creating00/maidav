@@ -392,7 +392,8 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             }
             // SALDO A FAVOR
             // APLICAR SALDO A FAVOR A PROXIMA CUOTA
-            boolean carriedForward = appliedCurrentPayment;
+            boolean manualCashPricing = usesManualCashAmount(account, installment, paymentMethod, paidAt);
+            boolean carriedForward = appliedCurrentPayment && !manualCashPricing;
             BigDecimal collectedNeeded = carriedForward
                     ? financedRemaining
                     : resolveCollectedAmountDue(account, installment, financedRemaining, cashRecargo, paymentMethod, paidAt);
