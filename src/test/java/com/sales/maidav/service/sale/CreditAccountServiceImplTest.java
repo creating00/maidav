@@ -276,7 +276,7 @@ class CreditAccountServiceImplTest {
         settings.setCalcRecargo(new BigDecimal("1.20"));
 
         AtomicLong nextPaymentId = new AtomicLong(1L);
-        when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
+        lenient().when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
         when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId())).thenReturn(installments);
         when(creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(account.getId())).thenAnswer(invocation -> payments.stream()
                 .sorted(Comparator.comparing(CreditPayment::getPaidAt)
@@ -406,6 +406,61 @@ class CreditAccountServiceImplTest {
         assertThat(restoredSecondInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
         assertThat(restoredSecondInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
         assertThat(account.getBalance()).isEqualByComparingTo("100.00");
+        assertThat(payments).filteredOn(CreditPayment::isReversal).hasSize(1);
+    }
+
+    @Test
+    void voidingLegacyManualCashPaymentUsesAllocationSummarySelectedInstallments() {
+        CreditAccount account = account(27L, PaymentFrequency.MONTHLY, "40000.00");
+        account.setAccountNumber("C-000027");
+        account.setBalance(new BigDecimal("10000.00"));
+        CreditInstallment firstInstallment = installment(account, 792L, 1, "10000.00", LocalDate.now().minusDays(7));
+        CreditInstallment secondInstallment = installment(account, 793L, 2, "10000.00", LocalDate.now().plusDays(24));
+        CreditInstallment thirdInstallment = installment(account, 794L, 3, "10000.00", LocalDate.now().plusDays(55));
+        CreditInstallment fourthInstallment = installment(account, 795L, 4, "10000.00", LocalDate.now().plusDays(85));
+        List.of(firstInstallment, secondInstallment, thirdInstallment, fourthInstallment)
+                .forEach(installment -> installment.setCashAmount(new BigDecimal("2000.00")));
+        List.of(secondInstallment, thirdInstallment, fourthInstallment).forEach(installment -> {
+            installment.setPaidAmount(new BigDecimal("10000.00"));
+            installment.setStatus(InstallmentStatus.PAID);
+            installment.setPaidAt(LocalDate.now());
+        });
+        List<CreditInstallment> installments = new ArrayList<>(List.of(
+                firstInstallment,
+                secondInstallment,
+                thirdInstallment,
+                fourthInstallment
+        ));
+        CreditPayment legacyPayment = payment(
+                account,
+                335L,
+                "6000.00",
+                "30000.00",
+                LocalDate.now(),
+                PaymentCollectionMethod.CASH
+        );
+        legacyPayment.setAllocationSummary(
+                "Cuota #2: se aplican $ 2.000,00 y queda saldada (valor contado) | "
+                        + "Cuota #3: se aplican $ 2.000,00 y queda saldada (valor contado) | "
+                        + "Cuota #4: se aplican $ 2.000,00 y queda saldada (valor contado)"
+        );
+        List<CreditPayment> payments = new ArrayList<>(List.of(legacyPayment));
+
+        mockStatefulAccount(account, installments, payments, new BigDecimal("1.20"));
+
+        service.voidInstallment(27L, 793L, "admin", "anulacion cuota 2");
+
+        CreditInstallment restoredSecondInstallment = installments.stream()
+                .filter(installment -> Long.valueOf(793L).equals(installment.getRestoredFromInstallmentId()))
+                .filter(installment -> !installment.isVoided())
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(restoredSecondInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
+        assertThat(restoredSecondInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
+        assertThat(firstInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
+        assertThat(thirdInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(fourthInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
         assertThat(payments).filteredOn(CreditPayment::isReversal).hasSize(1);
     }
 
@@ -666,7 +721,7 @@ class CreditAccountServiceImplTest {
         settings.setMoraNoticeDays(2);
         settings.setMoraNoticeTiming(MoraNotificationTiming.BEFORE_DUE_DATE);
 
-        when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
+        lenient().when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
         when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId())).thenReturn(installments);
         when(companySettingsService.getSettings()).thenReturn(settings);
         lenient().when(creditPaymentRepository.save(any(CreditPayment.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -689,9 +744,15 @@ class CreditAccountServiceImplTest {
                         .max(Long::compareTo)
                         .orElse(0L) + 1
         );
-        AtomicLong nextPaymentId = new AtomicLong(1L);
+        AtomicLong nextPaymentId = new AtomicLong(
+                payments.stream()
+                        .map(CreditPayment::getId)
+                        .filter(id -> id != null)
+                        .max(Long::compareTo)
+                        .orElse(0L) + 1
+        );
 
-        when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
+        lenient().when(creditAccountRepository.findById(account.getId())).thenReturn(Optional.of(account));
         when(creditInstallmentRepository.findById(any(Long.class))).thenAnswer(invocation -> installments.stream()
                 .filter(installment -> invocation.getArgument(0).equals(installment.getId()))
                 .findFirst());

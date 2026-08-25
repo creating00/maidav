@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -43,6 +45,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     private static final int ALLOCATION_SUMMARY_MAX_LENGTH = 255;
     private static final DateTimeFormatter MORA_DATE_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final Pattern ALLOCATION_INSTALLMENT_PATTERN = Pattern.compile("Cuota\\s+#(\\d+)");
 
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
@@ -135,6 +138,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         payment.setPaidAt(LocalDate.now());
         payment.setRegisteredBy(trimToNull(registeredBy));
         payment.setOperationToken(normalizedOperationToken);
+        payment.setInstallmentIds(serializeInstallmentIds(installmentIds));
         PaymentCollectionMethod resolvedMethod = paymentMethod == null ? PaymentCollectionMethod.BANK : paymentMethod;
         payment.setPaymentMethod(resolvedMethod);
 
@@ -812,7 +816,10 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             }
             PaymentApplicationResult result = applyPaymentToInstallments(
                     account,
-                    replayEligibleInstallments(replayInstallments, disabledInstallmentIds),
+                    resolveReplayPaymentInstallments(
+                            replayEligibleInstallments(replayInstallments, disabledInstallmentIds),
+                            payment
+                    ),
                     payment.getAmount(),
                     payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod(),
                     payment.getPaidAt(),
@@ -1022,6 +1029,92 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         return installmentAllocations.stream()
                 .filter(allocation -> allocation.installmentId() != null)
                 .toList();
+    }
+
+    private List<CreditInstallment> resolveReplayPaymentInstallments(List<CreditInstallment> eligibleInstallments,
+                                                                     CreditPayment payment) {
+        List<Long> selectedInstallmentIds = parseInstallmentIds(payment.getInstallmentIds());
+        if (!selectedInstallmentIds.isEmpty()) {
+            return installmentsFromFirstSelectedId(eligibleInstallments, selectedInstallmentIds);
+        }
+
+        List<Integer> selectedInstallmentNumbers = parseInstallmentNumbers(payment.getAllocationSummary());
+        if (selectedInstallmentNumbers.isEmpty()) {
+            return eligibleInstallments;
+        }
+        return installmentsFromFirstSelectedNumber(eligibleInstallments, selectedInstallmentNumbers);
+    }
+
+    private List<CreditInstallment> installmentsFromFirstSelectedId(List<CreditInstallment> installments,
+                                                                    List<Long> selectedInstallmentIds) {
+        for (int index = 0; index < installments.size(); index++) {
+            if (selectedInstallmentIds.contains(installments.get(index).getId())) {
+                return installments.subList(index, installments.size());
+            }
+        }
+        return installments;
+    }
+
+    private List<CreditInstallment> installmentsFromFirstSelectedNumber(List<CreditInstallment> installments,
+                                                                        List<Integer> selectedInstallmentNumbers) {
+        for (int index = 0; index < installments.size(); index++) {
+            if (selectedInstallmentNumbers.contains(installments.get(index).getInstallmentNumber())) {
+                return installments.subList(index, installments.size());
+            }
+        }
+        return installments;
+    }
+
+    private String serializeInstallmentIds(List<Long> installmentIds) {
+        if (installmentIds == null || installmentIds.isEmpty()) {
+            return null;
+        }
+        String serialized = installmentIds.stream()
+                .filter(id -> id != null && id > 0)
+                .map(String::valueOf)
+                .distinct()
+                .reduce((left, right) -> left + "," + right)
+                .orElse(null);
+        return trimToNull(serialized);
+    }
+
+    private List<Long> parseInstallmentIds(String rawInstallmentIds) {
+        String normalized = trimToNull(rawInstallmentIds);
+        if (normalized == null) {
+            return List.of();
+        }
+        List<Long> installmentIds = new ArrayList<>();
+        for (String token : normalized.split(",")) {
+            try {
+                long id = Long.parseLong(token.trim());
+                if (id > 0) {
+                    installmentIds.add(id);
+                }
+            } catch (NumberFormatException ignored) {
+                // Ignore malformed legacy tokens and fall back to normal replay.
+            }
+        }
+        return installmentIds;
+    }
+
+    private List<Integer> parseInstallmentNumbers(String allocationSummary) {
+        String normalized = trimToNull(allocationSummary);
+        if (normalized == null) {
+            return List.of();
+        }
+        List<Integer> installmentNumbers = new ArrayList<>();
+        Matcher matcher = ALLOCATION_INSTALLMENT_PATTERN.matcher(normalized);
+        while (matcher.find()) {
+            try {
+                int number = Integer.parseInt(matcher.group(1));
+                if (number > 0 && !installmentNumbers.contains(number)) {
+                    installmentNumbers.add(number);
+                }
+            } catch (NumberFormatException ignored) {
+                // Ignore malformed summary fragments and keep parsing the rest.
+            }
+        }
+        return installmentNumbers;
     }
 
     private int compareInstallmentIds(Long leftId, Long rightId) {
