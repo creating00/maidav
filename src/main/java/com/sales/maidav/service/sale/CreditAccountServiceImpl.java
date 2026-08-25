@@ -207,6 +207,9 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
     @Override
     public void voidInstallment(Long accountId, Long installmentId, String voidedBy, String reason) {
+        if (!isCurrentUserAdmin()) {
+            throw new InvalidSaleException("Solo el administrador puede anular cuotas");
+        }
         CreditInstallment installment = creditInstallmentRepository.findById(installmentId)
                 .orElseThrow(() -> new InvalidSaleException("Cuota no encontrada"));
         if (!installment.getAccount().getId().equals(accountId)) {
