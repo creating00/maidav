@@ -410,6 +410,21 @@ class CreditAccountServiceImplTest {
     }
 
     @Test
+    void nonAdminCannotVoidImpactedInstallment() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new TestingAuthenticationToken("seller", "password", "ROLE_SELLER")
+        );
+        CreditAccount account = account(47L, PaymentFrequency.WEEKLY, "100.00");
+        CreditInstallment installment = installment(account, 471L, 1, "100.00", LocalDate.now());
+        installment.setPaidAmount(new BigDecimal("100.00"));
+        installment.setStatus(InstallmentStatus.PAID);
+
+        assertThatThrownBy(() -> service.voidInstallment(47L, 471L, "seller", "sin permiso"))
+                .isInstanceOf(InvalidSaleException.class)
+                .hasMessageContaining("Solo el administrador puede anular cuotas");
+    }
+
+    @Test
     void voidingRestoredInstallmentWithoutNewPaymentIsRejected() {
         CreditAccount account = account(5L, PaymentFrequency.WEEKLY, "200.00");
         CreditInstallment originalInstallment = installment(account, 51L, 1, "100.00", LocalDate.now());
