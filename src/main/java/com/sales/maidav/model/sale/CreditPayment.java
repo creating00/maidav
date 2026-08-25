@@ -36,6 +36,9 @@ public class CreditPayment extends BaseEntity {
     @Column(name = "operation_token", length = 120)
     private String operationToken;
 
+    @Column(name = "installment_ids", length = 500)
+    private String installmentIds;
+
     @Column(nullable = false)
     private boolean reversal = false;
 
@@ -73,6 +76,9 @@ public class CreditPayment extends BaseEntity {
 
     public String getOperationToken() { return operationToken; }
     public void setOperationToken(String operationToken) { this.operationToken = operationToken; }
+
+    public String getInstallmentIds() { return installmentIds; }
+    public void setInstallmentIds(String installmentIds) { this.installmentIds = installmentIds; }
 
     public boolean isReversal() { return reversal; }
     public void setReversal(boolean reversal) { this.reversal = reversal; }
