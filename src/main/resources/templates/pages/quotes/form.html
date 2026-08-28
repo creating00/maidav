@@ -420,7 +420,7 @@
                     const image = fragment.querySelector('[data-image]');
                     const imageFallback = fragment.querySelector('[data-image-fallback]');
                     if (product.image) {
-                        image.loading = 'lazy';
+                        image.loading = 'eager';
                         image.decoding = 'async';
                         image.addEventListener('load', () => {
                             image.classList.remove('hidden');
@@ -432,6 +432,8 @@
                             imageFallback.classList.remove('hidden');
                         }, {once: true});
                         image.src = product.image;
+                        image.classList.remove('hidden');
+                        imageFallback.classList.add('hidden');
                     } else {
                         imageFallback.textContent = initials(product.description);
                     }
