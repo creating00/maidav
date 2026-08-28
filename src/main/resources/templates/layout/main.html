@@ -45,13 +45,14 @@
     <div x-cloak
          x-show="sidebarOpen"
          x-transition.opacity
-         class="fixed inset-0 z-[70] bg-slate-950/35 backdrop-blur-sm md:hidden"
+         class="fixed inset-0 bg-slate-950/35 backdrop-blur-sm md:hidden"
+         style="z-index: 900;"
          :style="`top:${headerHeight}px`"
          @click="$dispatch('close-sidebar')"></div>
 
     <!-- SIDEBAR MOBILE -->
-    <div class="fixed left-0 z-[80] w-72 max-w-[92vw] transform transition-transform duration-200 md:hidden"
-         style="top:74px;height:calc(100dvh - 74px)"
+    <div class="fixed left-0 w-72 max-w-[92vw] transform transition-transform duration-200 md:hidden"
+         style="z-index: 1000; top:74px;height:calc(100dvh - 74px)"
          :style="`top:${headerHeight}px;height:calc(100dvh - ${headerHeight}px)`"
          :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'">
         <div th:replace="fragments/sidebar :: sidebar"></div>
