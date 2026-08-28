@@ -461,9 +461,10 @@
             }
 
             function hydrateCatalogImage(button) {
+                const imagePath = button.dataset.image;
                 const image = button.querySelector('[data-src]');
                 const fallback = button.querySelector('[data-catalog-image-fallback]');
-                if (!image || image.src) {
+                if (!imagePath || !image || image.src) {
                     return;
                 }
                 image.addEventListener('load', () => {
@@ -474,7 +475,9 @@
                     image.classList.add('hidden');
                     fallback?.classList.remove('hidden');
                 }, {once: true});
-                image.src = image.dataset.src;
+                image.src = imagePath;
+                image.classList.remove('hidden');
+                fallback?.classList.add('hidden');
             }
 
             function renderCatalogPage() {
