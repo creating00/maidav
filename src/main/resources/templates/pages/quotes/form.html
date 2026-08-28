@@ -135,8 +135,7 @@
                         <button type="button" th:each="product : ${products}" class="catalog-item quote-product-card flex w-full items-center gap-4 rounded-[1.6rem] p-3 text-left"
                                 th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-barcode=${product.barcode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-cost-vat=${product.cost * (100 + product.vatRate) / 100},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + (product.barcode != null ? product.barcode : '') + ' ' + product.description}">
                             <span class="quote-image-frame flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.35rem]">
-                                <img th:if="${product.imagePath}" th:src="${product.imagePath}" alt="Producto" class="h-full w-full object-cover"/>
-                                <span th:if="${product.imagePath == null}" class="quote-title text-xl font-bold text-[var(--quote-copper)]">+</span>
+                                <span data-catalog-image-fallback class="quote-title text-xl font-bold text-[var(--quote-copper)]">+</span>
                             </span>
                             <span class="min-w-0 flex-1">
                                 <strong class="block text-sm text-slate-900" th:text="${product.description}"></strong>
@@ -402,6 +401,8 @@
                     const imageFallback = fragment.querySelector('[data-image-fallback]');
                     if (product.image) {
                         image.src = product.image;
+                        image.loading = 'lazy';
+                        image.decoding = 'async';
                         image.classList.remove('hidden');
                         imageFallback.classList.add('hidden');
                     } else {
@@ -843,6 +844,7 @@
 
             catalogItems.forEach(button => {
                 const id = String(button.dataset.productId);
+                button.querySelector('[data-catalog-image-fallback]').textContent = initials(button.dataset.description);
                 catalog.set(id, {
                     productId: id,
                     description: button.dataset.description || '',
