@@ -135,6 +135,7 @@
                         <button type="button" th:each="product : ${products}" class="catalog-item quote-product-card flex w-full items-center gap-4 rounded-[1.6rem] p-3 text-left"
                                 th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-barcode=${product.barcode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-cost-vat=${product.cost * (100 + product.vatRate) / 100},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + (product.barcode != null ? product.barcode : '') + ' ' + product.description}">
                             <span class="quote-image-frame flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.35rem]">
+                                <img th:if="${product.imagePath}" th:attr="data-src=${product.imagePath}" alt="Producto" class="hidden h-full w-full object-cover" loading="lazy" decoding="async"/>
                                 <span data-catalog-image-fallback class="quote-title text-xl font-bold text-[var(--quote-copper)]">+</span>
                             </span>
                             <span class="min-w-0 flex-1">
@@ -146,6 +147,19 @@
                                 </span>
                             </span>
                         </button>
+                    </div>
+                    <div id="catalogPagination" class="mt-4 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <p id="catalogPageInfo" class="text-center text-sm text-slate-500 sm:text-left"></p>
+                        <div class="flex gap-3">
+                            <button type="button" id="catalogPrevBtn"
+                                    class="flex-1 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none">
+                                Anterior
+                            </button>
+                            <button type="button" id="catalogNextBtn"
+                                    class="flex-1 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45 sm:flex-none">
+                                Siguiente
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -250,6 +264,12 @@
             const catalogScannerStatus = $('catalogScannerStatus');
             const catalogScannerStartBtn = $('catalogScannerStartBtn');
             const catalogScannerStopBtn = $('catalogScannerStopBtn');
+            const catalogPrevBtn = $('catalogPrevBtn');
+            const catalogNextBtn = $('catalogNextBtn');
+            const catalogPageInfo = $('catalogPageInfo');
+            const catalogPageSize = 6;
+            let catalogPage = 1;
+            let catalogMatches = catalogItems;
             let catalogScannerController = null;
 
             function escapeXml(value) {
@@ -400,11 +420,18 @@
                     const image = fragment.querySelector('[data-image]');
                     const imageFallback = fragment.querySelector('[data-image-fallback]');
                     if (product.image) {
-                        image.src = product.image;
                         image.loading = 'lazy';
                         image.decoding = 'async';
-                        image.classList.remove('hidden');
-                        imageFallback.classList.add('hidden');
+                        image.addEventListener('load', () => {
+                            image.classList.remove('hidden');
+                            imageFallback.classList.add('hidden');
+                        }, {once: true});
+                        image.addEventListener('error', () => {
+                            image.classList.add('hidden');
+                            imageFallback.textContent = initials(product.description);
+                            imageFallback.classList.remove('hidden');
+                        }, {once: true});
+                        image.src = product.image;
                     } else {
                         imageFallback.textContent = initials(product.description);
                     }
@@ -433,12 +460,60 @@
                 }
             }
 
+            function hydrateCatalogImage(button) {
+                const image = button.querySelector('[data-src]');
+                const fallback = button.querySelector('[data-catalog-image-fallback]');
+                if (!image || image.src) {
+                    return;
+                }
+                image.addEventListener('load', () => {
+                    image.classList.remove('hidden');
+                    fallback?.classList.add('hidden');
+                }, {once: true});
+                image.addEventListener('error', () => {
+                    image.classList.add('hidden');
+                    fallback?.classList.remove('hidden');
+                }, {once: true});
+                image.src = image.dataset.src;
+            }
+
+            function renderCatalogPage() {
+                const totalPages = Math.max(1, Math.ceil(catalogMatches.length / catalogPageSize));
+                catalogPage = Math.min(Math.max(1, catalogPage), totalPages);
+                const start = (catalogPage - 1) * catalogPageSize;
+                const visibleItems = new Set(catalogMatches.slice(start, start + catalogPageSize));
+
+                catalogItems.forEach(button => {
+                    const isVisible = visibleItems.has(button);
+                    button.classList.toggle('hidden', !isVisible);
+                    if (isVisible) {
+                        hydrateCatalogImage(button);
+                    }
+                });
+
+                if (catalogPageInfo) {
+                    const from = catalogMatches.length ? start + 1 : 0;
+                    const to = Math.min(start + catalogPageSize, catalogMatches.length);
+                    catalogPageInfo.textContent = catalogMatches.length
+                        ? `Mostrando ${from}-${to} de ${catalogMatches.length} productos`
+                        : 'No hay productos para mostrar';
+                }
+                if (catalogPrevBtn) {
+                    catalogPrevBtn.disabled = catalogPage <= 1;
+                }
+                if (catalogNextBtn) {
+                    catalogNextBtn.disabled = catalogPage >= totalPages;
+                }
+            }
+
             function applyCatalogFilter(term) {
                 const normalized = normalizeTerm(term);
-                catalogItems.forEach(button => {
+                catalogMatches = catalogItems.filter(button => {
                     const searchText = normalizeTerm(button.dataset.search);
-                    button.classList.toggle('hidden', Boolean(normalized) && !searchText.includes(normalized));
+                    return !normalized || searchText.includes(normalized);
                 });
+                catalogPage = 1;
+                renderCatalogPage();
             }
 
             function findCatalogExactMatch(term) {
@@ -868,9 +943,18 @@
                     stopCatalogScanner();
                     return;
                 }
+                renderCatalogPage();
                 if (catalogSearch) {
                     catalogSearch.focus();
                 }
+            });
+            catalogPrevBtn?.addEventListener('click', () => {
+                catalogPage -= 1;
+                renderCatalogPage();
+            });
+            catalogNextBtn?.addEventListener('click', () => {
+                catalogPage += 1;
+                renderCatalogPage();
             });
             catalogSearch?.addEventListener('input', e => {
                 applyCatalogFilter(e.target.value);
@@ -891,6 +975,7 @@
             catalogScannerStartBtn?.addEventListener('click', () => {
                 if (catalogPanel?.classList.contains('hidden')) {
                     catalogPanel.classList.remove('hidden');
+                    renderCatalogPage();
                 }
                 startCatalogScanner();
             });
