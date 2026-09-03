@@ -77,19 +77,48 @@ class ExportDocumentServiceTest {
     }
 
     @Test
-    void labelsFinancingDebitPriceAsTransferInExcelExport() throws Exception {
+    void includesFinancingCashAndTransferInstallmentsInExcelExport() throws Exception {
         Product product = new Product();
         product.setProductCode("P-004");
         product.setDescription("Placard");
-        product.setCost(new BigDecimal("100.00"));
-        product.setVatRate(new BigDecimal("21.00"));
+        product.setCost(new BigDecimal("1000.00"));
+        product.setVatRate(BigDecimal.ZERO);
+
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcMultContado(BigDecimal.ONE);
+        settings.setCalcMultDebito(new BigDecimal("1.50"));
+        settings.setCalcRecargo(new BigDecimal("2.00"));
+        settings.setCalcIntDia(new BigDecimal("2.00"));
+        settings.setCalcDias(100);
+        settings.setCalcIntSem(new BigDecimal("2.00"));
+        settings.setCalcSemanas(10);
+        settings.setCalcIntMesCorto(new BigDecimal("2.00"));
+        settings.setCalcMesesCorto(4);
+        settings.setCalcIntMesLargo(new BigDecimal("2.00"));
+        settings.setCalcMesesLargo(8);
 
         byte[] excel = exportDocumentService.productPrices(List.of(product), ExportDocumentService.PriceListType.FINANCING,
-                ExportDocumentService.ExportFormat.EXCEL, new CompanySettings());
+                ExportDocumentService.ExportFormat.EXCEL, settings);
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
             assertThat(workbook.getSheetAt(0).getRow(1).getCell(4).getStringCellValue()).isEqualTo("Efectivo");
-            assertThat(workbook.getSheetAt(0).getRow(1).getCell(5).getStringCellValue()).isEqualTo("Débito/Transferencia");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(5).getStringCellValue()).isEqualTo("Transferencia");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(6).getStringCellValue()).isEqualTo("8 cuotas contado");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(7).getStringCellValue()).isEqualTo("8 cuotas transferencia");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(8).getStringCellValue()).isEqualTo("4 cuotas contado");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(9).getStringCellValue()).isEqualTo("4 cuotas transferencia");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(10).getStringCellValue()).isEqualTo("10 semanas contado");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(11).getStringCellValue()).isEqualTo("10 semanas transferencia");
+            assertThat(workbook.getSheetAt(0).getRow(1).getCell(12).getStringCellValue()).isEqualTo("100 días transferencia");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(4).getStringCellValue()).isEqualTo("$ 1000.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(5).getStringCellValue()).isEqualTo("$ 1500.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(6).getStringCellValue()).isEqualTo("$ 250.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(7).getStringCellValue()).isEqualTo("$ 500.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(8).getStringCellValue()).isEqualTo("$ 500.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(9).getStringCellValue()).isEqualTo("$ 1000.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(10).getStringCellValue()).isEqualTo("$ 200.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(11).getStringCellValue()).isEqualTo("$ 400.00");
+            assertThat(workbook.getSheetAt(0).getRow(2).getCell(12).getStringCellValue()).isEqualTo("$ 50.00");
         }
     }
 
