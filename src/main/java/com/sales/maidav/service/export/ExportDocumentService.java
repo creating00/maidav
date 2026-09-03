@@ -66,7 +66,7 @@ public class ExportDocumentService {
 
     private byte[] pdf(String title, List<String> headers, List<List<String>> rows) {
         try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-            Document document = new Document(PageSize.A4.rotate(), 28, 28, 30, 30);
+            Document document = new Document(headers.size() > 10 ? PageSize.A3.rotate() : PageSize.A4.rotate(), 28, 28, 30, 30);
             PdfWriter.getInstance(document, output);
             document.open();
             Paragraph heading = new Paragraph(title, new Font(Font.HELVETICA, 15, Font.BOLD));
@@ -76,6 +76,7 @@ public class ExportDocumentService {
             document.add(new Paragraph(" "));
             PdfPTable table = new PdfPTable(headers.size());
             table.setWidthPercentage(100);
+            table.setWidths(relativeWidths(headers));
             for (String header : headers) {
                 PdfPCell cell = new PdfPCell(new Paragraph(header, new Font(Font.HELVETICA, 8, Font.BOLD)));
                 cell.setBackgroundColor(new java.awt.Color(226, 232, 240));
@@ -146,11 +147,14 @@ public class ExportDocumentService {
         }
         if (type == PriceListType.FINANCING) {
             headers.add("Efectivo");
-            headers.add("Débito/Transferencia");
-            headers.add("Diaria (" + whole(settings.getCalcDias(), 144) + ")");
-            headers.add("Semanal (" + whole(settings.getCalcSemanas(), 13) + ")");
-            headers.add("Mensual (" + whole(settings.getCalcMesesCorto(), 4) + ")");
-            headers.add("Mensual (" + whole(settings.getCalcMesesLargo(), 8) + ")");
+            headers.add("Transferencia");
+            headers.add(whole(settings.getCalcMesesLargo(), 8) + " cuotas contado");
+            headers.add(whole(settings.getCalcMesesLargo(), 8) + " cuotas transferencia");
+            headers.add(whole(settings.getCalcMesesCorto(), 4) + " cuotas contado");
+            headers.add(whole(settings.getCalcMesesCorto(), 4) + " cuotas transferencia");
+            headers.add(whole(settings.getCalcSemanas(), 13) + " semanas contado");
+            headers.add(whole(settings.getCalcSemanas(), 13) + " semanas transferencia");
+            headers.add(whole(settings.getCalcDias(), 144) + " días transferencia");
         }
         return headers;
     }
@@ -173,12 +177,19 @@ public class ExportDocumentService {
         if (type == PriceListType.FINANCING) {
             BigDecimal base = baseWithVat(product);
             BigDecimal recargo = financingSurcharge(settings);
+            BigDecimal dailyTransfer = installment(base, settings.getCalcIntDia(), recargo, whole(settings.getCalcDias(), 144));
+            BigDecimal weeklyTransfer = installment(base, settings.getCalcIntSem(), recargo, whole(settings.getCalcSemanas(), 13));
+            BigDecimal monthlyShortTransfer = installment(base, settings.getCalcIntMesCorto(), recargo, whole(settings.getCalcMesesCorto(), 4));
+            BigDecimal monthlyLongTransfer = installment(base, settings.getCalcIntMesLargo(), recargo, whole(settings.getCalcMesesLargo(), 8));
             row.add(money(cashPrice(base, settings)));
             row.add(money(round50(base.multiply(positive(settings.getCalcMultDebito(), "1.50")))));
-            row.add(money(installment(base, settings.getCalcIntDia(), recargo, whole(settings.getCalcDias(), 144))));
-            row.add(money(installment(base, settings.getCalcIntSem(), recargo, whole(settings.getCalcSemanas(), 13))));
-            row.add(money(installment(base, settings.getCalcIntMesCorto(), recargo, whole(settings.getCalcMesesCorto(), 4))));
-            row.add(money(installment(base, settings.getCalcIntMesLargo(), recargo, whole(settings.getCalcMesesLargo(), 8))));
+            row.add(money(cashInstallment(monthlyLongTransfer, recargo)));
+            row.add(money(monthlyLongTransfer));
+            row.add(money(cashInstallment(monthlyShortTransfer, recargo)));
+            row.add(money(monthlyShortTransfer));
+            row.add(money(cashInstallment(weeklyTransfer, recargo)));
+            row.add(money(weeklyTransfer));
+            row.add(money(dailyTransfer));
         }
         return row;
     }
@@ -201,6 +212,27 @@ public class ExportDocumentService {
 
     private BigDecimal installment(BigDecimal base, BigDecimal interest, BigDecimal recargo, int count) {
         return round50(base.multiply(positive(interest, "2")).multiply(recargo).divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP));
+    }
+
+    private BigDecimal cashInstallment(BigDecimal financedAmount, BigDecimal recargo) {
+        return round50(value(financedAmount).divide(positive(recargo, "1.26"), 2, RoundingMode.HALF_UP));
+    }
+
+    private float[] relativeWidths(List<String> headers) {
+        float[] widths = new float[headers.size()];
+        for (int i = 0; i < headers.size(); i++) {
+            String header = headers.get(i);
+            if ("Descripción".equals(header)) {
+                widths[i] = 2.6f;
+            } else if ("Proveedor".equals(header)) {
+                widths[i] = 1.4f;
+            } else if ("Código".equals(header)) {
+                widths[i] = 1.1f;
+            } else {
+                widths[i] = 1f;
+            }
+        }
+        return widths;
     }
 
     private BigDecimal round50(BigDecimal value) { return value.divide(BigDecimal.valueOf(50), 0, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(50)); }
