@@ -177,7 +177,7 @@
                 th:with="remaining=${inst.amount - (inst.paidAmount != null ? inst.paidAmount : 0)}">
                 <td class="px-4 py-3">
                     <input type="checkbox" name="installmentIds" th:value="${inst.id}"
-                           th:attr="data-remaining=${remaining},data-charge-amount=${chargeAmounts[inst.id]},data-financed-amount=${financedAmounts[inst.id]}"
+                           th:attr="data-remaining=${remaining},data-charge-amount=${chargeAmounts[inst.id]},data-cash-amount=${chargeAmounts[inst.id]},data-financed-amount=${financedAmounts[inst.id]},data-bank-amount=${financedAmounts[inst.id]}"
                            form="paymentForm"
                            th:disabled="${inst.status.name() == 'PAID'}"/>
                 </td>
@@ -434,7 +434,15 @@
             const closingTotalGeneralEl = document.getElementById('closing-total-general');
             let paymentSubmitting = false;
             function parseNumber(value) {
-                const num = parseFloat(value);
+                let normalized = String(value || '')
+                    .trim()
+                    .replace(/\s/g, '');
+                if (normalized.includes(',') && normalized.includes('.')) {
+                    normalized = normalized.replace(/\./g, '').replace(',', '.');
+                } else if (normalized.includes(',')) {
+                    normalized = normalized.replace(',', '.');
+                }
+                const num = parseFloat(normalized);
                 return Number.isFinite(num) ? num : 0;
             }
 
@@ -456,8 +464,8 @@
                     if (!checkbox.checked) {
                         return;
                     }
-                    const cashAmount = parseNumber(checkbox.dataset.chargeAmount);
-                    const bankAmount = parseNumber(checkbox.dataset.financedAmount || checkbox.dataset.remaining);
+                    const cashAmount = parseNumber(checkbox.dataset.cashAmount || checkbox.dataset.chargeAmount);
+                    const bankAmount = parseNumber(checkbox.dataset.bankAmount || checkbox.dataset.financedAmount || checkbox.dataset.remaining);
                     total += selectedMethod === 'CASH' ? cashAmount : bankAmount;
                 });
                 if (amountInput) {
@@ -571,6 +579,7 @@
             });
             if (methodSelect) {
                 methodSelect.addEventListener('change', updateAmount);
+                methodSelect.addEventListener('input', updateAmount);
             }
             paymentRows.forEach(row => {
                 const amountField = row.querySelector('.payment-amount-input');

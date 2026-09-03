@@ -242,6 +242,40 @@ class CreditAccountServiceImplTest {
     }
 
     @Test
+    void selectedCashPaymentUsesCashValueOnlyOnInstallmentDueToday() {
+        CreditAccount account = account(178L, PaymentFrequency.WEEKLY, "62250.00");
+        CreditInstallment firstInstallment = installment(account, 2255L, 1, "20750.00", LocalDate.now().minusWeeks(2));
+        CreditInstallment secondInstallment = installment(account, 2256L, 2, "20750.00", LocalDate.now().minusWeeks(1));
+        CreditInstallment thirdInstallment = installment(account, 2257L, 3, "20750.00", LocalDate.now());
+        List<CreditInstallment> installments = List.of(firstInstallment, secondInstallment, thirdInstallment);
+
+        mockAccount(account, installments, new BigDecimal("1.26"));
+
+        CreditPayment payment = service.registerPayment(
+                178L,
+                new BigDecimal("58000.00"),
+                List.of(2255L, 2256L, 2257L),
+                "tester",
+                PaymentCollectionMethod.CASH,
+                null
+        );
+
+        assertThat(firstInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(firstInstallment.getPaidAmount()).isEqualByComparingTo("20750.00");
+        assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("20750.00");
+        assertThat(thirdInstallment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(thirdInstallment.getPaidAmount()).isEqualByComparingTo("20750.00");
+        assertThat(account.getBalance()).isEqualByComparingTo("0.00");
+        assertThat(payment.getAmount()).isEqualByComparingTo("58000.00");
+        assertThat(payment.getImpactAmount()).isEqualByComparingTo("62250.00");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #1: se aplican $ 20.750,00 y queda saldada (valor financiado)");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #2: se aplican $ 20.750,00 y queda saldada (valor financiado)");
+        assertThat(payment.getAllocationSummary()).contains("Cuota #3: se aplican $ 16.500,00 y queda saldada (valor contado)");
+        assertThat(payment.getAllocationSummary()).doesNotContain("saldo a favor");
+    }
+
+    @Test
     void dailyPlanNeverUsesCashValue() {
         CreditAccount account = account(3L, PaymentFrequency.DAILY, "1200.00");
         CreditInstallment installment = installment(account, 31L, 1, "1200.00", LocalDate.now().plusDays(1));

@@ -150,6 +150,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 resolvedMethod,
                 LocalDate.now(),
                 payment.getId(),
+                selectedInstallmentIds(installmentIds),
                 new ArrayList<>()
         );
         BigDecimal impactAmount = applicationResult.impactAmount();
@@ -373,12 +374,13 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                                                                 PaymentCollectionMethod paymentMethod,
                                                                 LocalDate paidAt,
                                                                 Long paymentId,
+                                                                Set<Long> selectedInstallmentIds,
                                                                 List<PaymentAllocation> allocations) {
         BigDecimal remainingInput = inputAmount == null ? BigDecimal.ZERO : inputAmount.setScale(2, RoundingMode.HALF_UP);
         BigDecimal impactAmount = BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         BigDecimal cashRecargo = resolveCashRecargo();
         Map<Integer, String> paymentReferences = new LinkedHashMap<>();
-        boolean appliedCurrentPayment = false;
+        boolean carryForwardAvailable = false;
 
         for (int index = 0; index < installments.size(); index++) {
             CreditInstallment installment = installments.get(index);
@@ -400,7 +402,9 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             // SALDO A FAVOR
             // APLICAR SALDO A FAVOR A PROXIMA CUOTA
             boolean manualCashPricing = usesManualCashAmount(account, installment, paymentMethod, paidAt);
-            boolean carriedForward = appliedCurrentPayment && !manualCashPricing;
+            boolean carriedForward = carryForwardAvailable
+                    && !manualCashPricing
+                    && !isExplicitlySelectedInstallment(installment, selectedInstallmentIds);
             BigDecimal collectedNeeded = carriedForward
                     ? financedRemaining
                     : resolveCollectedAmountDue(account, installment, financedRemaining, cashRecargo, paymentMethod, paidAt);
@@ -448,7 +452,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                     collectedApplied,
                     allocationImpact
             ));
-            appliedCurrentPayment = true;
+            carryForwardAvailable = remainingInput.compareTo(BigDecimal.ZERO) > 0;
         }
 
         return new PaymentApplicationResult(
@@ -824,6 +828,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                     payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod(),
                     payment.getPaidAt(),
                     payment.getId(),
+                    selectedInstallmentIds(parseInstallmentIds(payment.getInstallmentIds())),
                     allocations
             );
             if (updatePayments) {
@@ -1076,6 +1081,26 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 .reduce((left, right) -> left + "," + right)
                 .orElse(null);
         return trimToNull(serialized);
+    }
+
+    private Set<Long> selectedInstallmentIds(List<Long> installmentIds) {
+        if (installmentIds == null || installmentIds.isEmpty()) {
+            return Set.of();
+        }
+        Set<Long> selectedInstallmentIds = new HashSet<>();
+        for (Long installmentId : installmentIds) {
+            if (installmentId != null && installmentId > 0) {
+                selectedInstallmentIds.add(installmentId);
+            }
+        }
+        return selectedInstallmentIds;
+    }
+
+    private boolean isExplicitlySelectedInstallment(CreditInstallment installment, Set<Long> selectedInstallmentIds) {
+        return installment != null
+                && installment.getId() != null
+                && selectedInstallmentIds != null
+                && selectedInstallmentIds.contains(installment.getId());
     }
 
     private List<Long> parseInstallmentIds(String rawInstallmentIds) {
