@@ -574,11 +574,16 @@ public class SaleController {
         cfg.put("intMesCorto", getDecimal(settings.getCalcIntMesCorto(), "2.00"));
         cfg.put("mesesLargo", getInt(settings.getCalcMesesLargo(), 8));
         cfg.put("intMesLargo", getDecimal(settings.getCalcIntMesLargo(), "2.50"));
+        cfg.put("monthlyLongMinCost", getAmount(settings.getCalcMonthlyLongMinCost()));
         return cfg;
     }
 
     private BigDecimal getDecimal(BigDecimal value, String fallback) {
         return value == null ? new BigDecimal(fallback) : value;
+    }
+
+    private BigDecimal getAmount(BigDecimal value) {
+        return value == null || value.compareTo(BigDecimal.ZERO) <= 0 ? BigDecimal.ZERO : value;
     }
 
     private String amountText(BigDecimal value) {

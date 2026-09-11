@@ -28,6 +28,13 @@ final class QuotePricingSupport {
         return financingBase != null ? financingBase : resolveVisibleUnitPrice(product, priceMode);
     }
 
+    public static BigDecimal resolveCost(Product product) {
+        if (product == null || product.getCost() == null || product.getCost().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return scaled(product.getCost());
+    }
+
     private static BigDecimal financingBaseFromCostVat(Product product) {
         if (product == null) {
             return null;

@@ -96,6 +96,52 @@ class QuoteServiceImplTest {
     }
 
     @Test
+    void createHidesMonthlyLongPlanWhenCostIsBelowThreshold() {
+        authenticate("seller@maidav.com");
+
+        User seller = new User();
+        seller.setId(9L);
+        seller.setEmail("seller@maidav.com");
+        Product product = product();
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcMonthlyLongMinCost(new BigDecimal("15000.00"));
+
+        when(userRepository.findByEmail("seller@maidav.com")).thenReturn(Optional.of(seller));
+        when(productRepository.findById(7L)).thenReturn(Optional.of(product));
+        when(companySettingsService.getSettings()).thenReturn(settings);
+        when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Quote quote = quoteService.create(QuotePriceMode.RETAIL, List.of(new QuoteItemInput(7L, 1)));
+
+        assertThat(quote.getPlanOptions()).hasSize(3);
+        assertThat(quote.getPlanOptions())
+                .noneMatch(option -> option.getInstallmentCount() != null && option.getInstallmentCount() == 8);
+    }
+
+    @Test
+    void createShowsMonthlyLongPlanWhenCostEqualsThreshold() {
+        authenticate("seller@maidav.com");
+
+        User seller = new User();
+        seller.setId(9L);
+        seller.setEmail("seller@maidav.com");
+        Product product = product();
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcMonthlyLongMinCost(new BigDecimal("10000.00"));
+
+        when(userRepository.findByEmail("seller@maidav.com")).thenReturn(Optional.of(seller));
+        when(productRepository.findById(7L)).thenReturn(Optional.of(product));
+        when(companySettingsService.getSettings()).thenReturn(settings);
+        when(quoteRepository.save(any(Quote.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        Quote quote = quoteService.create(QuotePriceMode.RETAIL, List.of(new QuoteItemInput(7L, 1)));
+
+        assertThat(quote.getPlanOptions()).hasSize(4);
+        assertThat(quote.getPlanOptions())
+                .anyMatch(option -> option.getInstallmentCount() != null && option.getInstallmentCount() == 8);
+    }
+
+    @Test
     void findAllUsesCurrentSellerVisibility() {
         authenticate("seller@maidav.com");
 

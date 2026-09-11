@@ -183,7 +183,7 @@
                 <section>
                     <p class="mb-2 text-xs font-black uppercase tracking-[0.24em] text-amber-300">Planes de financiacion</p>
                     <div class="space-y-3">
-                        <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
+                        <article id="scanProductMonthlyLongPlan" class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
                             <div class="flex items-center justify-between gap-3">
                                 <p id="scanProductDailyLabel" class="text-lg font-semibold text-white">Diaria (144 dias)</p>
                                 <p id="scanProductDailyFee" class="text-2xl font-black text-white">$0</p>
@@ -408,7 +408,8 @@
                   data-meses-corto=${calculatorConfig.mesesCorto},
                   data-int-mes-corto=${calculatorConfig.intMesCorto},
                   data-meses-largo=${calculatorConfig.mesesLargo},
-                  data-int-mes-largo=${calculatorConfig.intMesLargo}"
+                  data-int-mes-largo=${calculatorConfig.intMesLargo},
+                  data-monthly-long-min-cost=${calculatorConfig.monthlyLongMinCost}"
          class="hidden"></div>
 
     <div class="bg-white rounded shadow overflow-hidden">
@@ -435,10 +436,11 @@
                     th:attr="data-product-id=${product.id},
                              data-barcode=${product.barcode},
                              data-product-code=${product.productCode},
-                             data-description=${product.description},
-                             data-image=${product.imagePath},
-                             data-stock-available=${product.stockAvailable},
-                             data-base=${product.cost * (100 + product.vatRate) / 100}"
+                              data-description=${product.description},
+                              data-image=${product.imagePath},
+                              data-stock-available=${product.stockAvailable},
+                              data-cost=${product.cost},
+                              data-base=${product.cost * (100 + product.vatRate) / 100}"
                     th:classappend="${focusProductId != null and product.id == focusProductId} ? ' bg-amber-50' : ''">
                     <td class="px-4 py-3 align-top">
                         <button type="button"
@@ -516,9 +518,10 @@
                     th:id="${'financing-' + product.id}">
                     <td colspan="11" class="px-4 py-4">
                         <div class="rounded-lg border border-slate-200 bg-white p-4 financing-panel"
-                             th:attr="data-base=${product.cost * (100 + product.vatRate) / 100},
-                                      data-code=${product.productCode},
-                                      data-description=${product.description}">
+                              th:attr="data-base=${product.cost * (100 + product.vatRate) / 100},
+                                       data-cost=${product.cost},
+                                       data-code=${product.productCode},
+                                       data-description=${product.description}">
                             <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
                                 <div>
                                     <p class="font-semibold text-slate-900"
@@ -550,7 +553,7 @@
                                     </tr>
                                     </thead>
                                     <tbody>
-                                    <tr class="border-t">
+                                    <tr class="border-t monthly-long-plan-row">
                                         <td class="px-2 py-2">Diaria</td>
                                         <td class="px-2 py-2 js-dias-label">144 dias</td>
                                         <td class="px-2 py-2 font-semibold js-dia">$0.00</td>
@@ -679,6 +682,7 @@
             const scanProductMonthlyLongLabel = document.getElementById('scanProductMonthlyLongLabel');
             const scanProductMonthlyLongFee = document.getElementById('scanProductMonthlyLongFee');
             const scanProductMonthlyLongCash = document.getElementById('scanProductMonthlyLongCash');
+            const scanProductMonthlyLongPlan = document.getElementById('scanProductMonthlyLongPlan');
             const scanProductClientSelect = document.getElementById('scanProductClientSelect');
             const scanProductClientHelp = document.getElementById('scanProductClientHelp');
             const copyScanProductMessageBtn = document.getElementById('copyScanProductMessageBtn');
@@ -749,8 +753,14 @@
                     mesesCorto: Math.max(1, Math.round(parseNumber(data('mesesCorto', '4')))),
                     intMesCorto: parseNumber(data('intMesCorto', '2')),
                     mesesLargo: Math.max(1, Math.round(parseNumber(data('mesesLargo', '8')))),
-                    intMesLargo: parseNumber(data('intMesLargo', '2.5'))
+                    intMesLargo: parseNumber(data('intMesLargo', '2.5')),
+                    monthlyLongMinCost: parseNumber(data('monthlyLongMinCost', '0'))
                 };
+            }
+
+            function isMonthlyLongEnabled(costAmount, cfg) {
+                const minCost = cfg && cfg.monthlyLongMinCost ? cfg.monthlyLongMinCost : 0;
+                return minCost <= 0 || parseNumber(costAmount) >= minCost;
             }
 
             function normalizeLineBreaks(value) {
@@ -792,7 +802,7 @@
                 return digits;
             }
 
-            function calculatePlans(base) {
+            function calculatePlans(base, costAmount) {
                 const cfg = getCalcConfig();
                 const recargo = cfg.recargo > 0 ? cfg.recargo : 1;
                 const diaria = roundTo50((base * cfg.intDia * recargo) / cfg.dias);
@@ -803,6 +813,7 @@
                 return {
                     cfg,
                     recargo,
+                    monthlyLongEnabled: isMonthlyLongEnabled(costAmount, cfg),
                     contado: roundTo50(base * cfg.multContado),
                     debito: roundTo50(base * cfg.multDebito),
                     plans: {
@@ -832,12 +843,15 @@
                 lines.push('\uD83D\uDDD3 Diaria (' + data.plans.DAILY.count + ' dias): ' + moneyCompact(data.plans.DAILY.fee) + ' (Efe: ' + moneyCompact(data.plans.DAILY.cashFee) + ')');
                 lines.push('\uD83D\uDDD3 Semanal (' + data.plans.WEEKLY.count + ' semanas): ' + moneyCompact(data.plans.WEEKLY.fee) + ' (Efe: ' + moneyCompact(data.plans.WEEKLY.cashFee) + ')');
                 lines.push('\uD83D\uDDD3 Mensual ' + data.cfg.mesesCorto + ': ' + moneyCompact(data.plans.MONTHLY_SHORT.fee) + ' (Efe: ' + moneyCompact(data.plans.MONTHLY_SHORT.cashFee) + ')');
-                lines.push('\uD83D\uDDD3 Mensual ' + data.cfg.mesesLargo + ': ' + moneyCompact(data.plans.MONTHLY_LONG.fee) + ' (Efe: ' + moneyCompact(data.plans.MONTHLY_LONG.cashFee) + ')');
+                if (data.monthlyLongEnabled) {
+                    lines.push('\uD83D\uDDD3 Mensual ' + data.cfg.mesesLargo + ': ' + moneyCompact(data.plans.MONTHLY_LONG.fee) + ' (Efe: ' + moneyCompact(data.plans.MONTHLY_LONG.cashFee) + ')');
+                }
                 return lines.join('\n');
             }
 
             function buildProductState(product) {
                 const base = parseNumber(product.baseAmount || product.base);
+                const cost = parseNumber(product.costAmount || product.cost);
                 return {
                     productId: product.productId || '',
                     productCode: product.productCode || product.code || '',
@@ -846,7 +860,8 @@
                     stockAvailable: parseNumber(product.stockAvailable),
                     barcode: product.barcode || '',
                     baseAmount: base,
-                    data: calculatePlans(base)
+                    costAmount: cost,
+                    data: calculatePlans(base, cost)
                 };
             }
 
@@ -975,6 +990,9 @@
                 if (scanProductMonthlyLongCash) {
                     scanProductMonthlyLongCash.textContent = moneyCompact(state.data.plans.MONTHLY_LONG.cashFee);
                 }
+                if (scanProductMonthlyLongPlan) {
+                    scanProductMonthlyLongPlan.classList.toggle('hidden', !state.data.monthlyLongEnabled);
+                }
                 setShareStatus('', null);
                 updateScannedProductClientHelp();
             }
@@ -991,6 +1009,7 @@
                     description: row.dataset.description || '',
                     imagePath: row.dataset.image || '',
                     stockAvailable: row.dataset.stockAvailable || 0,
+                    costAmount: row.dataset.cost || 0,
                     baseAmount: row.dataset.base || 0
                 };
             }
@@ -1013,7 +1032,8 @@
 
             function renderPanel(panel) {
                 const base = parseNumber(panel.dataset.base);
-                const data = calculatePlans(base);
+                const cost = parseNumber(panel.dataset.cost);
+                const data = calculatePlans(base, cost);
 
                 setPanelText(panel, '.js-base', money(base));
                 setPanelText(panel, '.js-contado', money(data.contado));
@@ -1030,6 +1050,10 @@
                 setPanelText(panel, '.js-semanal-ef', money(data.plans.WEEKLY.cashFee));
                 setPanelText(panel, '.js-mensual-corto-ef', money(data.plans.MONTHLY_SHORT.cashFee));
                 setPanelText(panel, '.js-mensual-largo-ef', money(data.plans.MONTHLY_LONG.cashFee));
+                const monthlyLongRow = panel.querySelector('.monthly-long-plan-row');
+                if (monthlyLongRow) {
+                    monthlyLongRow.classList.toggle('hidden', !data.monthlyLongEnabled);
+                }
 
                 panel.dataset.whatsappText = normalizeLineBreaks(buildShareText({
                     code: panel.dataset.code || '',
