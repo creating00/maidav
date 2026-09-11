@@ -61,6 +61,9 @@ public class CompanySettings extends BaseEntity {
     @Column(name = "calc_int_mes_largo", precision = 8, scale = 4)
     private BigDecimal calcIntMesLargo;
 
+    @Column(name = "calc_monthly_long_min_cost", precision = 14, scale = 2)
+    private BigDecimal calcMonthlyLongMinCost;
+
     @Column(name = "mora_notice_template", length = 2000)
     private String moraNoticeTemplate;
 
@@ -126,6 +129,9 @@ public class CompanySettings extends BaseEntity {
 
     public BigDecimal getCalcIntMesLargo() { return calcIntMesLargo; }
     public void setCalcIntMesLargo(BigDecimal calcIntMesLargo) { this.calcIntMesLargo = calcIntMesLargo; }
+
+    public BigDecimal getCalcMonthlyLongMinCost() { return calcMonthlyLongMinCost; }
+    public void setCalcMonthlyLongMinCost(BigDecimal calcMonthlyLongMinCost) { this.calcMonthlyLongMinCost = calcMonthlyLongMinCost; }
 
     public String getMoraNoticeTemplate() { return moraNoticeTemplate; }
     public void setMoraNoticeTemplate(String moraNoticeTemplate) { this.moraNoticeTemplate = moraNoticeTemplate; }

@@ -34,7 +34,8 @@
                       data-meses-corto=${calculatorConfig.mesesCorto},
                       data-int-mes-corto=${calculatorConfig.intMesCorto},
                       data-meses-largo=${calculatorConfig.mesesLargo},
-                      data-int-mes-largo=${calculatorConfig.intMesLargo}"
+                      data-int-mes-largo=${calculatorConfig.intMesLargo},
+                      data-monthly-long-min-cost=${calculatorConfig.monthlyLongMinCost}"
              class="hidden"></div>
         <div id="editManualInstallmentsData"
              th:if="${isEditing and editManualInstallmentAmounts != null}"
@@ -254,7 +255,7 @@
                                             data-plan="MONTHLY_SHORT">Aplicar 4 meses</button>
                                 </td>
                             </tr>
-                            <tr class="border-t bg-white">
+                            <tr class="border-t bg-white" id="calcMonthlyLongRow">
                                 <td class="px-3 py-2">Mensual largo</td>
                                 <td class="px-3 py-2" id="calcMes8Label">8 meses</td>
                                 <td class="px-3 py-2 font-semibold" id="calcMes8">$0</td>
@@ -467,10 +468,11 @@
                                 aria-hidden="true">
                             <option value="">Seleccionar producto</option>
                             <option th:each="product : ${products}"
-                                    th:value="${product.id}"
-                                    th:data-retail="${product.priceRetail}"
-                                    th:data-wholesale="${product.priceWholesale}"
-                                    th:data-cost-vat="${product.cost * (100 + product.vatRate) / 100}"
+                                     th:value="${product.id}"
+                                     th:data-retail="${product.priceRetail}"
+                                     th:data-wholesale="${product.priceWholesale}"
+                                     th:data-cost="${product.cost}"
+                                     th:data-cost-vat="${product.cost * (100 + product.vatRate) / 100}"
                                     th:data-barcode="${product.barcode}"
                                     th:data-product-code="${product.productCode}"
                                     th:data-description="${product.description}"
@@ -541,10 +543,11 @@
                                 aria-hidden="true">
                             <option value="">Seleccionar producto</option>
                             <option th:each="product : ${products}"
-                                    th:value="${product.id}"
-                                    th:data-retail="${product.priceRetail}"
-                                    th:data-wholesale="${product.priceWholesale}"
-                                    th:data-cost-vat="${product.cost * (100 + product.vatRate) / 100}"
+                                     th:value="${product.id}"
+                                     th:data-retail="${product.priceRetail}"
+                                     th:data-wholesale="${product.priceWholesale}"
+                                     th:data-cost="${product.cost}"
+                                     th:data-cost-vat="${product.cost * (100 + product.vatRate) / 100}"
                                     th:data-barcode="${product.barcode}"
                                     th:data-product-code="${product.productCode}"
                                     th:data-description="${product.description}"
@@ -921,6 +924,13 @@
                     return costWithVat;
                 }
                 return parseNumber(getPriceFromOption(option));
+            }
+
+            function getCostFromOption(option) {
+                if (!option) {
+                    return 0;
+                }
+                return parseNumber(option.dataset.cost);
             }
 
             function getProductOptionLabel(option) {
@@ -1762,6 +1772,20 @@
                 return Math.max(0, baseTotal - discount);
             }
 
+            function getCostCartTotal() {
+                let costTotal = 0;
+                body.querySelectorAll('tr').forEach(row => {
+                    const select = row.querySelector('.product-select');
+                    const option = select ? select.options[select.selectedIndex] : null;
+                    const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
+                    if (!option || !option.value || qty <= 0) {
+                        return;
+                    }
+                    costTotal += getCostFromOption(option) * qty;
+                });
+                return costTotal;
+            }
+
             function getCalcConfig() {
                 function data(name, fallback) {
                     if (!calcConfigEl) {
@@ -1781,8 +1805,14 @@
                     mesesCorto: Math.max(1, Math.round(parseNumber(data('mesesCorto', '4')))),
                     intMesCorto: parseNumber(data('intMesCorto', '2')),
                     mesesLargo: Math.max(1, Math.round(parseNumber(data('mesesLargo', '8')))),
-                    intMesLargo: parseNumber(data('intMesLargo', '2.5'))
+                    intMesLargo: parseNumber(data('intMesLargo', '2.5')),
+                    monthlyLongMinCost: parseNumber(data('monthlyLongMinCost', '0'))
                 };
+            }
+
+            function isMonthlyLongEnabled(costTotal, cfg) {
+                const minCost = cfg && cfg.monthlyLongMinCost ? cfg.monthlyLongMinCost : 0;
+                return minCost <= 0 || parseNumber(costTotal) >= minCost;
             }
 
             function setText(id, value) {
@@ -1794,6 +1824,7 @@
 
             function calculatePlans(base) {
                 const cfg = getCalcConfig();
+                const costTotal = getCostCartTotal();
                 const recargo = cfg.recargo > 0 ? cfg.recargo : 1;
                 const diaria = roundTo50((base * cfg.intDia * recargo) / cfg.dias);
                 const semanal = roundTo50((base * cfg.intSem * recargo) / cfg.semanas);
@@ -1803,6 +1834,7 @@
                 return {
                     cfg,
                     recargo,
+                    monthlyLongEnabled: isMonthlyLongEnabled(costTotal, cfg),
                     contado: roundTo50(base * cfg.multContado),
                     debito: roundTo50(base * cfg.multDebito),
                     plans: {
@@ -1829,6 +1861,9 @@
                 const data = calculatePlans(getBaseCartTotal());
                 if (preset.kind === 'PLAN') {
                     const plan = data.plans[preset.planKey];
+                    if (preset.planKey === 'MONTHLY_LONG' && !data.monthlyLongEnabled) {
+                        return null;
+                    }
                     if (!plan || plan.count < 1 || plan.fee <= 0) {
                         return null;
                     }
@@ -1954,6 +1989,10 @@
                 setText('calcSemEf', money(data.plans.WEEKLY.cashFee));
                 setText('calcMes4Ef', money(data.plans.MONTHLY_SHORT.cashFee));
                 setText('calcMes8Ef', money(data.plans.MONTHLY_LONG.cashFee));
+                const monthlyLongRow = document.getElementById('calcMonthlyLongRow');
+                if (monthlyLongRow) {
+                    monthlyLongRow.classList.toggle('hidden', !data.monthlyLongEnabled);
+                }
             }
 
             function applyTargetTotal(targetTotal) {
@@ -2673,6 +2712,9 @@
             function applyPlanToCart(planKey) {
                 const base = getBaseCartTotal();
                 const data = calculatePlans(base);
+                if (planKey === 'MONTHLY_LONG' && !data.monthlyLongEnabled) {
+                    return;
+                }
                 const plan = data.plans[planKey];
                 if (!plan || plan.count < 1 || plan.fee <= 0) {
                     return;

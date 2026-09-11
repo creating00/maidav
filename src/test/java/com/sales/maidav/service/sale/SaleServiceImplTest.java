@@ -12,6 +12,7 @@ import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.sale.SaleSellerChange;
 import com.sales.maidav.model.sale.SaleStatus;
+import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.product.ProductRepository;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
@@ -21,6 +22,7 @@ import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.sale.SaleRepository;
 import com.sales.maidav.repository.sale.SaleSellerChangeRepository;
 import com.sales.maidav.repository.user.UserRepository;
+import com.sales.maidav.service.settings.CompanySettingsService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -68,6 +70,8 @@ class SaleServiceImplTest {
     private UserRepository userRepository;
     @Mock
     private EntityManager entityManager;
+    @Mock
+    private CompanySettingsService companySettingsService;
 
     private SaleServiceImpl saleService;
 
@@ -82,7 +86,8 @@ class SaleServiceImplTest {
                 creditPaymentRepository,
                 saleSellerChangeRepository,
                 userRepository,
-                entityManager
+                entityManager,
+                companySettingsService
         );
     }
 
@@ -495,5 +500,84 @@ class SaleServiceImplTest {
         ArgumentCaptor<CreditAccount> accountCaptor = ArgumentCaptor.forClass(CreditAccount.class);
         verify(creditAccountRepository, atLeastOnce()).save(accountCaptor.capture());
         assertThat(accountCaptor.getValue().getTotalAmount()).isEqualByComparingTo("2200.00");
+    }
+
+    @Test
+    void createSaleRejectsMonthlyLongWhenCostIsBelowThreshold() {
+        Client client = new Client();
+        client.setId(7L);
+        User seller = new User();
+        seller.setId(13L);
+        Product product = new Product();
+        product.setId(9L);
+        product.setDescription("Modulo");
+        product.setStockAvailable(3);
+        product.setCost(new BigDecimal("14000.00"));
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcMesesLargo(8);
+        settings.setCalcMonthlyLongMinCost(new BigDecimal("15000.00"));
+
+        when(productRepository.findById(9L)).thenReturn(Optional.of(product));
+        when(companySettingsService.getSettings()).thenReturn(settings);
+
+        assertThatThrownBy(() -> saleService.createSale(
+                client,
+                seller,
+                PaymentType.CREDIT,
+                LocalDate.of(2026, 9, 11),
+                LocalDate.of(2026, 10, 10),
+                PaymentFrequency.MONTHLY,
+                List.of("10"),
+                BigDecimal.ZERO,
+                8,
+                List.of(new SaleItemInput(9L, 1, new BigDecimal("30000.00")))
+        ))
+                .isInstanceOf(InvalidSaleException.class)
+                .hasMessageContaining("8 cuotas");
+    }
+
+    @Test
+    void createSaleAllowsMonthlyShortWhenCostIsBelowThreshold() {
+        Client client = new Client();
+        client.setId(8L);
+        User seller = new User();
+        seller.setId(14L);
+        Product product = new Product();
+        product.setId(10L);
+        product.setDescription("Modulo");
+        product.setStockAvailable(3);
+        product.setCost(new BigDecimal("14000.00"));
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcMesesLargo(8);
+        settings.setCalcMonthlyLongMinCost(new BigDecimal("15000.00"));
+
+        when(productRepository.findById(10L)).thenReturn(Optional.of(product));
+        when(companySettingsService.getSettings()).thenReturn(settings);
+        when(saleRepository.save(any(Sale.class))).thenAnswer(invocation -> {
+            Sale saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(119L);
+            }
+            return saved;
+        });
+        when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        saleService.createSale(
+                client,
+                seller,
+                PaymentType.CREDIT,
+                LocalDate.of(2026, 9, 11),
+                LocalDate.of(2026, 10, 10),
+                PaymentFrequency.MONTHLY,
+                List.of("10"),
+                BigDecimal.ZERO,
+                4,
+                List.of(new SaleItemInput(10L, 1, new BigDecimal("30000.00")))
+        );
+
+        verify(creditInstallmentRepository, times(4)).save(any(CreditInstallment.class));
     }
 }

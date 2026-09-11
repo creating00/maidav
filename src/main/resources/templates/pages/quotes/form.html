@@ -74,7 +74,7 @@
                  th:text="${formError}"></div>
             <input type="hidden" name="draftState" id="draftStateInput" th:value="${draftState}">
             <div id="calcConfig" class="hidden"
-                 th:attr="data-recargo=${calculatorConfig.recargo},data-mult-contado=${calculatorConfig.multContado},data-mult-debito=${calculatorConfig.multDebito},data-dias=${calculatorConfig.dias},data-int-dia=${calculatorConfig.intDia},data-semanas=${calculatorConfig.semanas},data-int-sem=${calculatorConfig.intSem},data-meses-corto=${calculatorConfig.mesesCorto},data-int-mes-corto=${calculatorConfig.intMesCorto},data-meses-largo=${calculatorConfig.mesesLargo},data-int-mes-largo=${calculatorConfig.intMesLargo}"></div>
+                 th:attr="data-recargo=${calculatorConfig.recargo},data-mult-contado=${calculatorConfig.multContado},data-mult-debito=${calculatorConfig.multDebito},data-dias=${calculatorConfig.dias},data-int-dia=${calculatorConfig.intDia},data-semanas=${calculatorConfig.semanas},data-int-sem=${calculatorConfig.intSem},data-meses-corto=${calculatorConfig.mesesCorto},data-int-mes-corto=${calculatorConfig.intMesCorto},data-meses-largo=${calculatorConfig.mesesLargo},data-int-mes-largo=${calculatorConfig.intMesLargo},data-monthly-long-min-cost=${calculatorConfig.monthlyLongMinCost}"></div>
 
             <div class="grid gap-6 xl:grid-cols-[minmax(0,1.45fr)_390px]">
             <div class="quote-panel rounded-[2rem] p-5">
@@ -133,7 +133,7 @@
                     </div>
                     <div id="catalogList" class="mt-4 grid gap-3 md:grid-cols-2">
                         <button type="button" th:each="product : ${products}" class="catalog-item quote-product-card flex w-full items-center gap-4 rounded-[1.6rem] p-3 text-left"
-                                th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-barcode=${product.barcode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-cost-vat=${product.cost * (100 + product.vatRate) / 100},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + (product.barcode != null ? product.barcode : '') + ' ' + product.description}">
+                                th:attr="data-product-id=${product.id},data-description=${product.description},data-code=${product.productCode},data-barcode=${product.barcode},data-image=${product.imagePath},data-retail=${product.priceRetail},data-wholesale=${product.priceWholesale},data-cost=${product.cost},data-cost-vat=${product.cost * (100 + product.vatRate) / 100},data-stock=${product.stockAvailable},data-search=${(product.productCode != null ? product.productCode : '') + ' ' + (product.barcode != null ? product.barcode : '') + ' ' + product.description}">
                             <span class="quote-image-frame flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-[1.35rem]">
                                 <img th:if="${product.imagePath}" th:attr="data-src=${product.imagePath}" alt="Producto" class="hidden h-full w-full object-cover" loading="lazy" decoding="async"/>
                                 <span data-catalog-image-fallback class="quote-title text-xl font-bold text-[var(--quote-copper)]">+</span>
@@ -196,7 +196,7 @@
                     <div class="rounded-3xl border border-slate-200 bg-white px-5 py-4"><p id="dailyPlanMain" class="font-semibold text-[var(--quote-ink)]">Son 144 dias de $0</p></div>
                     <div class="rounded-3xl border border-slate-200 bg-white px-5 py-4"><p id="weeklyPlanMain" class="font-semibold text-[var(--quote-ink)]">Son 13 semanas de $0</p><p id="weeklyPlanPromo" class="mt-2 text-sm text-[var(--quote-copper)]">Si abonas en efectivo pagas la cuota $0</p></div>
                     <div class="rounded-3xl border border-slate-200 bg-white px-5 py-4"><p id="shortPlanMain" class="font-semibold text-[var(--quote-ink)]">Son 4 meses de $0</p><p id="shortPlanPromo" class="mt-2 text-sm text-[var(--quote-copper)]">Si abonas en efectivo pagas la cuota $0</p></div>
-                    <div class="rounded-3xl border border-slate-200 bg-white px-5 py-4"><p id="longPlanMain" class="font-semibold text-[var(--quote-ink)]">Son 8 meses de $0</p><p id="longPlanPromo" class="mt-2 text-sm text-[var(--quote-copper)]">Si abonas en efectivo pagas la cuota $0</p></div>
+                    <div id="longPlanCard" class="rounded-3xl border border-slate-200 bg-white px-5 py-4"><p id="longPlanMain" class="font-semibold text-[var(--quote-ink)]">Son 8 meses de $0</p><p id="longPlanPromo" class="mt-2 text-sm text-[var(--quote-copper)]">Si abonas en efectivo pagas la cuota $0</p></div>
                 </div>
                 <div class="mt-5 flex flex-col gap-3">
                     <button type="submit" class="w-full rounded-3xl bg-emerald-600 px-5 py-4 text-base font-semibold text-white hover:bg-emerald-700">Guardar presupuesto</button>
@@ -353,6 +353,18 @@
                 }, 0);
             }
 
+            function costSubtotal() {
+                return cart.reduce((sum, item) => {
+                    const product = catalog.get(item.productId);
+                    return product ? sum + parse(product.cost) * item.quantity : sum;
+                }, 0);
+            }
+
+            function isMonthlyLongEnabled() {
+                const minCost = cfg('monthlyLongMinCost');
+                return minCost <= 0 || costSubtotal() >= minCost;
+            }
+
             function plans(base) {
                 const recargo = cfg('recargo') || 1.26;
                 const daily = round50((base * (cfg('intDia') || 2) * recargo) / (cfg('dias') || 144));
@@ -365,7 +377,8 @@
                     daily: {count: cfg('dias') || 144, fee: daily},
                     weekly: {count: cfg('semanas') || 13, fee: weekly, cash: round50(weekly / recargo)},
                     short: {count: cfg('mesesCorto') || 4, fee: short, cash: round50(short / recargo)},
-                    long: {count: cfg('mesesLargo') || 8, fee: long, cash: round50(long / recargo)}
+                    long: {count: cfg('mesesLargo') || 8, fee: long, cash: round50(long / recargo)},
+                    monthlyLongEnabled: isMonthlyLongEnabled()
                 };
             }
 
@@ -401,6 +414,7 @@
                 $('shortPlanPromo').textContent = `Si abonas en efectivo pagas la cuota ${money(summary.short.cash)}`;
                 $('longPlanMain').textContent = `Son ${summary.long.count} meses de ${money(summary.long.fee)}`;
                 $('longPlanPromo').textContent = `Si abonas en efectivo pagas la cuota ${money(summary.long.cash)}`;
+                $('longPlanCard')?.classList.toggle('hidden', !summary.monthlyLongEnabled);
             }
 
             function renderCart() {
@@ -646,7 +660,7 @@
 
             function buildShareText() {
                 const summary = plans(financingSubtotal());
-                return [
+                const lines = [
                     'Presupuesto Maidav',
                     `Tipo de precio: ${$('priceMode').value === 'WHOLESALE' ? 'Mayorista' : 'Minorista'}`,
                     '',
@@ -658,9 +672,12 @@
                     `Debito / transferencia: ${money(summary.debit)}`,
                     `Diario: ${summary.daily.count} dias de ${money(summary.daily.fee)}`,
                     `Semanal: ${summary.weekly.count} semanas de ${money(summary.weekly.fee)} | Efectivo ${money(summary.weekly.cash)}`,
-                    `Mensual corto: ${summary.short.count} meses de ${money(summary.short.fee)} | Efectivo ${money(summary.short.cash)}`,
-                    `Mensual largo: ${summary.long.count} meses de ${money(summary.long.fee)} | Efectivo ${money(summary.long.cash)}`
-                ].join('\n');
+                    `Mensual corto: ${summary.short.count} meses de ${money(summary.short.fee)} | Efectivo ${money(summary.short.cash)}`
+                ];
+                if (summary.monthlyLongEnabled) {
+                    lines.push(`Mensual largo: ${summary.long.count} meses de ${money(summary.long.fee)} | Efectivo ${money(summary.long.cash)}`);
+                }
+                return lines.join('\n');
             }
 
             function buildShareModel() {
@@ -688,9 +705,10 @@
                     plans: [
                         {label: `Diario ${summary.daily.count} dias`, value: money(summary.daily.fee), note: ''},
                         {label: `Semanal ${summary.weekly.count} semanas`, value: money(summary.weekly.fee), note: `Efectivo ${money(summary.weekly.cash)}`},
-                        {label: `Mensual corto ${summary.short.count} meses`, value: money(summary.short.fee), note: `Efectivo ${money(summary.short.cash)}`},
+                        {label: `Mensual corto ${summary.short.count} meses`, value: money(summary.short.fee), note: `Efectivo ${money(summary.short.cash)}`}
+                    ].concat(summary.monthlyLongEnabled ? [
                         {label: `Mensual largo ${summary.long.count} meses`, value: money(summary.long.fee), note: `Efectivo ${money(summary.long.cash)}`}
-                    ]
+                    ] : [])
                 };
             }
 
@@ -933,6 +951,7 @@
                     image: button.dataset.image || '',
                     retail: parse(button.dataset.retail),
                     wholesale: parse(button.dataset.wholesale),
+                    cost: parse(button.dataset.cost),
                     costVat: parse(button.dataset.costVat),
                     stock: button.dataset.stock || '0'
                 });
