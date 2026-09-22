@@ -12,6 +12,7 @@ import com.sales.maidav.model.product.Product;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.settings.CompanySettings;
+import com.sales.maidav.service.sale.CreditPaymentPricingSupport;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
@@ -222,11 +223,11 @@ public class ExportDocumentService {
     }
 
     private BigDecimal installment(BigDecimal base, BigDecimal interest, BigDecimal recargo, int count) {
-        return round50(base.multiply(positive(interest, "2")).multiply(recargo).divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP));
+        return roundUpToFifty(base.multiply(positive(interest, "2")).multiply(recargo).divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP));
     }
 
     private BigDecimal cashInstallment(BigDecimal financedAmount, BigDecimal recargo) {
-        return round50(value(financedAmount).divide(positive(recargo, "1.26"), 2, RoundingMode.HALF_UP));
+        return roundUpToFifty(value(financedAmount).divide(positive(recargo, "1.26"), 2, RoundingMode.HALF_UP));
     }
 
     private float[] relativeWidths(List<String> headers) {
@@ -247,6 +248,7 @@ public class ExportDocumentService {
     }
 
     private BigDecimal round50(BigDecimal value) { return value.divide(BigDecimal.valueOf(50), 0, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(50)); }
+    private BigDecimal roundUpToFifty(BigDecimal value) { return CreditPaymentPricingSupport.roundUpToFifty(value); }
     private BigDecimal positive(BigDecimal value, String fallback) { return value != null && value.signum() > 0 ? value : new BigDecimal(fallback); }
     private BigDecimal value(BigDecimal value) { return value == null ? BigDecimal.ZERO : value; }
     private int whole(Integer value, int fallback) { return value == null || value < 1 ? fallback : value; }

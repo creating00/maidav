@@ -188,9 +188,6 @@
                                 <p id="scanProductDailyLabel" class="text-lg font-semibold text-white">Diaria (144 dias)</p>
                                 <p id="scanProductDailyFee" class="text-2xl font-black text-white">$0</p>
                             </div>
-                            <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
-                                Pagando la cuota en efectivo: <span id="scanProductDailyCash">$0</span>
-                            </div>
                         </article>
                         <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
                             <div class="flex items-center justify-between gap-3">
@@ -200,7 +197,7 @@
                             <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
                                 Pagando la cuota en efectivo: <span id="scanProductWeeklyCash">$0</span>
                             </div>
-                        </article>
+                                                </article>
                         <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
                             <div class="flex items-center justify-between gap-3">
                                 <p id="scanProductMonthlyShortLabel" class="text-lg font-semibold text-white">Mensual (4 meses)</p>
@@ -209,7 +206,7 @@
                             <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
                                 Pagando la cuota en efectivo: <span id="scanProductMonthlyShortCash">$0</span>
                             </div>
-                        </article>
+                                                </article>
                         <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
                             <div class="flex items-center justify-between gap-3">
                                 <p id="scanProductMonthlyLongLabel" class="text-lg font-semibold text-white">Mensual (8 meses)</p>
@@ -672,7 +669,6 @@
             const scanProductDebitHero = document.getElementById('scanProductDebitHero');
             const scanProductDailyLabel = document.getElementById('scanProductDailyLabel');
             const scanProductDailyFee = document.getElementById('scanProductDailyFee');
-            const scanProductDailyCash = document.getElementById('scanProductDailyCash');
             const scanProductWeeklyLabel = document.getElementById('scanProductWeeklyLabel');
             const scanProductWeeklyFee = document.getElementById('scanProductWeeklyFee');
             const scanProductWeeklyCash = document.getElementById('scanProductWeeklyCash');
@@ -817,7 +813,7 @@
                     contado: roundTo50(base * cfg.multContado),
                     debito: roundTo50(base * cfg.multDebito),
                     plans: {
-                        DAILY: {count: cfg.dias, fee: diaria, cashFee: roundTo50(diaria / recargo)},
+                        DAILY: {count: cfg.dias, fee: diaria, cashFee: null},
                         WEEKLY: {count: cfg.semanas, fee: semanal, cashFee: roundTo50(semanal / recargo)},
                         MONTHLY_SHORT: {count: cfg.mesesCorto, fee: mensualCorto, cashFee: roundTo50(mensualCorto / recargo)},
                         MONTHLY_LONG: {count: cfg.mesesLargo, fee: mensualLargo, cashFee: roundTo50(mensualLargo / recargo)}
@@ -840,7 +836,7 @@
                 lines.push('\uD83D\uDCB5 Efectivo: ' + moneyCompact(data.contado));
                 lines.push('\uD83D\uDCB3 Debito: ' + moneyCompact(data.debito));
                 lines.push('---------------------------');
-                lines.push('\uD83D\uDDD3 Diaria (' + data.plans.DAILY.count + ' dias): ' + moneyCompact(data.plans.DAILY.fee) + ' (Efe: ' + moneyCompact(data.plans.DAILY.cashFee) + ')');
+                lines.push('\uD83D\uDDD3 Diaria (' + data.plans.DAILY.count + ' dias): ' + moneyCompact(data.plans.DAILY.fee));
                 lines.push('\uD83D\uDDD3 Semanal (' + data.plans.WEEKLY.count + ' semanas): ' + moneyCompact(data.plans.WEEKLY.fee) + ' (Efe: ' + moneyCompact(data.plans.WEEKLY.cashFee) + ')');
                 lines.push('\uD83D\uDDD3 Mensual ' + data.cfg.mesesCorto + ': ' + moneyCompact(data.plans.MONTHLY_SHORT.fee) + ' (Efe: ' + moneyCompact(data.plans.MONTHLY_SHORT.cashFee) + ')');
                 if (data.monthlyLongEnabled) {
@@ -960,9 +956,6 @@
                 if (scanProductDailyFee) {
                     scanProductDailyFee.textContent = moneyCompact(state.data.plans.DAILY.fee);
                 }
-                if (scanProductDailyCash) {
-                    scanProductDailyCash.textContent = moneyCompact(state.data.plans.DAILY.cashFee);
-                }
                 if (scanProductWeeklyLabel) {
                     scanProductWeeklyLabel.textContent = 'Semanal (' + state.data.cfg.semanas + ' semanas)';
                 }
@@ -1046,7 +1039,7 @@
                 setPanelText(panel, '.js-semanal', money(data.plans.WEEKLY.fee));
                 setPanelText(panel, '.js-mensual-corto', money(data.plans.MONTHLY_SHORT.fee));
                 setPanelText(panel, '.js-mensual-largo', money(data.plans.MONTHLY_LONG.fee));
-                setPanelText(panel, '.js-dia-ef', money(data.plans.DAILY.cashFee));
+                setPanelText(panel, '.js-dia-ef', 'No aplica');
                 setPanelText(panel, '.js-semanal-ef', money(data.plans.WEEKLY.cashFee));
                 setPanelText(panel, '.js-mensual-corto-ef', money(data.plans.MONTHLY_SHORT.cashFee));
                 setPanelText(panel, '.js-mensual-largo-ef', money(data.plans.MONTHLY_LONG.cashFee));

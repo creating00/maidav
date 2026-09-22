@@ -409,6 +409,51 @@ class SaleServiceImplTest {
     }
 
     @Test
+    void createSaleDoesNotPersistManualCashAmountsForDailyInstallments() {
+        Client client = new Client();
+        client.setId(15L);
+        User seller = new User();
+        seller.setId(16L);
+        Product product = new Product();
+        product.setId(17L);
+        product.setDescription("Silla");
+        product.setStockAvailable(4);
+        when(productRepository.findById(17L)).thenReturn(Optional.of(product));
+        when(saleRepository.save(any(Sale.class))).thenAnswer(invocation -> {
+            Sale saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(119L);
+            }
+            return saved;
+        });
+        when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        saleService.createSale(
+                client,
+                seller,
+                PaymentType.CREDIT,
+                null,
+                LocalDate.of(2026, 8, 19),
+                LocalDate.of(2026, 8, 20),
+                PaymentFrequency.DAILY,
+                List.of("WEDNESDAY"),
+                BigDecimal.ZERO,
+                2,
+                List.of(new BigDecimal("1200.00"), new BigDecimal("1300.00")),
+                List.of(new BigDecimal("900.00"), new BigDecimal("1000.00")),
+                List.of(new SaleItemInput(17L, 1, new BigDecimal("2500.00")))
+        );
+
+        ArgumentCaptor<CreditInstallment> installmentsCaptor = ArgumentCaptor.forClass(CreditInstallment.class);
+        verify(creditInstallmentRepository, times(2)).save(installmentsCaptor.capture());
+        assertThat(installmentsCaptor.getAllValues())
+                .extracting(CreditInstallment::getCashAmount)
+                .containsOnlyNulls();
+    }
+    @Test
     void createSaleUsesManualInstallmentAmountsWhenProvided() {
         Client client = new Client();
         client.setId(5L);

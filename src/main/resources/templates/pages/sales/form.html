@@ -226,7 +226,7 @@
                                 <td class="px-3 py-2">Diaria</td>
                                 <td class="px-3 py-2" id="calcDiasLabel">144 dias</td>
                                 <td class="px-3 py-2 font-semibold" id="calcDia">$0</td>
-                                <td class="px-3 py-2" id="calcDiaEf">$0</td>
+                                <td class="px-3 py-2" id="calcDiaEf">No aplica</td>
                                 <td class="px-3 py-2 text-right">
                                     <button type="button"
                                             class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
@@ -1838,7 +1838,7 @@
                     contado: roundTo50(base * cfg.multContado),
                     debito: roundTo50(base * cfg.multDebito),
                     plans: {
-                        DAILY: {count: cfg.dias, fee: diaria, cashFee: roundTo50(diaria / recargo), frequency: 'DAILY'},
+                        DAILY: {count: cfg.dias, fee: diaria, cashFee: null, frequency: 'DAILY'},
                         WEEKLY: {count: cfg.semanas, fee: semanal, cashFee: roundTo50(semanal / recargo), frequency: 'WEEKLY'},
                         MONTHLY_SHORT: {count: cfg.mesesCorto, fee: mensualCorto, cashFee: roundTo50(mensualCorto / recargo), frequency: 'MONTHLY'},
                         MONTHLY_LONG: {count: cfg.mesesLargo, fee: mensualLargo, cashFee: roundTo50(mensualLargo / recargo), frequency: 'MONTHLY'}
@@ -1985,7 +1985,7 @@
                 setText('calcSem', money(data.plans.WEEKLY.fee));
                 setText('calcMes4', money(data.plans.MONTHLY_SHORT.fee));
                 setText('calcMes8', money(data.plans.MONTHLY_LONG.fee));
-                setText('calcDiaEf', money(data.plans.DAILY.cashFee));
+                setText('calcDiaEf', 'No aplica');
                 setText('calcSemEf', money(data.plans.WEEKLY.cashFee));
                 setText('calcMes4Ef', money(data.plans.MONTHLY_SHORT.cashFee));
                 setText('calcMes8Ef', money(data.plans.MONTHLY_LONG.cashFee));
@@ -2122,10 +2122,11 @@
                     ? calculatePlans(getBaseCartTotal()).plans[appliedPricingPreset.planKey]
                     : null;
                 const regularAmount = plan ? plan.fee : (count > 0 ? Number((total / count).toFixed(2)) : 0);
-                const regularCashAmount = plan ? plan.cashFee : regularAmount;
+                const frequency = paymentFrequency ? paymentFrequency.value : '';
+                const supportsCashInstallments = frequency !== 'DAILY';
+                const regularCashAmount = supportsCashInstallments && plan ? plan.cashFee : regularAmount;
                 let accumulated = 0;
                 const firstDue = toDateOnly(firstDueDateInput ? firstDueDateInput.value : '');
-                const frequency = paymentFrequency ? paymentFrequency.value : '';
 
                 for (let i = 0; i < count; i++) {
                     let amount = existingValues[i];
@@ -2147,11 +2148,13 @@
                         'class="manual-installment-amount w-full rounded border border-slate-300 px-3 py-2" ' +
                         'value="' + Number(numericAmount).toFixed(2) + '"/>' +
                         '</td>' +
-                        '<td class="px-3 py-2">' +
-                        '<input type="number" step="0.01" min="0.01" name="manualCashInstallmentAmounts" ' +
-                        'class="manual-cash-installment-amount w-full rounded border border-slate-300 px-3 py-2" ' +
-                        'value="' + Number(cashAmount > 0 ? cashAmount : numericAmount).toFixed(2) + '"/>' +
-                        '</td>';
+                        (supportsCashInstallments
+                            ? '<td class="px-3 py-2">' +
+                              '<input type="number" step="0.01" min="0.01" name="manualCashInstallmentAmounts" ' +
+                              'class="manual-cash-installment-amount w-full rounded border border-slate-300 px-3 py-2" ' +
+                              'value="' + Number(cashAmount > 0 ? cashAmount : numericAmount).toFixed(2) + '"/>' +
+                              '</td>'
+                            : '<td class="px-3 py-2 text-slate-500">No aplica</td>');
                     manualInstallmentsBody.appendChild(tr);
                 }
 
@@ -2193,7 +2196,9 @@
                     .reduce((sum, input) => sum + parseNumber(input.value), 0);
                 const manualCashTotal = getManualCashInstallmentInputs()
                     .reduce((sum, input) => sum + parseNumber(input.value), 0);
-                manualInstallmentsSummary.textContent = 'Total financiado: ' + money(manualTotal) + ' | Total efectivo: ' + money(manualCashTotal);
+                manualInstallmentsSummary.textContent = getManualCashInstallmentInputs().length
+                    ? 'Total financiado: ' + money(manualTotal) + ' | Total efectivo: ' + money(manualCashTotal)
+                    : 'Total financiado: ' + money(manualTotal);
                 manualInstallmentsSummary.classList.toggle('border-red-200', false);
                 manualInstallmentsSummary.classList.toggle('bg-red-50', false);
                 manualInstallmentsSummary.classList.toggle('text-red-700', false);

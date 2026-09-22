@@ -5,6 +5,8 @@ import com.sales.maidav.model.product.Provider;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.settings.CompanySettings;
+import com.sales.maidav.model.quote.QuotePlanType;
+import com.sales.maidav.service.quote.QuoteCalculator;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
 
@@ -122,6 +124,42 @@ class ExportDocumentServiceTest {
         }
     }
 
+    @Test
+    void financingExportUsesTheSameRoundUpRuleAsQuotePlans() throws Exception {
+        Product product = new Product();
+        product.setProductCode("P-PARITY");
+        product.setDescription("Producto de paridad");
+        product.setCost(new BigDecimal("100001.00"));
+        product.setVatRate(BigDecimal.ZERO);
+
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcRecargo(new BigDecimal("1.26"));
+        settings.setCalcIntDia(new BigDecimal("2.00"));
+        settings.setCalcDias(144);
+        settings.setCalcIntSem(new BigDecimal("2.00"));
+        settings.setCalcSemanas(13);
+        settings.setCalcIntMesCorto(new BigDecimal("2.00"));
+        settings.setCalcMesesCorto(4);
+        settings.setCalcIntMesLargo(new BigDecimal("2.50"));
+        settings.setCalcMesesLargo(8);
+
+        byte[] excel = exportDocumentService.productPrices(List.of(product), ExportDocumentService.PriceListType.FINANCING,
+                ExportDocumentService.ExportFormat.EXCEL, settings);
+        var plans = new QuoteCalculator().calculatePlanSnapshots(product.getCost(), settings).stream()
+                .collect(java.util.stream.Collectors.toMap(plan -> plan.planType(), plan -> plan.feeAmount()));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(excel))) {
+            var row = workbook.getSheetAt(0).getRow(2);
+            assertThat(row.getCell(12).getStringCellValue()).isEqualTo(money(plans.get(QuotePlanType.DAILY)));
+            assertThat(row.getCell(11).getStringCellValue()).isEqualTo(money(plans.get(QuotePlanType.WEEKLY)));
+            assertThat(row.getCell(9).getStringCellValue()).isEqualTo(money(plans.get(QuotePlanType.MONTHLY_SHORT)));
+            assertThat(row.getCell(7).getStringCellValue()).isEqualTo(money(plans.get(QuotePlanType.MONTHLY_LONG)));
+        }
+    }
+
+    private String money(BigDecimal amount) {
+        return "$ " + amount.setScale(2).toPlainString();
+    }
     @Test
     void includesAssociatedProductsInSalesExcelExport() throws Exception {
         Product product = new Product();
