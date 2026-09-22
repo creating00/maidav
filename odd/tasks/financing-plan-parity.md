@@ -44,7 +44,8 @@ Completed 2026-09-22.
 
 - FIN-01: financing export installments and their cash alternatives now reuse `CreditPaymentPricingSupport.roundUpToFifty`; parity coverage compares 144 days, 13 weeks, 4 months, and 8 months against `QuoteCalculator` using a non-product-specific fixture.
 - FIN-02: product quick-view, shared WhatsApp text, and sales form no longer calculate or display a daily cash installment; daily schedule creation discards supplied manual cash values before persistence. Weekly and monthly cash values remain unchanged.
-- FIN-03: `mvn "-Dtest=ExportDocumentServiceTest,SaleServiceImplTest" test` passed: ExportDocumentServiceTest (5 tests) and SaleServiceImplTest (14 tests), 0 failures/errors.
+- FIN-03 original verification: `mvn "-Dtest=ExportDocumentServiceTest,SaleServiceImplTest" test` passed: ExportDocumentServiceTest (5 tests) and SaleServiceImplTest (14 tests), 0 failures/errors.
+- Independent re-run: the same Maven command exited 1 before test discovery or execution because it could not resolve `spring-boot-starter-parent:3.5.9` from Maven Central (`Permission denied`). This is a network/permission limitation, not a test failure; no test totals were produced on that re-run.
 
 ## Next step
 
