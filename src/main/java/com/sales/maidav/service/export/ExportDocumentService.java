@@ -181,10 +181,11 @@ public class ExportDocumentService {
             BigDecimal weeklyTransfer = installment(base, settings.getCalcIntSem(), recargo, whole(settings.getCalcSemanas(), 13));
             BigDecimal monthlyShortTransfer = installment(base, settings.getCalcIntMesCorto(), recargo, whole(settings.getCalcMesesCorto(), 4));
             BigDecimal monthlyLongTransfer = installment(base, settings.getCalcIntMesLargo(), recargo, whole(settings.getCalcMesesLargo(), 8));
+            boolean monthlyLongEnabled = isMonthlyLongEnabled(product, settings);
             row.add(money(cashPrice(base, settings)));
             row.add(money(round50(base.multiply(positive(settings.getCalcMultDebito(), "1.50")))));
-            row.add(money(cashInstallment(monthlyLongTransfer, recargo)));
-            row.add(money(monthlyLongTransfer));
+            row.add(monthlyLongEnabled ? money(cashInstallment(monthlyLongTransfer, recargo)) : "No aplica");
+            row.add(monthlyLongEnabled ? money(monthlyLongTransfer) : "No aplica");
             row.add(money(cashInstallment(monthlyShortTransfer, recargo)));
             row.add(money(monthlyShortTransfer));
             row.add(money(cashInstallment(weeklyTransfer, recargo)));
@@ -192,6 +193,16 @@ public class ExportDocumentService {
             row.add(money(dailyTransfer));
         }
         return row;
+    }
+
+    private boolean isMonthlyLongEnabled(Product product, CompanySettings settings) {
+        BigDecimal minCost = settings == null ? null : settings.getCalcMonthlyLongMinCost();
+        if (minCost == null || minCost.compareTo(BigDecimal.ZERO) <= 0) {
+            return true;
+        }
+        return value(product == null ? null : product.getCost())
+                .setScale(2, RoundingMode.HALF_UP)
+                .compareTo(minCost.setScale(2, RoundingMode.HALF_UP)) >= 0;
     }
 
     private BigDecimal cashPrice(Product product, CompanySettings settings) {

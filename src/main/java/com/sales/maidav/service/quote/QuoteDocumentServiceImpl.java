@@ -119,6 +119,7 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
         List<QuotePdfItem> items = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal financingBaseAmount = BigDecimal.ZERO;
+        BigDecimal costAmount = BigDecimal.ZERO;
 
         for (QuoteItemInput input : inputs) {
             if (input.productId() == null || input.quantity() == null || input.quantity() <= 0) {
@@ -142,11 +143,17 @@ public class QuoteDocumentServiceImpl implements QuoteDocumentService {
             ));
             totalAmount = totalAmount.add(lineTotal);
             financingBaseAmount = financingBaseAmount.add(financingLineTotal);
+            costAmount = costAmount.add(QuotePricingSupport.resolveCost(product)
+                    .multiply(BigDecimal.valueOf(input.quantity())));
         }
 
         BigDecimal normalizedTotal = scaled(totalAmount);
         BigDecimal normalizedFinancingBaseAmount = scaled(financingBaseAmount);
-        List<QuotePdfPlan> plans = quoteCalculator.calculatePlanSnapshots(normalizedFinancingBaseAmount, settings).stream()
+        List<QuotePdfPlan> plans = quoteCalculator.calculatePlanSnapshots(
+                        normalizedFinancingBaseAmount,
+                        costAmount.setScale(2, RoundingMode.HALF_UP),
+                        settings
+                ).stream()
                 .map(plan -> new QuotePdfPlan(plan.title(), plan.promoText()))
                 .toList();
 

@@ -13,6 +13,7 @@ public record QuoteCalculatorConfig(
         Integer mesesCorto,
         BigDecimal intMesCorto,
         Integer mesesLargo,
-        BigDecimal intMesLargo
+        BigDecimal intMesLargo,
+        BigDecimal monthlyLongMinCost
 ) {
 }

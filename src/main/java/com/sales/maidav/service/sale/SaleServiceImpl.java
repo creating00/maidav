@@ -3,10 +3,12 @@ package com.sales.maidav.service.sale;
 import com.sales.maidav.model.client.Client;
 import com.sales.maidav.model.product.Product;
 import com.sales.maidav.model.sale.*;
+import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.product.ProductRepository;
 import com.sales.maidav.repository.sale.*;
 import com.sales.maidav.repository.user.UserRepository;
+import com.sales.maidav.service.settings.CompanySettingsService;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -40,6 +42,7 @@ public class SaleServiceImpl implements SaleService {
     private final SaleSellerChangeRepository saleSellerChangeRepository;
     private final UserRepository userRepository;
     private final EntityManager entityManager;
+    private final CompanySettingsService companySettingsService;
 
     @Override
     public List<Sale> findAll() {
@@ -138,6 +141,7 @@ public class SaleServiceImpl implements SaleService {
 
         List<SaleItem> saleItems = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
+        BigDecimal costTotal = BigDecimal.ZERO;
 
         for (SaleItemInput input : items) {
             if (input.getProductId() == null || input.getQuantity() == null || input.getUnitPrice() == null) {
@@ -165,7 +169,10 @@ public class SaleServiceImpl implements SaleService {
             item.setLineTotal(lineTotal);
             saleItems.add(item);
             total = total.add(lineTotal);
+            costTotal = costTotal.add(resolveProductCost(product).multiply(BigDecimal.valueOf(input.getQuantity())));
         }
+
+        validateMonthlyLongPlanEligibility(paymentType, paymentFrequency, weeksCount, costTotal);
 
         total = resolveManualSaleTotal(total, paymentType, manualInstallmentAmounts);
         if (paymentType == PaymentType.CREDIT && manualInstallmentAmounts != null) {
@@ -313,6 +320,7 @@ public class SaleServiceImpl implements SaleService {
         // Build new items
         List<SaleItem> saleItems = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
+        BigDecimal costTotal = BigDecimal.ZERO;
 
         for (SaleItemInput input : items) {
             if (input.getProductId() == null || input.getQuantity() == null || input.getUnitPrice() == null) {
@@ -340,7 +348,10 @@ public class SaleServiceImpl implements SaleService {
             item.setLineTotal(lineTotal);
             saleItems.add(item);
             total = total.add(lineTotal);
+            costTotal = costTotal.add(resolveProductCost(product).multiply(BigDecimal.valueOf(input.getQuantity())));
         }
+
+        validateMonthlyLongPlanEligibility(paymentType, paymentFrequency, weeksCount, costTotal);
 
         total = resolveManualSaleTotal(total, paymentType, manualInstallmentAmounts);
         if (paymentType == PaymentType.CREDIT && manualInstallmentAmounts != null) {
@@ -567,6 +578,39 @@ public class SaleServiceImpl implements SaleService {
             return null;
         }
         return paymentCollectionMethod == null ? PaymentCollectionMethod.BANK : paymentCollectionMethod;
+    }
+
+    private void validateMonthlyLongPlanEligibility(PaymentType paymentType,
+                                                   PaymentFrequency paymentFrequency,
+                                                   Integer weeksCount,
+                                                   BigDecimal costTotal) {
+        if (paymentType != PaymentType.CREDIT || paymentFrequency != PaymentFrequency.MONTHLY || weeksCount == null) {
+            return;
+        }
+        CompanySettings settings = companySettingsService.getSettings();
+        if (settings == null) {
+            settings = new CompanySettings();
+        }
+        int monthlyLongCount = settings.getCalcMesesLargo() == null || settings.getCalcMesesLargo() < 1
+                ? 8
+                : settings.getCalcMesesLargo();
+        BigDecimal minCost = settings.getCalcMonthlyLongMinCost();
+        if (weeksCount != monthlyLongCount || minCost == null || minCost.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+        BigDecimal normalizedCostTotal = (costTotal == null ? BigDecimal.ZERO : costTotal).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal normalizedMinCost = minCost.setScale(2, RoundingMode.HALF_UP);
+        if (normalizedCostTotal.compareTo(normalizedMinCost) < 0) {
+            throw new InvalidSaleException("El plan de " + monthlyLongCount
+                    + " cuotas solo esta disponible desde un costo de $" + normalizedMinCost.toPlainString());
+        }
+    }
+
+    private BigDecimal resolveProductCost(Product product) {
+        if (product == null || product.getCost() == null || product.getCost().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return product.getCost().setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal resolveManualSaleTotal(BigDecimal currentTotal,

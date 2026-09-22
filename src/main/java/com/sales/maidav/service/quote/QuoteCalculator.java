@@ -25,12 +25,20 @@ public class QuoteCalculator {
                 integer(safeSettings.getCalcMesesCorto(), 4),
                 decimal(safeSettings.getCalcIntMesCorto(), "2.00"),
                 integer(safeSettings.getCalcMesesLargo(), 8),
-                decimal(safeSettings.getCalcIntMesLargo(), "2.50")
+                decimal(safeSettings.getCalcIntMesLargo(), "2.50"),
+                amount(safeSettings.getCalcMonthlyLongMinCost())
         );
     }
 
     public List<QuotePlanSnapshot> calculatePlanSnapshots(BigDecimal baseAmount, CompanySettings settings) {
+        return calculatePlanSnapshots(baseAmount, baseAmount, settings);
+    }
+
+    public List<QuotePlanSnapshot> calculatePlanSnapshots(BigDecimal baseAmount,
+                                                          BigDecimal monthlyLongEligibilityAmount,
+                                                          CompanySettings settings) {
         BigDecimal normalizedBase = normalize(baseAmount);
+        BigDecimal normalizedEligibilityAmount = normalize(monthlyLongEligibilityAmount);
         QuoteCalculatorConfig cfg = readConfig(settings);
         BigDecimal recargo = cfg.recargo().compareTo(BigDecimal.ZERO) > 0 ? cfg.recargo() : new BigDecimal("1.26");
 
@@ -43,44 +51,50 @@ public class QuoteCalculator {
         BigDecimal monthlyShortCash = cashInstallmentAmount(monthlyShortFee, recargo);
         BigDecimal monthlyLongCash = cashInstallmentAmount(monthlyLongFee, recargo);
 
-        return List.of(
-                new QuotePlanSnapshot(
-                        QuotePlanType.DAILY,
-                        "Son " + cfg.dias() + " dias de $" + amountText(dailyFee),
-                        null,
-                        cfg.dias(),
-                        dailyFee,
-                        null,
-                        1
-                ),
-                new QuotePlanSnapshot(
-                        QuotePlanType.WEEKLY,
-                        "Son " + cfg.semanas() + " semanas de $" + amountText(weeklyFee),
-                        "Si abonas en efectivo pagas la cuota $" + amountText(weeklyCash),
-                        cfg.semanas(),
-                        weeklyFee,
-                        weeklyCash,
-                        2
-                ),
-                new QuotePlanSnapshot(
-                        QuotePlanType.MONTHLY_SHORT,
-                        "Son " + cfg.mesesCorto() + " meses de $" + amountText(monthlyShortFee),
-                        "Si abonas en efectivo pagas la cuota $" + amountText(monthlyShortCash),
-                        cfg.mesesCorto(),
-                        monthlyShortFee,
-                        monthlyShortCash,
-                        3
-                ),
-                new QuotePlanSnapshot(
-                        QuotePlanType.MONTHLY_LONG,
-                        "Son " + cfg.mesesLargo() + " meses de $" + amountText(monthlyLongFee),
-                        "Si abonas en efectivo pagas la cuota $" + amountText(monthlyLongCash),
-                        cfg.mesesLargo(),
-                        monthlyLongFee,
-                        monthlyLongCash,
-                        4
-                )
-        );
+        java.util.ArrayList<QuotePlanSnapshot> plans = new java.util.ArrayList<>();
+        plans.add(new QuotePlanSnapshot(
+                QuotePlanType.DAILY,
+                "Son " + cfg.dias() + " dias de $" + amountText(dailyFee),
+                null,
+                cfg.dias(),
+                dailyFee,
+                null,
+                1
+        ));
+        plans.add(new QuotePlanSnapshot(
+                QuotePlanType.WEEKLY,
+                "Son " + cfg.semanas() + " semanas de $" + amountText(weeklyFee),
+                "Si abonas en efectivo pagas la cuota $" + amountText(weeklyCash),
+                cfg.semanas(),
+                weeklyFee,
+                weeklyCash,
+                2
+        ));
+        plans.add(new QuotePlanSnapshot(
+                QuotePlanType.MONTHLY_SHORT,
+                "Son " + cfg.mesesCorto() + " meses de $" + amountText(monthlyShortFee),
+                "Si abonas en efectivo pagas la cuota $" + amountText(monthlyShortCash),
+                cfg.mesesCorto(),
+                monthlyShortFee,
+                monthlyShortCash,
+                3
+        ));
+        if (isMonthlyLongEnabled(normalizedEligibilityAmount, cfg.monthlyLongMinCost())) {
+            plans.add(new QuotePlanSnapshot(
+                    QuotePlanType.MONTHLY_LONG,
+                    "Son " + cfg.mesesLargo() + " meses de $" + amountText(monthlyLongFee),
+                    "Si abonas en efectivo pagas la cuota $" + amountText(monthlyLongCash),
+                    cfg.mesesLargo(),
+                    monthlyLongFee,
+                    monthlyLongCash,
+                    4
+            ));
+        }
+        return plans;
+    }
+
+    public boolean isMonthlyLongEnabled(BigDecimal eligibilityAmount, CompanySettings settings) {
+        return isMonthlyLongEnabled(normalize(eligibilityAmount), readConfig(settings).monthlyLongMinCost());
     }
 
     public BigDecimal calculateCashTotal(BigDecimal baseAmount, CompanySettings settings) {
@@ -120,6 +134,19 @@ public class QuoteCalculator {
 
     private BigDecimal decimal(BigDecimal value, String fallback) {
         return value == null ? new BigDecimal(fallback) : value.setScale(4, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal amount(BigDecimal value) {
+        if (value == null || value.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        return value.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private boolean isMonthlyLongEnabled(BigDecimal eligibilityAmount, BigDecimal minCost) {
+        return minCost == null
+                || minCost.compareTo(BigDecimal.ZERO) <= 0
+                || normalize(eligibilityAmount).compareTo(minCost.setScale(2, RoundingMode.HALF_UP)) >= 0;
     }
 
     private Integer integer(Integer value, int fallback) {

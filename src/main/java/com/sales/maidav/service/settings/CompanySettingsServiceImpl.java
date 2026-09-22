@@ -33,6 +33,10 @@ public class CompanySettingsServiceImpl implements CompanySettingsService {
         settings.setMoraNoticeTemplate(trimToNull(settings.getMoraNoticeTemplate()));
         settings.setMoraNoticeTemplateBeforeDue(trimToNull(settings.getMoraNoticeTemplateBeforeDue()));
         settings.setMoraNoticeTemplateAfterDue(trimToNull(settings.getMoraNoticeTemplateAfterDue()));
+        if (settings.getCalcMonthlyLongMinCost() != null
+                && settings.getCalcMonthlyLongMinCost().compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("El costo minimo para plan largo no puede ser negativo");
+        }
         if (settings.getMoraNoticeTemplateBeforeDue() == null) {
             throw new IllegalArgumentException("La plantilla antes del vencimiento es obligatoria");
         }

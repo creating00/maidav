@@ -77,6 +77,7 @@ public class QuoteServiceImpl implements QuoteService {
         List<QuoteItem> items = new ArrayList<>();
         BigDecimal totalAmount = BigDecimal.ZERO;
         BigDecimal financingBaseAmount = BigDecimal.ZERO;
+        BigDecimal costAmount = BigDecimal.ZERO;
 
         for (int index = 0; index < inputs.size(); index++) {
             QuoteItemInput input = inputs.get(index);
@@ -112,6 +113,8 @@ public class QuoteServiceImpl implements QuoteService {
 
             totalAmount = totalAmount.add(lineTotal);
             financingBaseAmount = financingBaseAmount.add(financingLineTotal);
+            costAmount = costAmount.add(QuotePricingSupport.resolveCost(product)
+                    .multiply(BigDecimal.valueOf(input.quantity())));
         }
 
         BigDecimal pricingBaseAmount = totalAmount.setScale(2, RoundingMode.HALF_UP);
@@ -132,7 +135,11 @@ public class QuoteServiceImpl implements QuoteService {
             quote.addItem(item);
         }
 
-        for (QuotePlanSnapshot snapshot : quoteCalculator.calculatePlanSnapshots(normalizedFinancingBaseAmount, settings)) {
+        for (QuotePlanSnapshot snapshot : quoteCalculator.calculatePlanSnapshots(
+                normalizedFinancingBaseAmount,
+                costAmount.setScale(2, RoundingMode.HALF_UP),
+                settings
+        )) {
             QuotePlanOption option = new QuotePlanOption();
             option.setDisplayOrder(snapshot.displayOrder());
             option.setPlanType(snapshot.planType());
