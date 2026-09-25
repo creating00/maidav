@@ -145,6 +145,29 @@ class CreditAccountServiceImplTest {
     }
 
     @Test
+    void partialCashPaymentRoundsFinancedImpactToFiftyAndReconcilesFinalPayment() {
+        CreditAccount account = account(200L, PaymentFrequency.WEEKLY, "32700.00");
+        CreditInstallment installment = installment(account, 2001L, 1, "32700.00", LocalDate.now().plusDays(1));
+        mockAccount(account, List.of(installment), new BigDecimal("1.26"));
+
+        CreditPayment partialPayment = service.registerPayment(
+                200L, new BigDecimal("12000.00"), null, "tester", PaymentCollectionMethod.CASH, null);
+
+        assertThat(partialPayment.getImpactAmount()).isEqualByComparingTo("15100.00");
+        assertThat(installment.getPaidAmount()).isEqualByComparingTo("15100.00");
+        assertThat(account.getBalance()).isEqualByComparingTo("17600.00");
+
+        CreditPayment finalPayment = service.registerPayment(
+                200L, new BigDecimal("14000.00"), null, "tester", PaymentCollectionMethod.CASH, null);
+
+        assertThat(finalPayment.getImpactAmount()).isEqualByComparingTo("17600.00");
+        assertThat(installment.getPaidAmount()).isEqualByComparingTo("32700.00");
+        assertThat(installment.getStatus()).isEqualTo(InstallmentStatus.PAID);
+        assertThat(account.getBalance()).isEqualByComparingTo("0.00");
+        assertThat(account.getStatus()).isEqualTo(AccountStatus.CLOSED);
+    }
+
+    @Test
     void paymentInDateWithBankUsesFinancedValue() {
         CreditAccount account = account(22L, PaymentFrequency.WEEKLY, "1200.00");
         CreditInstallment installment = installment(account, 221L, 1, "1200.00", LocalDate.now());
