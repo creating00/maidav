@@ -132,10 +132,13 @@ public final class CreditPaymentPricingSupport {
         BigDecimal ratio = normalizedCollected
                 .divide(collectedNeeded, 8, RoundingMode.HALF_UP)
                 .min(BigDecimal.ONE);
-        return normalizedRemaining
+        BigDecimal impact = normalizedRemaining
                 .multiply(ratio)
                 .setScale(2, RoundingMode.HALF_UP)
                 .min(normalizedRemaining);
+        return normalizedCollected.compareTo(collectedNeeded) < 0
+                ? roundToNearestFifty(impact).min(normalizedRemaining)
+                : impact;
     }
 
     public static BigDecimal roundUpToFifty(BigDecimal amount) {
@@ -145,6 +148,17 @@ public final class CreditPaymentPricingSupport {
         BigDecimal factor = new BigDecimal("50");
         return amount
                 .divide(factor, 0, RoundingMode.CEILING)
+                .multiply(factor)
+                .setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public static BigDecimal roundToNearestFifty(BigDecimal amount) {
+        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
+        BigDecimal factor = new BigDecimal("50");
+        return amount
+                .divide(factor, 0, RoundingMode.HALF_UP)
                 .multiply(factor)
                 .setScale(2, RoundingMode.HALF_UP);
     }
