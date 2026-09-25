@@ -506,10 +506,13 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         BigDecimal ratio = collectedAmount
                 .divide(collectedNeeded, 8, RoundingMode.HALF_UP)
                 .min(BigDecimal.ONE);
-        return financedRemaining
+        BigDecimal impact = financedRemaining
                 .multiply(ratio)
                 .setScale(2, RoundingMode.HALF_UP)
                 .min(financedRemaining);
+        return collectedAmount.compareTo(collectedNeeded) < 0
+                ? CreditPaymentPricingSupport.roundToNearestFifty(impact).min(financedRemaining)
+                : impact;
     }
 
     private boolean usesManualCashAmount(CreditAccount account,
