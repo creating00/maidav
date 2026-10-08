@@ -11,6 +11,7 @@ import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.service.sale.CreditPaymentPricingSupport;
+import com.sales.maidav.service.export.CreditAccountExportService;
 import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.sale.InvalidSaleException;
 import com.sales.maidav.service.sale.MoraWarningInfo;
@@ -20,6 +21,9 @@ import com.sales.maidav.util.SearchTextNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -48,6 +52,7 @@ public class CreditAccountController {
     private final CompanySettingsService companySettingsService;
     private final SaleItemRepository saleItemRepository;
     private final UserService userService;
+    private final CreditAccountExportService creditAccountExportService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('ARREARS_READ')")
@@ -56,28 +61,8 @@ public class CreditAccountController {
                        @RequestParam(required = false, defaultValue = "false") boolean priorityFirst,
                        Authentication authentication,
                        Model model) {
-        List<CreditAccount> accounts = creditAccountService.findAll();
+        List<CreditAccount> accounts = filteredAccounts(q, sellerId, authentication);
         Long effectiveSellerId = resolveSellerFilter(authentication, sellerId);
-        if (effectiveSellerId != null) {
-            // FILTRO POR VENDEDOR
-            // FILTRO VENDEDOR BACKEND
-            accounts = accounts.stream()
-                    .filter(account -> account.getSale() != null
-                            && account.getSale().getSeller() != null
-                            && effectiveSellerId.equals(account.getSale().getSeller().getId()))
-                    .toList();
-        }
-        if (q != null && !q.isBlank()) {
-            String term = SearchTextNormalizer.normalize(q);
-            accounts = accounts.stream()
-                    .filter(a -> contains(String.valueOf(a.getId()), term)
-                            || contains(a.getAccountNumber(), term)
-                            || contains(a.getClient() != null ? a.getClient().getNationalId() : null, term)
-                            || contains(a.getClient() != null ? a.getClient().getFirstName() : null, term)
-                            || contains(a.getClient() != null ? a.getClient().getLastName() : null, term)
-                            || contains(a.getStatus() != null ? a.getStatus().name() : null, term))
-                    .toList();
-        }
         Map<Long, BigDecimal> currentInstallments = new HashMap<>();
         Map<Long, String> dueSchedules = new HashMap<>();
         Map<Long, MoraWarningInfo> moraWarnings = new HashMap<>();
@@ -105,6 +90,44 @@ public class CreditAccountController {
         model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount, moraWarnings, priorityFirst));
         model.addAttribute("isAdmin", isAdmin(authentication));
         return "pages/accounts/index";
+    }
+
+    @GetMapping("/export")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> export(@RequestParam(required = false) String q,
+                                         @RequestParam(required = false) Long sellerId,
+                                         Authentication authentication) {
+        byte[] workbook = creditAccountExportService.export(filteredAccounts(q, sellerId, authentication));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=cuentas_credito.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(workbook);
+    }
+
+    private List<CreditAccount> filteredAccounts(String q, Long sellerId, Authentication authentication) {
+        List<CreditAccount> accounts = creditAccountService.findAll();
+        Long effectiveSellerId = resolveSellerFilter(authentication, sellerId);
+        if (effectiveSellerId != null) {
+            // FILTRO POR VENDEDOR
+            // FILTRO VENDEDOR BACKEND
+            accounts = accounts.stream()
+                    .filter(account -> account.getSale() != null
+                            && account.getSale().getSeller() != null
+                            && effectiveSellerId.equals(account.getSale().getSeller().getId()))
+                    .toList();
+        }
+        if (q != null && !q.isBlank()) {
+            String term = SearchTextNormalizer.normalize(q);
+            accounts = accounts.stream()
+                    .filter(a -> contains(String.valueOf(a.getId()), term)
+                            || contains(a.getAccountNumber(), term)
+                            || contains(a.getClient() != null ? a.getClient().getNationalId() : null, term)
+                            || contains(a.getClient() != null ? a.getClient().getFirstName() : null, term)
+                            || contains(a.getClient() != null ? a.getClient().getLastName() : null, term)
+                            || contains(a.getStatus() != null ? a.getStatus().name() : null, term))
+                    .toList();
+        }
+        return accounts;
     }
 
     @GetMapping("/{id}")

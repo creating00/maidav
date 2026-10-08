@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CreditPaymentRepository extends JpaRepository<CreditPayment, Long> {
+    List<CreditPayment> findByAccount_IdIn(List<Long> accountIds);
     List<CreditPayment> findByAccount_IdOrderByPaidAtDesc(Long accountId);
     List<CreditPayment> findByAccount_IdOrderByPaidAtDescIdDesc(Long accountId);
     List<CreditPayment> findByAccount_IdOrderByPaidAtAscIdAsc(Long accountId);

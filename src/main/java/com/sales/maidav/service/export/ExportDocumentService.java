@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -59,6 +60,11 @@ public class ExportDocumentService {
                 money(sale.getTotalAmount())
         )).toList();
         return generate("Ventas", headers, rows, format);
+    }
+
+    public byte[] creditAccounts(List<String> headers, List<List<String>> rows) {
+        return excel("Cuentas de credito", headers, rows,
+                Set.of(8, 9, 16, 17, 18, 19, 20, 21, 22, 23));
     }
 
     private byte[] generate(String title, List<String> headers, List<List<String>> rows, ExportFormat format) {
@@ -100,6 +106,10 @@ public class ExportDocumentService {
     }
 
     private byte[] excel(String title, List<String> headers, List<List<String>> rows) {
+        return excel(title, headers, rows, Set.of());
+    }
+
+    private byte[] excel(String title, List<String> headers, List<List<String>> rows, Set<Integer> numericColumns) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             XSSFSheet sheet = workbook.createSheet(title.length() > 31 ? title.substring(0, 31) : title);
             CellStyle headerStyle = workbook.createCellStyle();
@@ -121,7 +131,17 @@ public class ExportDocumentService {
             for (List<String> values : rows) {
                 org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIndex++);
                 for (int column = 0; column < values.size(); column++) {
-                    row.createCell(column).setCellValue(values.get(column));
+                    Cell cell = row.createCell(column);
+                    String value = values.get(column);
+                    if (numericColumns.contains(column) && value != null && !value.isBlank()) {
+                        try {
+                            cell.setCellValue(new BigDecimal(value).doubleValue());
+                        } catch (NumberFormatException ex) {
+                            cell.setCellValue(value);
+                        }
+                    } else {
+                        cell.setCellValue(value);
+                    }
                 }
             }
             sheet.createFreezePane(0, 2);
