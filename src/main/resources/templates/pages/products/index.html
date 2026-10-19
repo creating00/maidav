@@ -183,7 +183,7 @@
                 <section>
                     <p class="mb-2 text-xs font-black uppercase tracking-[0.24em] text-amber-300">Planes de financiacion</p>
                     <div class="space-y-3">
-                        <article id="scanProductMonthlyLongPlan" class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
+                        <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
                             <div class="flex items-center justify-between gap-3">
                                 <p id="scanProductDailyLabel" class="text-lg font-semibold text-white">Diaria (144 dias)</p>
                                 <p id="scanProductDailyFee" class="text-2xl font-black text-white">$0</p>
@@ -197,7 +197,7 @@
                             <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
                                 Pagando la cuota en efectivo: <span id="scanProductWeeklyCash">$0</span>
                             </div>
-                                                </article>
+                        </article>
                         <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
                             <div class="flex items-center justify-between gap-3">
                                 <p id="scanProductMonthlyShortLabel" class="text-lg font-semibold text-white">Mensual (4 meses)</p>
@@ -206,8 +206,8 @@
                             <div class="mt-3 rounded-xl bg-amber-400 px-4 py-3 text-sm font-black text-slate-950">
                                 Pagando la cuota en efectivo: <span id="scanProductMonthlyShortCash">$0</span>
                             </div>
-                                                </article>
-                        <article class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
+                        </article>
+                        <article id="scanProductMonthlyLongPlan" class="rounded-[1.4rem] border border-cyan-300/20 bg-white/6 px-4 py-3">
                             <div class="flex items-center justify-between gap-3">
                                 <p id="scanProductMonthlyLongLabel" class="text-lg font-semibold text-white">Mensual (8 meses)</p>
                                 <p id="scanProductMonthlyLongFee" class="text-2xl font-black text-white">$0</p>
@@ -550,7 +550,7 @@
                                     </tr>
                                     </thead>
                                     <tbody>
-                                    <tr class="border-t monthly-long-plan-row">
+                                    <tr class="border-t">
                                         <td class="px-2 py-2">Diaria</td>
                                         <td class="px-2 py-2 js-dias-label">144 dias</td>
                                         <td class="px-2 py-2 font-semibold js-dia">$0.00</td>
@@ -568,7 +568,7 @@
                                         <td class="px-2 py-2 font-semibold js-mensual-corto">$0.00</td>
                                         <td class="px-2 py-2 js-mensual-corto-ef">$0.00</td>
                                     </tr>
-                                    <tr class="border-t">
+                                    <tr class="border-t monthly-long-plan-row">
                                         <td class="px-2 py-2">Mensual largo</td>
                                         <td class="px-2 py-2 js-meses-largo-label">8 meses</td>
                                         <td class="px-2 py-2 font-semibold js-mensual-largo">$0.00</td>

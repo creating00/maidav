@@ -306,7 +306,7 @@
                                     <th class="px-3 py-2">Cuota</th>
                                     <th class="px-3 py-2">Vencimiento estimado</th>
                                     <th class="px-3 py-2">Importe financiado</th>
-                                    <th class="px-3 py-2">Importe efectivo</th>
+                                    <th class="px-3 py-2" id="manualCashInstallmentsHeader">Importe efectivo</th>
                                 </tr>
                                 </thead>
                                 <tbody id="manualInstallmentsBody"></tbody>
@@ -2127,6 +2127,7 @@
                 const regularCashAmount = supportsCashInstallments && plan ? plan.cashFee : regularAmount;
                 let accumulated = 0;
                 const firstDue = toDateOnly(firstDueDateInput ? firstDueDateInput.value : '');
+                document.getElementById('manualCashInstallmentsHeader')?.classList.toggle('hidden', !supportsCashInstallments);
 
                 for (let i = 0; i < count; i++) {
                     let amount = existingValues[i];
@@ -2154,7 +2155,7 @@
                               'class="manual-cash-installment-amount w-full rounded border border-slate-300 px-3 py-2" ' +
                               'value="' + Number(cashAmount > 0 ? cashAmount : numericAmount).toFixed(2) + '"/>' +
                               '</td>'
-                            : '<td class="px-3 py-2 text-slate-500">No aplica</td>');
+                            : '');
                     manualInstallmentsBody.appendChild(tr);
                 }
 
@@ -2216,7 +2217,9 @@
                 getManualInstallmentInputs().concat(getManualCashInstallmentInputs()).forEach(input => {
                     input.disabled = !enabled;
                 });
-                if (enabled && (options && options.rebuild || getManualInstallmentInputs().length === 0)) {
+                const cashInputsExpected = paymentFrequency?.value !== 'DAILY';
+                const cashInputsPresent = getManualCashInstallmentInputs().length > 0;
+                if (enabled && (options && options.rebuild || getManualInstallmentInputs().length === 0 || cashInputsExpected !== cashInputsPresent)) {
                     buildManualInstallmentRows(options);
                 } else {
                     updateManualInstallmentsSummary();
