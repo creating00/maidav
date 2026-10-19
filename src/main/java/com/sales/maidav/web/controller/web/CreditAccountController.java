@@ -8,6 +8,7 @@ import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.model.sale.CreditInstallment;
 import com.sales.maidav.model.sale.InstallmentStatus;
 import com.sales.maidav.model.sale.PaymentCollectionMethod;
+import com.sales.maidav.model.sale.PaymentFrequency;
 import com.sales.maidav.model.sale.SaleItem;
 import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.service.sale.CreditPaymentPricingSupport;
@@ -810,6 +811,9 @@ public class CreditAccountController {
     private BigDecimal resolveFullCashAmount(CreditAccount account,
                                              CreditInstallment installment,
                                              BigDecimal cashRecargo) {
+        if (account.getPaymentFrequency() == PaymentFrequency.DAILY) {
+            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+        }
         if (installment.getCashAmount() != null && installment.getCashAmount().compareTo(BigDecimal.ZERO) > 0) {
             return installment.getCashAmount().setScale(2, RoundingMode.HALF_UP);
         }

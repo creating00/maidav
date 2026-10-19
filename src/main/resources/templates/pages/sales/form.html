@@ -226,7 +226,7 @@
                                 <td class="px-3 py-2">Diaria</td>
                                 <td class="px-3 py-2" id="calcDiasLabel">144 dias</td>
                                 <td class="px-3 py-2 font-semibold" id="calcDia">$0</td>
-                                <td class="px-3 py-2" id="calcDiaEf">$0</td>
+                                <td class="px-3 py-2" id="calcDiaEf">No aplica</td>
                                 <td class="px-3 py-2 text-right">
                                     <button type="button"
                                             class="apply-plan rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700"
@@ -306,7 +306,7 @@
                                     <th class="px-3 py-2">Cuota</th>
                                     <th class="px-3 py-2">Vencimiento estimado</th>
                                     <th class="px-3 py-2">Importe financiado</th>
-                                    <th class="px-3 py-2">Importe efectivo</th>
+                                    <th class="px-3 py-2" id="manualCashInstallmentsHeader">Importe efectivo</th>
                                 </tr>
                                 </thead>
                                 <tbody id="manualInstallmentsBody"></tbody>
@@ -1838,7 +1838,7 @@
                     contado: roundTo50(base * cfg.multContado),
                     debito: roundTo50(base * cfg.multDebito),
                     plans: {
-                        DAILY: {count: cfg.dias, fee: diaria, cashFee: roundTo50(diaria / recargo), frequency: 'DAILY'},
+                        DAILY: {count: cfg.dias, fee: diaria, cashFee: null, frequency: 'DAILY'},
                         WEEKLY: {count: cfg.semanas, fee: semanal, cashFee: roundTo50(semanal / recargo), frequency: 'WEEKLY'},
                         MONTHLY_SHORT: {count: cfg.mesesCorto, fee: mensualCorto, cashFee: roundTo50(mensualCorto / recargo), frequency: 'MONTHLY'},
                         MONTHLY_LONG: {count: cfg.mesesLargo, fee: mensualLargo, cashFee: roundTo50(mensualLargo / recargo), frequency: 'MONTHLY'}
@@ -1985,7 +1985,7 @@
                 setText('calcSem', money(data.plans.WEEKLY.fee));
                 setText('calcMes4', money(data.plans.MONTHLY_SHORT.fee));
                 setText('calcMes8', money(data.plans.MONTHLY_LONG.fee));
-                setText('calcDiaEf', money(data.plans.DAILY.cashFee));
+                setText('calcDiaEf', 'No aplica');
                 setText('calcSemEf', money(data.plans.WEEKLY.cashFee));
                 setText('calcMes4Ef', money(data.plans.MONTHLY_SHORT.cashFee));
                 setText('calcMes8Ef', money(data.plans.MONTHLY_LONG.cashFee));
@@ -2126,6 +2126,8 @@
                 let accumulated = 0;
                 const firstDue = toDateOnly(firstDueDateInput ? firstDueDateInput.value : '');
                 const frequency = paymentFrequency ? paymentFrequency.value : '';
+                const cashPricingAvailable = frequency !== 'DAILY';
+                document.getElementById('manualCashInstallmentsHeader')?.classList.toggle('hidden', !cashPricingAvailable);
 
                 for (let i = 0; i < count; i++) {
                     let amount = existingValues[i];
@@ -2146,12 +2148,12 @@
                         '<input type="number" step="0.01" min="0.01" name="manualInstallmentAmounts" ' +
                         'class="manual-installment-amount w-full rounded border border-slate-300 px-3 py-2" ' +
                         'value="' + Number(numericAmount).toFixed(2) + '"/>' +
-                        '</td>' +
+                        '</td>' + (cashPricingAvailable ?
                         '<td class="px-3 py-2">' +
                         '<input type="number" step="0.01" min="0.01" name="manualCashInstallmentAmounts" ' +
                         'class="manual-cash-installment-amount w-full rounded border border-slate-300 px-3 py-2" ' +
                         'value="' + Number(cashAmount > 0 ? cashAmount : numericAmount).toFixed(2) + '"/>' +
-                        '</td>';
+                        '</td>' : '');
                     manualInstallmentsBody.appendChild(tr);
                 }
 
@@ -2193,7 +2195,8 @@
                     .reduce((sum, input) => sum + parseNumber(input.value), 0);
                 const manualCashTotal = getManualCashInstallmentInputs()
                     .reduce((sum, input) => sum + parseNumber(input.value), 0);
-                manualInstallmentsSummary.textContent = 'Total financiado: ' + money(manualTotal) + ' | Total efectivo: ' + money(manualCashTotal);
+                manualInstallmentsSummary.textContent = 'Total financiado: ' + money(manualTotal)
+                    + (paymentFrequency?.value === 'DAILY' ? '' : ' | Total efectivo: ' + money(manualCashTotal));
                 manualInstallmentsSummary.classList.toggle('border-red-200', false);
                 manualInstallmentsSummary.classList.toggle('bg-red-50', false);
                 manualInstallmentsSummary.classList.toggle('text-red-700', false);
@@ -2211,7 +2214,9 @@
                 getManualInstallmentInputs().concat(getManualCashInstallmentInputs()).forEach(input => {
                     input.disabled = !enabled;
                 });
-                if (enabled && (options && options.rebuild || getManualInstallmentInputs().length === 0)) {
+                const cashInputsExpected = paymentFrequency?.value !== 'DAILY';
+                const cashInputsPresent = getManualCashInstallmentInputs().length > 0;
+                if (enabled && (options && options.rebuild || getManualInstallmentInputs().length === 0 || cashInputsExpected !== cashInputsPresent)) {
                     buildManualInstallmentRows(options);
                 } else {
                     updateManualInstallmentsSummary();

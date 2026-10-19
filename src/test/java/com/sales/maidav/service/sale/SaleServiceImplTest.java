@@ -28,6 +28,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -454,6 +456,44 @@ class SaleServiceImplTest {
                         new BigDecimal("1500.00"),
                         new BigDecimal("2300.00")
                 );
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = PaymentFrequency.class, names = {"DAILY", "WEEKLY", "MONTHLY"})
+    void createSaleStoresManualCashAmountsOnlyForEligibleFrequencies(PaymentFrequency frequency) {
+        Client client = new Client();
+        User seller = new User();
+        Product product = new Product();
+        product.setId(7L);
+        product.setStockAvailable(3);
+        when(productRepository.findById(7L)).thenReturn(Optional.of(product));
+        when(saleRepository.save(any(Sale.class))).thenAnswer(invocation -> {
+            Sale saved = invocation.getArgument(0);
+            saved.setId(117L);
+            return saved;
+        });
+        when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        saleService.createSale(
+                client, seller, PaymentType.CREDIT, null,
+                LocalDate.of(2026, 8, 19), LocalDate.of(2026, 8, 26),
+                frequency, frequency == PaymentFrequency.MONTHLY ? List.of("26") : List.of("WEDNESDAY"),
+                BigDecimal.ZERO, 2,
+                List.of(new BigDecimal("1500.00"), new BigDecimal("1500.00")),
+                List.of(new BigDecimal("1200.00"), new BigDecimal("1200.00")),
+                List.of(new SaleItemInput(7L, 1, new BigDecimal("3000.00")))
+        );
+
+        ArgumentCaptor<CreditInstallment> captor = ArgumentCaptor.forClass(CreditInstallment.class);
+        verify(creditInstallmentRepository, times(2)).save(captor.capture());
+        assertThat(captor.getAllValues()).allSatisfy(installment -> {
+            assertThat(installment.getAmount()).isEqualByComparingTo("1500.00");
+            if (frequency == PaymentFrequency.DAILY) {
+                assertThat(installment.getCashAmount()).isNull();
+            } else {
+                assertThat(installment.getCashAmount()).isEqualByComparingTo("1200.00");
+            }
+        });
     }
 
     @Test

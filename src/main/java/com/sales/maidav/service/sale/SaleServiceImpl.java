@@ -528,10 +528,9 @@ public class SaleServiceImpl implements SaleService {
                 weeksCount,
                 manualInstallmentAmounts
         );
-        List<BigDecimal> cashInstallmentAmounts = resolveManualCashInstallmentAmounts(
-                weeksCount,
-                manualCashInstallmentAmounts
-        );
+        List<BigDecimal> cashInstallmentAmounts = paymentFrequency == PaymentFrequency.DAILY
+                ? null
+                : resolveManualCashInstallmentAmounts(weeksCount, manualCashInstallmentAmounts);
 
         CreditAccount account = new CreditAccount();
         account.setSale(sale);
