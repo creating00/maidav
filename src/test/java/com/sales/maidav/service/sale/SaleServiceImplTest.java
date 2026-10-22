@@ -10,6 +10,7 @@ import com.sales.maidav.model.sale.PaymentFrequency;
 import com.sales.maidav.model.sale.PaymentType;
 import com.sales.maidav.model.sale.Sale;
 import com.sales.maidav.model.sale.SaleItem;
+import com.sales.maidav.model.sale.SaleIdempotencyKey;
 import com.sales.maidav.model.sale.SaleSellerChange;
 import com.sales.maidav.model.sale.SaleStatus;
 import com.sales.maidav.model.settings.CompanySettings;
@@ -19,6 +20,7 @@ import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
+import com.sales.maidav.repository.sale.SaleIdempotencyKeyRepository;
 import com.sales.maidav.repository.sale.SaleRepository;
 import com.sales.maidav.repository.sale.SaleSellerChangeRepository;
 import com.sales.maidav.repository.user.UserRepository;
@@ -31,6 +33,9 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -43,9 +48,13 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -56,6 +65,8 @@ class SaleServiceImplTest {
     private SaleRepository saleRepository;
     @Mock
     private SaleItemRepository saleItemRepository;
+    @Mock
+    private SaleIdempotencyKeyRepository saleIdempotencyKeyRepository;
     @Mock
     private ProductRepository productRepository;
     @Mock
@@ -80,6 +91,7 @@ class SaleServiceImplTest {
         saleService = new SaleServiceImpl(
                 saleRepository,
                 saleItemRepository,
+                saleIdempotencyKeyRepository,
                 productRepository,
                 creditAccountRepository,
                 creditInstallmentRepository,
@@ -89,6 +101,7 @@ class SaleServiceImplTest {
                 entityManager,
                 companySettingsService
         );
+        lenient().when(productRepository.decrementStockIfAvailable(anyLong(), anyInt())).thenReturn(1);
     }
 
     @AfterEach
@@ -119,6 +132,28 @@ class SaleServiceImplTest {
     }
 
     @Test
+    void findPageDelegatesNormalizedFiltersToDatabase() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "admin@maidav.com",
+                        "secret",
+                        List.of(() -> "ROLE_ADMIN")
+                )
+        );
+        Sale sale = new Sale();
+        Page<Sale> expected = new PageImpl<>(List.of(sale));
+        when(saleRepository.findPageForListing(eq(null), eq(PaymentType.CREDIT), eq(false),
+                eq(SaleStatus.VOID), eq(AccountStatus.VOID), eq("%jose%"), any(Pageable.class)))
+                .thenReturn(expected);
+
+        Page<Sale> result = saleService.findPage(" José ", PaymentType.CREDIT, false, -1, 20);
+
+        assertThat(result.getContent()).containsExactly(sale);
+        verify(saleRepository).findPageForListing(eq(null), eq(PaymentType.CREDIT), eq(false),
+                eq(SaleStatus.VOID), eq(AccountStatus.VOID), eq("%jose%"), any(Pageable.class));
+    }
+
+    @Test
     void voidSaleRestoresProductStockForRelatedItems() {
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(
@@ -133,12 +168,14 @@ class SaleServiceImplTest {
         sale.setStatus(SaleStatus.ACTIVE);
 
         Product firstProduct = new Product();
+        firstProduct.setId(1L);
         firstProduct.setStockAvailable(3);
         SaleItem firstItem = new SaleItem();
         firstItem.setProduct(firstProduct);
         firstItem.setQuantity(2);
 
         Product secondProduct = new Product();
+        secondProduct.setId(2L);
         secondProduct.setStockAvailable(0);
         SaleItem secondItem = new SaleItem();
         secondItem.setProduct(secondProduct);
@@ -150,10 +187,8 @@ class SaleServiceImplTest {
         saleService.voidSale(7L);
 
         assertThat(sale.getStatus()).isEqualTo(SaleStatus.VOID);
-        assertThat(firstProduct.getStockAvailable()).isEqualTo(5);
-        assertThat(secondProduct.getStockAvailable()).isEqualTo(5);
-        verify(productRepository).save(firstProduct);
-        verify(productRepository).save(secondProduct);
+        verify(productRepository).incrementStock(1L, 2);
+        verify(productRepository).incrementStock(2L, 5);
     }
 
     @Test
@@ -263,7 +298,7 @@ class SaleServiceImplTest {
         saleService.voidSale(8L);
 
         verify(saleItemRepository, never()).findBySale_IdOrderByIdAsc(any());
-        verify(productRepository, never()).save(any());
+        verify(productRepository, never()).incrementStock(any(), anyInt());
     }
 
     @Test
@@ -336,7 +371,6 @@ class SaleServiceImplTest {
         when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
         Sale sale = saleService.createSale(
                 client,
                 seller,
@@ -350,7 +384,7 @@ class SaleServiceImplTest {
                 List.of(new SaleItemInput(5L, 1, new BigDecimal("100000.00")))
         );
         assertThat(sale.getSaleNumber()).isEqualTo("V-000115");
-        assertThat(product.getStockAvailable()).isEqualTo(9);
+        verify(productRepository).decrementStockIfAvailable(5L, 1);
         ArgumentCaptor<CreditInstallment> installmentsCaptor = ArgumentCaptor.forClass(CreditInstallment.class);
         verify(creditInstallmentRepository, times(4)).save(installmentsCaptor.capture());
         assertThat(installmentsCaptor.getAllValues())
@@ -383,7 +417,6 @@ class SaleServiceImplTest {
         when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
         saleService.createSale(
                 client,
                 seller,
@@ -429,7 +462,6 @@ class SaleServiceImplTest {
         when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         saleService.createSale(
                 client,
@@ -475,7 +507,6 @@ class SaleServiceImplTest {
             return saved;
         });
         when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -563,7 +594,6 @@ class SaleServiceImplTest {
         when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         saleService.createSale(
                 client,
@@ -579,5 +609,166 @@ class SaleServiceImplTest {
         );
 
         verify(creditInstallmentRepository, times(4)).save(any(CreditInstallment.class));
+    }
+
+    @Test
+    void createSaleRejectsWhenAtomicStockReservationFails() {
+        Client client = new Client();
+        client.setId(9L);
+        User seller = new User();
+        seller.setId(15L);
+        Product product = new Product();
+        product.setId(11L);
+        product.setDescription("Silla");
+        product.setStockAvailable(1);
+
+        when(productRepository.findById(11L)).thenReturn(Optional.of(product));
+        when(productRepository.decrementStockIfAvailable(11L, 2)).thenReturn(0);
+
+        assertThatThrownBy(() -> saleService.createSale(
+                client,
+                seller,
+                PaymentType.CASH,
+                LocalDate.of(2026, 10, 21),
+                null,
+                null,
+                List.of(),
+                BigDecimal.ZERO,
+                null,
+                List.of(new SaleItemInput(11L, 2, new BigDecimal("100.00")))
+        ))
+                .isInstanceOf(InvalidSaleException.class)
+                .hasMessage("Stock insuficiente para Silla");
+
+        verify(saleRepository, never()).save(any(Sale.class));
+        verify(saleItemRepository, never()).save(any(SaleItem.class));
+    }
+
+    @Test
+    void createSaleReservesCombinedQuantityForRepeatedProductLines() {
+        Client client = new Client();
+        client.setId(10L);
+        User seller = new User();
+        seller.setId(16L);
+        Product product = new Product();
+        product.setId(12L);
+        product.setDescription("Mesa");
+        product.setStockAvailable(3);
+
+        when(productRepository.findById(12L)).thenReturn(Optional.of(product));
+        when(saleRepository.save(any(Sale.class))).thenAnswer(invocation -> {
+            Sale saved = invocation.getArgument(0);
+            if (saved.getId() == null) {
+                saved.setId(120L);
+            }
+            return saved;
+        });
+
+        saleService.createSale(
+                client,
+                seller,
+                PaymentType.CASH,
+                LocalDate.of(2026, 10, 21),
+                null,
+                null,
+                List.of(),
+                BigDecimal.ZERO,
+                null,
+                List.of(
+                        new SaleItemInput(12L, 1, new BigDecimal("100.00")),
+                        new SaleItemInput(12L, 2, new BigDecimal("100.00"))
+                )
+        );
+
+        verify(productRepository).decrementStockIfAvailable(12L, 3);
+    }
+
+    @Test
+    void updateSaleAppliesOnlyTheNetStockChangePerProduct() {
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(
+                        "admin@maidav.com",
+                        "secret",
+                        List.of(() -> "ROLE_ADMIN")
+                )
+        );
+
+        Sale sale = new Sale();
+        sale.setId(13L);
+        sale.setStatus(SaleStatus.ACTIVE);
+        sale.setPaymentType(PaymentType.CASH);
+
+        Product existingProduct = new Product();
+        existingProduct.setId(13L);
+        existingProduct.setDescription("Base");
+        SaleItem existingItem = new SaleItem();
+        existingItem.setProduct(existingProduct);
+        existingItem.setQuantity(3);
+
+        Product newProduct = new Product();
+        newProduct.setId(14L);
+        newProduct.setDescription("Respaldo");
+        when(saleRepository.findById(13L)).thenReturn(Optional.of(sale));
+        when(saleItemRepository.findBySale_IdOrderByIdAsc(13L)).thenReturn(List.of(existingItem));
+        when(productRepository.findById(13L)).thenReturn(Optional.of(existingProduct));
+        when(productRepository.findById(14L)).thenReturn(Optional.of(newProduct));
+
+        Client client = new Client();
+        client.setId(11L);
+        User seller = new User();
+        seller.setId(17L);
+        saleService.updateSale(
+                13L,
+                client,
+                seller,
+                PaymentType.CASH,
+                LocalDate.of(2026, 10, 21),
+                null,
+                null,
+                List.of(),
+                BigDecimal.ZERO,
+                null,
+                List.of(
+                        new SaleItemInput(13L, 1, new BigDecimal("100.00")),
+                        new SaleItemInput(14L, 2, new BigDecimal("200.00"))
+                )
+        );
+
+        verify(productRepository).incrementStock(13L, 2);
+        verify(productRepository).decrementStockIfAvailable(14L, 2);
+    }
+
+    @Test
+    void createSaleReturnsExistingSaleForRepeatedIdempotencyKey() {
+        Sale existingSale = new Sale();
+        existingSale.setId(121L);
+        SaleIdempotencyKey requestKey = new SaleIdempotencyKey();
+        requestKey.setSale(existingSale);
+        String idempotencyKey = "9434e108-8208-4a7f-9408-ae4e4fd235f8";
+
+        when(saleIdempotencyKeyRepository.findByUserIdAndIdempotencyKeyForUpdate(18L, idempotencyKey))
+                .thenReturn(Optional.of(requestKey));
+
+        Sale result = saleService.createSale(
+                new Client(),
+                new User(),
+                PaymentType.CASH,
+                null,
+                LocalDate.of(2026, 10, 21),
+                null,
+                null,
+                List.of(),
+                BigDecimal.ZERO,
+                null,
+                null,
+                null,
+                List.of(),
+                18L,
+                idempotencyKey
+        );
+
+        assertThat(result).isSameAs(existingSale);
+        verify(saleIdempotencyKeyRepository).insertIfAbsent(18L, idempotencyKey);
+        verify(saleRepository, never()).save(any(Sale.class));
     }
 }

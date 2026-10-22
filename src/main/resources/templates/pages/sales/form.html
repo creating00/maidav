@@ -23,6 +23,7 @@
             <span th:if="${saleNumber}" th:text="${' | Numero de venta: ' + saleNumber}"></span>
         </div>
         <input type="hidden" name="draftState" id="draftStateInput" th:value="${draftState}"/>
+        <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}"/>
         <div id="calcConfig"
              th:attr="data-recargo=${calculatorConfig.recargo},
                       data-mult-contado=${calculatorConfig.multContado},
@@ -728,6 +729,7 @@
             const saleNumberBadge = document.getElementById('saleNumberBadge');
             const saleNumberHelp = document.getElementById('saleNumberHelp');
             const saleForm = document.getElementById('saleForm');
+            const saveSaleBtn = document.getElementById('saveSaleBtn');
             const hasFormError = Boolean(document.querySelector('[data-form-error="true"]'));
             const hasSuccessMessage = Boolean(document.getElementById('saleSuccessMessage'));
             const formErrorBox = document.getElementById('formErrorBox');
@@ -3555,7 +3557,14 @@
             }
             if (confirmSaveBtn && saleForm) {
                 confirmSaveBtn.addEventListener('click', function () {
+                    if (confirmedSubmit) {
+                        return;
+                    }
                     confirmedSubmit = true;
+                    confirmSaveBtn.disabled = true;
+                    if (saveSaleBtn) {
+                        saveSaleBtn.disabled = true;
+                    }
                     closeConfirmModal();
                     if (typeof saleForm.requestSubmit === 'function') {
                         saleForm.requestSubmit();
