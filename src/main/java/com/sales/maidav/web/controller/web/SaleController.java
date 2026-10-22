@@ -31,6 +31,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
+import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -49,6 +50,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 @Controller
 @RequestMapping("/sales")
@@ -75,19 +77,16 @@ public class SaleController {
                        @RequestParam(required = false, defaultValue = "0") int page,
                        Model model) {
         final int pageSize = 20;
-        List<Sale> sales = filteredSales(q, paymentType, showVoided);
-        Map<Long, String> displayNumbers = buildDisplayNumbers(sales);
-
         int safePage = Math.max(page, 0);
-        int totalItems = sales.size();
-        int totalPages = totalItems == 0 ? 1 : (int) Math.ceil((double) totalItems / pageSize);
+        Page<Sale> salePage = saleService.findPage(q, paymentType, showVoided, safePage, pageSize);
+        int totalItems = Math.toIntExact(salePage.getTotalElements());
+        int totalPages = Math.max(salePage.getTotalPages(), 1);
         if (safePage >= totalPages) {
             safePage = totalPages - 1;
+            salePage = saleService.findPage(q, paymentType, showVoided, safePage, pageSize);
         }
-        int fromIndex = Math.min(safePage * pageSize, totalItems);
-        int toIndex = Math.min(fromIndex + pageSize, totalItems);
-        List<Sale> pagedSales = sales.subList(fromIndex, toIndex);
-        displayNumbers = buildDisplayNumbers(pagedSales);
+        List<Sale> pagedSales = salePage.getContent();
+        Map<Long, String> displayNumbers = buildDisplayNumbers(pagedSales);
 
         model.addAttribute("q", q);
         model.addAttribute("paymentType", paymentType);
@@ -99,8 +98,8 @@ public class SaleController {
         model.addAttribute("pageSize", pageSize);
         model.addAttribute("totalItems", totalItems);
         model.addAttribute("totalPages", totalPages);
-        model.addAttribute("hasPrevious", safePage > 0);
-        model.addAttribute("hasNext", safePage + 1 < totalPages);
+        model.addAttribute("hasPrevious", salePage.hasPrevious());
+        model.addAttribute("hasNext", salePage.hasNext());
         return "pages/sales/index";
     }
 
@@ -248,7 +247,7 @@ public class SaleController {
                          @RequestParam(required = false) String quickClientFirstName,
                          @RequestParam(required = false) String quickClientLastName,
                          @RequestParam(required = false) String quickClientPhone,
-                         @RequestParam(required = false) String quickClientAddress,
+                          @RequestParam(required = false) String quickClientAddress,
                          @RequestParam(required = false) String draftState,
                          Authentication authentication,
                          Model model,
@@ -320,6 +319,7 @@ public class SaleController {
                          @RequestParam(required = false) String quickClientLastName,
                          @RequestParam(required = false) String quickClientPhone,
                          @RequestParam(required = false) String quickClientAddress,
+                          @RequestParam String idempotencyKey,
                          @RequestParam(required = false) String draftState,
                          Authentication authentication,
                          Model model,
@@ -346,7 +346,8 @@ public class SaleController {
                     : null;
 
             Sale sale = saleService.createSale(client, seller, paymentType, paymentCollectionMethod, saleDate, firstDueDate, paymentFrequency, dueDays,
-                    effectiveDiscount, weeksCount, effectiveManualInstallments, effectiveManualCashInstallments, items);
+                    effectiveDiscount, weeksCount, effectiveManualInstallments, effectiveManualCashInstallments, items,
+                    loggedUser.getId(), idempotencyKey);
             redirectAttributes.addFlashAttribute("saleNumber", sale.getSaleNumber());
             if (paymentType == PaymentType.CREDIT) {
                 CreditAccount account = creditAccountService.findBySaleId(sale.getId());
@@ -365,6 +366,7 @@ public class SaleController {
         } catch (InvalidSaleException | DuplicateNationalIdException | InvalidNationalIdException ex) {
             model.addAttribute("formError", ex.getMessage());
             model.addAttribute("draftState", draftState);
+            model.addAttribute("idempotencyKey", idempotencyKey);
             addCreateFormAttributes(model, authentication);
             return "pages/sales/form";
         }
@@ -404,6 +406,9 @@ public class SaleController {
     private void addCreateFormAttributes(Model model, Authentication authentication) {
         if (!model.containsAttribute("editing")) {
             model.addAttribute("editing", false);
+        }
+        if (!model.containsAttribute("idempotencyKey") && Boolean.FALSE.equals(model.asMap().get("editing"))) {
+            model.addAttribute("idempotencyKey", UUID.randomUUID().toString());
         }
         model.addAttribute("clients", clientService.findAll());
         model.addAttribute("products", productService.findAll());
