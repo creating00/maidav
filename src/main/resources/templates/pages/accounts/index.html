@@ -33,7 +33,7 @@
         </select>
         <input type="hidden" name="priorityFirst" th:value="${priorityFirst}"/>
         <button class="px-4 py-2 rounded border border-gray-300 hover:bg-gray-100">Buscar</button>
-        <a th:href="@{/accounts(q=${q},sellerId=${sellerId},priorityFirst=${!priorityFirst})}"
+        <a th:href="@{/accounts(q=${q},sellerId=${sellerId},priorityFirst=${!priorityFirst},page=0)}"
            class="px-4 py-2 rounded border font-semibold transition"
            th:classappend="${priorityFirst ? ' border-red-200 bg-red-50 text-red-700 hover:bg-red-100' : ' border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'}"
            th:text="${priorityFirst ? 'Quitar filtro de prioridad' : 'Ordenar por Prioridad (Mora primero)'}">
@@ -185,6 +185,35 @@
              class="rounded-xl bg-white px-4 py-8 text-center text-gray-500 shadow">
             No hay cuentas registradas
         </div>
+
+        <nav th:if="${totalPages > 1}"
+             class="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+             aria-label="Paginacion de cuentas">
+            <span class="text-sm text-slate-600"
+                  th:text="${'Pagina ' + (currentPage + 1) + ' de ' + totalPages + ' · ' + totalAccounts + ' cuenta(s)'}">
+                Pagina 1 de 1
+            </span>
+            <div class="flex items-center gap-2">
+                <a th:if="${currentPage > 0}"
+                   th:href="@{/accounts(page=${currentPage - 1},q=${q},sellerId=${sellerId},priorityFirst=${priorityFirst})}"
+                   class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                    Anterior
+                </a>
+                <span th:if="${currentPage == 0}"
+                      class="rounded border border-slate-200 px-3 py-1.5 text-sm text-slate-400">
+                    Anterior
+                </span>
+                <a th:if="${currentPage + 1 < totalPages}"
+                   th:href="@{/accounts(page=${currentPage + 1},q=${q},sellerId=${sellerId},priorityFirst=${priorityFirst})}"
+                   class="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100">
+                    Siguiente
+                </a>
+                <span th:if="${currentPage + 1 >= totalPages}"
+                      class="rounded border border-slate-200 px-3 py-1.5 text-sm text-slate-400">
+                    Siguiente
+                </span>
+            </div>
+        </nav>
     </div>
 
 </section>

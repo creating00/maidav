@@ -42,6 +42,8 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class CreditAccountController {
 
+    private static final int ACCOUNT_PAGE_SIZE = 5;
+
     private final CreditAccountService creditAccountService;
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final CreditPaymentRepository creditPaymentRepository;
@@ -54,6 +56,7 @@ public class CreditAccountController {
     public String list(@RequestParam(required = false) String q,
                        @RequestParam(required = false) Long sellerId,
                        @RequestParam(required = false, defaultValue = "false") boolean priorityFirst,
+                       @RequestParam(defaultValue = "0") Integer page,
                        Authentication authentication,
                        Model model) {
         List<CreditAccount> accounts = creditAccountService.findAll();
@@ -78,10 +81,28 @@ public class CreditAccountController {
                             || contains(a.getStatus() != null ? a.getStatus().name() : null, term))
                     .toList();
         }
+        Map<Long, MoraWarningInfo> moraWarnings = new HashMap<>();
+        if (priorityFirst) {
+            for (CreditAccount account : accounts) {
+                moraWarnings.put(account.getId(), creditAccountService.getMoraWarning(account.getId()));
+            }
+        }
+        List<CreditAccount> sortedAccounts = accounts.stream()
+                .sorted(resolveAccountComparator(moraWarnings, priorityFirst))
+                .toList();
+        int totalPages = (int) Math.ceil((double) sortedAccounts.size() / ACCOUNT_PAGE_SIZE);
+        int requestedPage = page == null || page < 0 ? 0 : page;
+        int currentPage = totalPages == 0 ? 0 : Math.min(requestedPage, totalPages - 1);
+        int fromIndex = currentPage * ACCOUNT_PAGE_SIZE;
+        int toIndex = Math.min(fromIndex + ACCOUNT_PAGE_SIZE, sortedAccounts.size());
+        List<CreditAccount> pageAccounts = sortedAccounts.subList(fromIndex, toIndex);
+
         Map<Long, BigDecimal> currentInstallments = new HashMap<>();
         Map<Long, String> dueSchedules = new HashMap<>();
-        Map<Long, MoraWarningInfo> moraWarnings = new HashMap<>();
-        for (CreditAccount account : accounts) {
+        for (CreditAccount account : pageAccounts) {
+            if (!moraWarnings.containsKey(account.getId())) {
+                moraWarnings.put(account.getId(), creditAccountService.getMoraWarning(account.getId()));
+            }
             BigDecimal currentAmount = creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(account.getId()).stream()
                     .filter(installment -> installment.getStatus() != InstallmentStatus.PAID)
                     .filter(installment -> installment.getStatus() != InstallmentStatus.VOID)
@@ -91,18 +112,21 @@ public class CreditAccountController {
                     .orElse(null);
             currentInstallments.put(account.getId(), currentAmount);
             dueSchedules.put(account.getId(), formatDueSchedule(account));
-            moraWarnings.put(account.getId(), creditAccountService.getMoraWarning(account.getId()));
         }
-        Map<Long, List<AccountProductItemView>> productsByAccount = buildProductsByAccount(accounts);
+        Map<Long, List<AccountProductItemView>> productsByAccount = buildProductsByAccount(pageAccounts);
         model.addAttribute("q", q);
         model.addAttribute("sellerId", effectiveSellerId);
         model.addAttribute("priorityFirst", priorityFirst);
+        model.addAttribute("currentPage", currentPage);
+        model.addAttribute("totalPages", totalPages);
+        model.addAttribute("pageSize", ACCOUNT_PAGE_SIZE);
+        model.addAttribute("totalAccounts", sortedAccounts.size());
         // FILTRO VENDEDOR FRONTEND
         model.addAttribute("sellerOptions", sellerOptions(authentication));
-        model.addAttribute("accounts", accounts);
+        model.addAttribute("accounts", pageAccounts);
         model.addAttribute("currentInstallments", currentInstallments);
         model.addAttribute("dueSchedules", dueSchedules);
-        model.addAttribute("clientGroups", buildClientGroups(accounts, currentInstallments, dueSchedules, productsByAccount, moraWarnings, priorityFirst));
+        model.addAttribute("clientGroups", buildClientGroups(pageAccounts, currentInstallments, dueSchedules, productsByAccount, moraWarnings, priorityFirst));
         model.addAttribute("isAdmin", isAdmin(authentication));
         return "pages/accounts/index";
     }
