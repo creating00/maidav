@@ -7,9 +7,6 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.web.access.AccessDeniedHandler;
 
 import java.io.IOException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-
 public class CustomAccessDeniedHandler implements AccessDeniedHandler {
 
     @Override
@@ -26,7 +23,8 @@ public class CustomAccessDeniedHandler implements AccessDeniedHandler {
             message = "No tienes permiso para anular la venta";
         }
 
-        String encoded = URLEncoder.encode(message, StandardCharsets.UTF_8);
-        response.sendRedirect("/access-denied?message=" + encoded);
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        request.setAttribute("accessDeniedMessage", message);
+        request.getRequestDispatcher("/access-denied").forward(request, response);
     }
 }

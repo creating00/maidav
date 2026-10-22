@@ -9,9 +9,13 @@ import com.sales.maidav.repository.product.ProductRepository;
 import com.sales.maidav.repository.sale.*;
 import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
+import com.sales.maidav.util.SearchTextNormalizer;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -23,10 +27,14 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.TreeMap;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +43,7 @@ public class SaleServiceImpl implements SaleService {
 
     private final SaleRepository saleRepository;
     private final SaleItemRepository saleItemRepository;
+    private final SaleIdempotencyKeyRepository saleIdempotencyKeyRepository;
     private final ProductRepository productRepository;
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
@@ -51,6 +60,24 @@ public class SaleServiceImpl implements SaleService {
             return sellerId == null ? List.of() : saleRepository.findBySeller_IdOrderBySaleDateDescIdDesc(sellerId);
         }
         return saleRepository.findAllByOrderBySaleDateDescIdDesc();
+    }
+
+    @Override
+    public Page<Sale> findPage(String q, PaymentType paymentType, boolean showVoided, int page, int pageSize) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.max(pageSize, 1));
+        Long sellerId = null;
+        if (!isCurrentUserAdmin()) {
+            sellerId = currentUserId();
+            if (sellerId == null) {
+                return Page.empty(pageable);
+            }
+        }
+
+        String normalizedQuery = q == null || q.isBlank()
+                ? null
+                : "%" + SearchTextNormalizer.normalize(q) + "%";
+        return saleRepository.findPageForListing(sellerId, paymentType, showVoided, SaleStatus.VOID,
+                AccountStatus.VOID, normalizedQuery, pageable);
     }
 
     @Override
@@ -109,6 +136,32 @@ public class SaleServiceImpl implements SaleService {
                            List<BigDecimal> manualInstallmentAmounts,
                            List<BigDecimal> manualCashInstallmentAmounts,
                            List<SaleItemInput> items) {
+        return createSale(client, seller, paymentType, paymentCollectionMethod, saleDate, firstDueDate,
+                paymentFrequency, dueDays, discountAmount, weeksCount, manualInstallmentAmounts,
+                manualCashInstallmentAmounts, items, null, null);
+    }
+
+    @Override
+    public Sale createSale(Client client,
+                           User seller,
+                           PaymentType paymentType,
+                           PaymentCollectionMethod paymentCollectionMethod,
+                           LocalDate saleDate,
+                           LocalDate firstDueDate,
+                           PaymentFrequency paymentFrequency,
+                           List<String> dueDays,
+                           BigDecimal discountAmount,
+                           Integer weeksCount,
+                           List<BigDecimal> manualInstallmentAmounts,
+                           List<BigDecimal> manualCashInstallmentAmounts,
+                           List<SaleItemInput> items,
+                           Long idempotencyUserId,
+                           String idempotencyKey) {
+
+        SaleIdempotencyKey requestKey = acquireIdempotencyKey(idempotencyUserId, idempotencyKey);
+        if (requestKey != null && requestKey.getSale() != null) {
+            return requestKey.getSale();
+        }
 
         if (client == null) {
             throw new InvalidSaleException("Debe seleccionar un cliente");
@@ -154,10 +207,6 @@ public class SaleServiceImpl implements SaleService {
             Product product = productRepository.findById(input.getProductId())
                     .orElseThrow(() -> new InvalidSaleException("Producto no encontrado"));
 
-            if (product.getStockAvailable() < input.getQuantity()) {
-                throw new InvalidSaleException("Stock insuficiente para " + product.getDescription());
-            }
-
             BigDecimal lineTotal = input.getUnitPrice()
                     .multiply(BigDecimal.valueOf(input.getQuantity()))
                     .setScale(2, RoundingMode.HALF_UP);
@@ -184,6 +233,8 @@ public class SaleServiceImpl implements SaleService {
             throw new InvalidSaleException("El total no puede ser negativo");
         }
 
+        applyStockChanges(List.of(), saleItems);
+
         Sale sale = new Sale();
         sale.setClient(client);
         sale.setSeller(seller);
@@ -204,14 +255,15 @@ public class SaleServiceImpl implements SaleService {
         for (SaleItem item : saleItems) {
             item.setSale(sale);
             saleItemRepository.save(item);
-            Product product = item.getProduct();
-            product.setStockAvailable(product.getStockAvailable() - item.getQuantity());
-            productRepository.save(product);
         }
 
         if (paymentType == PaymentType.CREDIT) {
             createAccountSchedule(sale, paymentFrequency, dueDays, firstDueDate, weeksCount,
                     manualInstallmentAmounts, manualCashInstallmentAmounts);
+        }
+
+        if (requestKey != null) {
+            requestKey.setSale(sale);
         }
 
         return sale;
@@ -301,23 +353,7 @@ public class SaleServiceImpl implements SaleService {
             throw new InvalidSaleException("El descuento no puede ser negativo");
         }
 
-        // Restore stock from old items
         List<SaleItem> oldItems = saleItemRepository.findBySale_IdOrderByIdAsc(saleId);
-        for (SaleItem oldItem : oldItems) {
-            Product product = oldItem.getProduct();
-            product.setStockAvailable(product.getStockAvailable() + oldItem.getQuantity());
-            productRepository.save(product);
-        }
-
-        // Delete old items
-        saleItemRepository.deleteAll(oldItems);
-
-        // If it was a credit sale, delete the associated credit account and installments
-        if (sale.getPaymentType() == PaymentType.CREDIT) {
-            deleteCreditAccountForSale(sale);
-        }
-
-        // Build new items
         List<SaleItem> saleItems = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         BigDecimal costTotal = BigDecimal.ZERO;
@@ -332,10 +368,6 @@ public class SaleServiceImpl implements SaleService {
 
             Product product = productRepository.findById(input.getProductId())
                     .orElseThrow(() -> new InvalidSaleException("Producto no encontrado"));
-
-            if (product.getStockAvailable() < input.getQuantity()) {
-                throw new InvalidSaleException("Stock insuficiente para " + product.getDescription());
-            }
 
             BigDecimal lineTotal = input.getUnitPrice()
                     .multiply(BigDecimal.valueOf(input.getQuantity()))
@@ -363,7 +395,14 @@ public class SaleServiceImpl implements SaleService {
             throw new InvalidSaleException("El total no puede ser negativo");
         }
 
-        // Update sale fields
+        applyStockChanges(oldItems, saleItems);
+
+        saleItemRepository.deleteAll(oldItems);
+
+        if (sale.getPaymentType() == PaymentType.CREDIT) {
+            deleteCreditAccountForSale(sale);
+        }
+
         sale.setClient(client);
         sale.setSeller(seller);
         sale.setPaymentType(paymentType);
@@ -374,13 +413,9 @@ public class SaleServiceImpl implements SaleService {
         sale.setFirstDueDate(firstDueDate);
         saleRepository.save(sale);
 
-        // Save new items and deduct stock
         for (SaleItem item : saleItems) {
             item.setSale(sale);
             saleItemRepository.save(item);
-            Product product = item.getProduct();
-            product.setStockAvailable(product.getStockAvailable() - item.getQuantity());
-            productRepository.save(product);
         }
 
         // Create credit account if needed
@@ -402,11 +437,7 @@ public class SaleServiceImpl implements SaleService {
         voidCreditAccountForSale(sale);
 
         List<SaleItem> items = saleItemRepository.findBySale_IdOrderByIdAsc(id);
-        for (SaleItem item : items) {
-            Product product = item.getProduct();
-            product.setStockAvailable(product.getStockAvailable() + item.getQuantity());
-            productRepository.save(product);
-        }
+        applyStockChanges(items, List.of());
     }
 
     @Override
@@ -445,6 +476,69 @@ public class SaleServiceImpl implements SaleService {
     public List<SaleSellerChange> findSellerChanges(Long saleId) {
         findById(saleId);
         return saleSellerChangeRepository.findBySale_IdOrderByCreatedAtDescIdDesc(saleId);
+    }
+
+    private void applyStockChanges(List<SaleItem> previousItems, List<SaleItem> newItems) {
+        Map<Long, Integer> quantityChanges = new TreeMap<>();
+        Map<Long, Product> productsById = new HashMap<>();
+        collectStockChanges(previousItems, -1, quantityChanges, productsById);
+        collectStockChanges(newItems, 1, quantityChanges, productsById);
+
+        for (Map.Entry<Long, Integer> entry : quantityChanges.entrySet()) {
+            int quantityChange = entry.getValue();
+            if (quantityChange == 0) {
+                continue;
+            }
+            if (quantityChange > 0) {
+                int updatedProducts = productRepository.decrementStockIfAvailable(entry.getKey(), quantityChange);
+                if (updatedProducts == 0) {
+                    Product product = productsById.get(entry.getKey());
+                    throw new InvalidSaleException("Stock insuficiente para " + product.getDescription());
+                }
+            } else {
+                productRepository.incrementStock(entry.getKey(), Math.abs(quantityChange));
+            }
+        }
+    }
+
+    private void collectStockChanges(List<SaleItem> items,
+                                     int direction,
+                                     Map<Long, Integer> quantityChanges,
+                                     Map<Long, Product> productsById) {
+        for (SaleItem item : items) {
+            Product product = item.getProduct();
+            Long productId = product == null ? null : product.getId();
+            if (productId == null || item.getQuantity() == null) {
+                throw new InvalidSaleException("Producto invalido en la venta");
+            }
+            try {
+                int quantity = Math.multiplyExact(item.getQuantity(), direction);
+                quantityChanges.merge(productId, quantity, Math::addExact);
+            } catch (ArithmeticException exception) {
+                throw new InvalidSaleException("Cantidad de producto invalida");
+            }
+            productsById.putIfAbsent(productId, product);
+        }
+    }
+
+    private SaleIdempotencyKey acquireIdempotencyKey(Long userId, String idempotencyKey) {
+        if (userId == null && (idempotencyKey == null || idempotencyKey.isBlank())) {
+            return null;
+        }
+        if (userId == null || idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new InvalidSaleException("No se pudo validar el intento de venta");
+        }
+
+        String normalizedKey = idempotencyKey.trim();
+        try {
+            UUID.fromString(normalizedKey);
+        } catch (IllegalArgumentException exception) {
+            throw new InvalidSaleException("No se pudo validar el intento de venta");
+        }
+
+        saleIdempotencyKeyRepository.insertIfAbsent(userId, normalizedKey);
+        return saleIdempotencyKeyRepository.findByUserIdAndIdempotencyKeyForUpdate(userId, normalizedKey)
+                .orElseThrow(() -> new IllegalStateException("No se pudo registrar el intento de venta"));
     }
 
     private void voidCreditAccountForSale(Sale sale) {
