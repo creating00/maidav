@@ -464,7 +464,6 @@ class SaleServiceImplTest {
         when(creditAccountRepository.save(any(CreditAccount.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(creditInstallmentRepository.save(any(CreditInstallment.class))).thenAnswer(invocation -> invocation.getArgument(0));
         when(saleItemRepository.save(any(SaleItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(productRepository.save(any(Product.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         saleService.createSale(
                 client,
