@@ -385,6 +385,10 @@
                     No se encontraron productos.
                 </div>
                 <div id="saleCatalogList" class="grid max-h-[16rem] gap-3 overflow-y-auto pr-1"></div>
+                <button type="button" id="saleCatalogLoadMore" hidden
+                        class="mt-3 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold hover:bg-slate-100">
+                    Mostrar mas productos
+                </button>
             </div>
             <div id="productActionToast"
                  class="pointer-events-none fixed right-4 top-4 z-50 hidden max-w-sm rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-opacity duration-200">
@@ -699,6 +703,7 @@
             const toggleSaleCatalogBtn = document.getElementById('toggleSaleCatalogBtn');
             const saleCatalogPanel = document.getElementById('saleCatalogPanel');
             const saleCatalogList = document.getElementById('saleCatalogList');
+            const saleCatalogLoadMore = document.getElementById('saleCatalogLoadMore');
             const saleCatalogEmpty = document.getElementById('saleCatalogEmpty');
             const saleCatalogFeedback = document.getElementById('saleCatalogFeedback');
             const clientSearch = document.getElementById('clientSearch');
@@ -878,6 +883,9 @@
             let productSearchFilterTimer = null;
             let productCatalogCache = null;
             let saleCatalogOpen = false;
+            const saleCatalogPageSize = 5;
+            let saleCatalogLimit = saleCatalogPageSize;
+            let saleCatalogTerm = '';
             let saleCatalogFeedbackTimer = null;
 
             function getCurrentProductSearchInput() {
@@ -1042,10 +1050,17 @@
                     return;
                 }
                 const isDesktopViewport = window.matchMedia('(min-width: 768px)').matches;
-                saleCatalogOpen = isDesktopViewport ? true : Boolean(open);
+                saleCatalogOpen = !isDesktopViewport && Boolean(open);
                 saleCatalogPanel.classList.toggle('hidden', !saleCatalogOpen);
                 if (toggleSaleCatalogBtn) {
                     toggleSaleCatalogBtn.textContent = saleCatalogOpen ? 'Ocultar catalogo' : 'Mostrar catalogo';
+                }
+                if (saleCatalogOpen) {
+                    const searchInput = productSearchMobile || productSearch;
+                    renderSaleCatalogList(searchInput ? searchInput.value : '');
+                } else {
+                    saleCatalogList.replaceChildren();
+                    saleCatalogLoadMore.hidden = true;
                 }
             }
 
@@ -1060,6 +1075,8 @@
 
                 if (item.imagePath) {
                     const image = document.createElement('img');
+                    image.loading = 'lazy';
+                    image.decoding = 'async';
                     image.src = item.imagePath;
                     image.alt = '';
                     image.className = 'h-full w-full object-cover';
@@ -1121,17 +1138,25 @@
                 return button;
             }
 
-            function renderSaleCatalogList(term) {
-                if (!saleCatalogList || !saleCatalogEmpty) {
+            function renderSaleCatalogList(term, keepLimit = false) {
+                if (!saleCatalogList || !saleCatalogEmpty || !saleCatalogOpen
+                        || window.matchMedia('(min-width: 768px)').matches) {
                     return;
                 }
+                if (!keepLimit) {
+                    saleCatalogLimit = saleCatalogPageSize;
+                }
                 const normalized = normalizeSearchTerm(term);
+                saleCatalogTerm = normalized;
                 const items = buildProductCatalogCache().filter(item => !normalized || item.searchText.includes(normalized));
                 saleCatalogList.innerHTML = '';
                 saleCatalogEmpty.classList.toggle('hidden', items.length > 0);
-                items.forEach(item => {
+                items.slice(0, saleCatalogLimit).forEach(item => {
                     saleCatalogList.appendChild(buildSaleCatalogCard(item));
                 });
+                const remaining = Math.max(0, items.length - saleCatalogLimit);
+                saleCatalogLoadMore.hidden = remaining === 0;
+                saleCatalogLoadMore.textContent = 'Mostrar mas productos (' + remaining + ' restantes)';
             }
 
             function closeAllProductComboboxes(exceptRow) {
@@ -3058,7 +3083,6 @@
                 }
             });
             setSaleCatalogPanelOpen(false);
-            renderSaleCatalogList('');
             updateTotals();
             if (discountInput) {
                 discountInput.addEventListener('input', updateTotals);
@@ -3281,7 +3305,7 @@
                         renderProductComboboxOptions(activeProductCombobox, getProductComboboxSearchValue(activeProductCombobox));
                         highlightProductComboboxOption(activeProductCombobox, 0);
                     }
-                    renderSaleCatalogList(getCurrentProductSearchInput() ? getCurrentProductSearchInput().value : '');
+                    renderSaleCatalogList(saleCatalogTerm);
                     updateTotals();
                 });
             }
@@ -3297,6 +3321,12 @@
             if (toggleSaleCatalogBtn) {
                 toggleSaleCatalogBtn.addEventListener('click', function () {
                     setSaleCatalogPanelOpen(!saleCatalogOpen);
+                });
+            }
+            if (saleCatalogLoadMore) {
+                saleCatalogLoadMore.addEventListener('click', function () {
+                    saleCatalogLimit += saleCatalogPageSize;
+                    renderSaleCatalogList(saleCatalogTerm, true);
                 });
             }
             if (startBarcodeScannerBtn) {
