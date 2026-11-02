@@ -76,17 +76,28 @@ class ProductImageExportServiceImplTest {
     }
 
     @Test
-    void rejectsMissingImagesAndPathsOutsideProductDirectory() throws Exception {
+    void skipsMissingImagesAndUnsafePathsAndContinuesWithAvailableImages() throws Exception {
         Files.writeString(uploads.resolve("secret.jpg"), "private");
+        Files.writeString(uploads.resolve("products/available.jpg"), "available");
+        Product available = product("P002", "Disponible", "available.jpg");
         for (String path : List.of("missing.jpg", "../secret.jpg", "../../secret.jpg")) {
-            when(repository.findAll()).thenReturn(List.of(product("P001", "Producto", path)));
-            assertThatThrownBy(() -> export()).isInstanceOf(InvalidProductException.class)
-                    .hasMessageContaining("P001");
+            when(repository.findAll()).thenReturn(List.of(product("P001", "Producto", path), available));
+            Map<String, byte[]> entries = export();
+            assertThat(entries).containsOnlyKeys("P002 - Disponible.jpg");
+            assertThat(new String(entries.get("P002 - Disponible.jpg"), StandardCharsets.UTF_8))
+                    .isEqualTo("available");
         }
-        Product external = product("P002", "Externo", null);
+        Product external = product("P003", "Externo", null);
         external.setImagePath("https://example.com/image.jpg");
-        when(repository.findAll()).thenReturn(List.of(external));
-        assertThatThrownBy(() -> export()).isInstanceOf(InvalidProductException.class);
+        when(repository.findAll()).thenReturn(List.of(external, available));
+        assertThat(export()).containsOnlyKeys("P002 - Disponible.jpg");
+    }
+
+    @Test
+    void reportsNoImagesWhenEveryRegisteredImageIsMissing() {
+        when(repository.findAll()).thenReturn(List.of(product("PRD-9CKQK05H0", "Producto", "missing.jpg")));
+        assertThatThrownBy(() -> export()).isInstanceOf(InvalidProductException.class)
+                .hasMessage("No hay imágenes de productos para exportar.");
     }
 
     private Map<String, byte[]> export() throws Exception {
