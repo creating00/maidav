@@ -2,6 +2,8 @@ package com.sales.maidav.service.product;
 
 import com.sales.maidav.model.product.Product;
 import com.sales.maidav.repository.product.ProductRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +12,7 @@ import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -18,6 +21,7 @@ import java.util.zip.ZipOutputStream;
 
 @Service
 public class ProductImageExportServiceImpl implements ProductImageExportService {
+    private static final Logger log = LoggerFactory.getLogger(ProductImageExportServiceImpl.class);
     private static final String IMAGE_PREFIX = "/uploads/products/";
     private final ProductRepository productRepository;
     private final Path uploadDirectory;
@@ -32,12 +36,22 @@ public class ProductImageExportServiceImpl implements ProductImageExportService 
     public void writeZip(OutputStream output) throws IOException {
         Set<String> names = new HashSet<>();
         int count = 0;
+        Path stagedImage = Files.createTempFile("product-image-", ".tmp");
         try (ZipOutputStream zip = new ZipOutputStream(output, StandardCharsets.UTF_8)) {
             for (Product product : productRepository.findAll()) {
                 if (product.getImagePath() == null || product.getImagePath().isBlank()) {
                     continue;
                 }
-                Path image = resolveImage(product);
+                Path image;
+                try {
+                    image = resolveImage(product);
+                    // Read the complete source before adding an entry, avoiding partial images in the ZIP.
+                    Files.copy(image, stagedImage, StandardCopyOption.REPLACE_EXISTING);
+                } catch (InvalidProductException | IOException ex) {
+                    log.warn("Se omite la imagen del producto {} durante la exportación: {}",
+                            product.getProductCode(), ex.getMessage());
+                    continue;
+                }
                 String originalName = image.getFileName().toString();
                 int dot = originalName.lastIndexOf('.');
                 String extension = dot < 0 ? "" : originalName.substring(dot);
@@ -52,13 +66,15 @@ public class ProductImageExportServiceImpl implements ProductImageExportService 
                     name = base + " (" + suffix++ + ")" + extension;
                 }
                 zip.putNextEntry(new ZipEntry(name));
-                Files.copy(image, zip);
+                Files.copy(stagedImage, zip);
                 zip.closeEntry();
                 count++;
             }
             if (count == 0) {
                 throw new InvalidProductException("No hay imágenes de productos para exportar.");
             }
+        } finally {
+            Files.deleteIfExists(stagedImage);
         }
     }
 
