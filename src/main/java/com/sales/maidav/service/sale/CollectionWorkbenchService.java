@@ -137,7 +137,12 @@ public class CollectionWorkbenchService {
         );
         return new PaymentSubmitResult(
                 normalize(payment.getAmount()),
-                payment.getPaymentMethod() == PaymentCollectionMethod.CASH ? "Efectivo" : "Transferencia / Debito",
+                switch (payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod()) {
+                    case CASH -> "Efectivo";
+                    case TRANSFER -> "Transferencia";
+                    case DEBIT -> "Débito";
+                    case BANK -> "Débito/Transferencia (sin distinguir)";
+                },
                 "/accounts/" + accountId + "#payments-section"
         );
     }
