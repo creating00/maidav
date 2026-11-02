@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface CreditInstallmentRepository extends JpaRepository<CreditInstallment, Long> {
+    List<CreditInstallment> findByAccount_IdInOrderByAccount_IdAscInstallmentNumberAsc(List<Long> accountIds);
     List<CreditInstallment> findByAccount_IdOrderByInstallmentNumber(Long accountId);
     List<CreditInstallment> findByAccount_IdAndIdInOrderByInstallmentNumber(Long accountId, List<Long> ids);
     List<CreditInstallment> findByStatusAndDueDateBefore(InstallmentStatus status, LocalDate date);

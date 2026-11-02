@@ -4,6 +4,7 @@ import com.sales.maidav.model.sale.AccountStatus;
 import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.model.sale.CreditInstallment;
 import com.sales.maidav.model.sale.CreditPayment;
+import com.sales.maidav.model.sale.CreditPaymentAllocation;
 import com.sales.maidav.model.sale.InstallmentStatus;
 import com.sales.maidav.model.sale.PaymentCollectionMethod;
 import com.sales.maidav.model.sale.PaymentFrequency;
@@ -14,6 +15,7 @@ import com.sales.maidav.model.settings.MoraNotificationTiming;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
+import com.sales.maidav.repository.sale.CreditPaymentAllocationRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
@@ -57,6 +59,9 @@ class CreditAccountServiceImplTest {
 
     @Mock
     private CreditPaymentRepository creditPaymentRepository;
+
+    @Mock
+    private CreditPaymentAllocationRepository creditPaymentAllocationRepository;
 
     @Mock
     private SaleItemRepository saleItemRepository;
@@ -118,6 +123,17 @@ class CreditAccountServiceImplTest {
         assertThat(savedPayments.get(1).getAmount()).isEqualByComparingTo("600.00");
         assertThat(savedPayments.get(1).getImpactAmount()).isEqualByComparingTo("700.00");
         assertThat(savedPayments.get(1).getAllocationSummary()).contains("Cuota #2: se aplican $ 600,00 y queda saldada");
+
+        ArgumentCaptor<Iterable<CreditPaymentAllocation>> allocationCaptor = ArgumentCaptor.forClass(Iterable.class);
+        verify(creditPaymentAllocationRepository, times(2)).saveAll(allocationCaptor.capture());
+        List<CreditPaymentAllocation> firstAllocations = new ArrayList<>();
+        allocationCaptor.getAllValues().getFirst().forEach(firstAllocations::add);
+        assertThat(firstAllocations).hasSize(2);
+        assertThat(firstAllocations.getFirst().getCollectedAmount()).isEqualByComparingTo("1000.00");
+        assertThat(firstAllocations.getFirst().getImpactAmount()).isEqualByComparingTo("1200.00");
+        assertThat(firstAllocations.getFirst().isVerified()).isTrue();
+        assertThat(firstAllocations.get(1).getCollectedAmount()).isEqualByComparingTo("500.00");
+        assertThat(firstAllocations.get(1).getImpactAmount()).isEqualByComparingTo("500.00");
     }
 
     @Test
@@ -394,6 +410,45 @@ class CreditAccountServiceImplTest {
         assertThat(restoredInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
         assertThat(secondInstallment.getPaidAmount()).isEqualByComparingTo("0.00");
         assertThat(secondInstallment.getStatus()).isEqualTo(InstallmentStatus.PENDING);
+    }
+
+    @Test
+    void replayDoesNotCertifyChangedHistoricalAllocation() throws Exception {
+        CreditAccount account = account(90L, PaymentFrequency.WEEKLY, "200.00");
+        CreditInstallment first = installment(account, 901L, 1, "100.00", LocalDate.now());
+        CreditInstallment second = installment(account, 902L, 2, "100.00", LocalDate.now().plusWeeks(1));
+        first.setPaidAmount(new BigDecimal("50.00"));
+        first.setStatus(InstallmentStatus.PARTIAL);
+        second.setPaidAmount(new BigDecimal("10.00"));
+        second.setStatus(InstallmentStatus.PARTIAL);
+        CreditPayment firstPayment = payment(account, 91L, "40.00", "50.00", LocalDate.now(), PaymentCollectionMethod.BANK);
+        CreditPayment secondPayment = payment(account, 92L, "10.00", "10.00", LocalDate.now(), PaymentCollectionMethod.BANK);
+        CreditPaymentAllocation previous = new CreditPaymentAllocation();
+        previous.setAccount(account);
+        previous.setPayment(firstPayment);
+        previous.setInstallment(first);
+        previous.setCollectedAmount(new BigDecimal("40.00"));
+        previous.setImpactAmount(new BigDecimal("50.00"));
+        previous.setVerified(true);
+
+        when(creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(90L)).thenReturn(List.of(first, second));
+        when(creditPaymentRepository.findByAccount_IdOrderByPaidAtAscIdAsc(90L))
+                .thenReturn(List.of(firstPayment, secondPayment));
+        when(creditPaymentAllocationRepository.findByAccount_Id(90L)).thenReturn(List.of(previous));
+        CompanySettings settings = new CompanySettings();
+        settings.setCalcRecargo(new BigDecimal("1.20"));
+        when(companySettingsService.getSettings()).thenReturn(settings);
+
+        invokeRecalculateAccountState(account);
+
+        ArgumentCaptor<Iterable<CreditPaymentAllocation>> captor = ArgumentCaptor.forClass(Iterable.class);
+        verify(creditPaymentAllocationRepository).saveAll(captor.capture());
+        List<CreditPaymentAllocation> current = new ArrayList<>();
+        captor.getValue().forEach(current::add);
+        assertThat(current).hasSize(2);
+        assertThat(current).allMatch(allocation -> !allocation.isVerified());
+        assertThat(first.getPaidAmount()).isEqualByComparingTo("50.00");
+        assertThat(second.getPaidAmount()).isEqualByComparingTo("0.00");
     }
 
     @Test

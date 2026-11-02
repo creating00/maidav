@@ -6,6 +6,7 @@ import com.sales.maidav.model.settings.MoraNotificationTiming;
 import com.sales.maidav.repository.sale.CreditAccountRepository;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
+import com.sales.maidav.repository.sale.CreditPaymentAllocationRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
@@ -50,6 +51,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final CreditPaymentRepository creditPaymentRepository;
+    private final CreditPaymentAllocationRepository creditPaymentAllocationRepository;
     private final SaleItemRepository saleItemRepository;
     private final CompanySettingsService companySettingsService;
     private final UserRepository userRepository;
@@ -174,6 +176,8 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             }
             throw ex;
         }
+        persistAllocations(account, applicationResult.allocations(),
+                Map.of(), installments, payment, Map.of(), Map.of(), true);
         account.setBalance(newBalance.setScale(2, RoundingMode.HALF_UP));
         if (account.getBalance().compareTo(BigDecimal.ZERO) == 0) {
             account.setStatus(AccountStatus.CLOSED);
@@ -719,6 +723,11 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     private void recalculateAccountState(CreditAccount account) {
         List<CreditInstallment> installments = creditInstallmentRepository
                 .findByAccount_IdOrderByInstallmentNumber(account.getId());
+        Map<Long, BigDecimal> previousPaidByInstallment = new HashMap<>();
+        for (CreditInstallment installment : installments) {
+            previousPaidByInstallment.put(installment.getId(),
+                    installment.getPaidAmount() == null ? BigDecimal.ZERO : installment.getPaidAmount());
+        }
         List<CreditPayment> payments = creditPaymentRepository
                 .findByAccount_IdOrderByPaidAtAscIdAsc(account.getId());
         ReplayResult replayResult = replayAccountState(account, installments, payments, true);
@@ -761,6 +770,72 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         account.setTotalAmount(recalculatedTotal);
         account.setBalance(newBalance);
         account.setStatus(newBalance.compareTo(BigDecimal.ZERO) == 0 ? AccountStatus.CLOSED : AccountStatus.OPEN);
+        List<CreditPaymentAllocation> previousAllocations =
+                creditPaymentAllocationRepository.findByAccount_Id(account.getId());
+        Map<Long, Boolean> verifiedPayments = new HashMap<>();
+        Map<Long, BigDecimal> previousImpactByInstallment = new HashMap<>();
+        Map<Long, Map<Long, CreditPaymentAllocation>> previousByPaymentAndInstallment = new HashMap<>();
+        for (CreditPaymentAllocation allocation : previousAllocations) {
+            verifiedPayments.merge(allocation.getPayment().getId(), allocation.isVerified(), Boolean::logicalAnd);
+            previousImpactByInstallment.merge(allocation.getInstallment().getId(),
+                    allocation.getImpactAmount(), BigDecimal::add);
+            previousByPaymentAndInstallment
+                    .computeIfAbsent(allocation.getPayment().getId(), ignored -> new HashMap<>())
+                    .put(allocation.getInstallment().getId(), allocation);
+        }
+        boolean previouslyComplete = previousAllocations.stream().allMatch(CreditPaymentAllocation::isVerified)
+                && installments.stream().allMatch(installment ->
+                previousImpactByInstallment.getOrDefault(installment.getId(), BigDecimal.ZERO)
+                        .compareTo(previousPaidByInstallment.getOrDefault(installment.getId(), BigDecimal.ZERO)) == 0);
+        creditPaymentAllocationRepository.deleteByAccount_Id(account.getId());
+        creditPaymentAllocationRepository.flush();
+        Map<Long, CreditPayment> paymentsById = new HashMap<>();
+        for (CreditPayment payment : payments) {
+            paymentsById.put(payment.getId(), payment);
+        }
+        persistAllocations(account, replayResult.allocations(), paymentsById, installments, null,
+                verifiedPayments, previousByPaymentAndInstallment, previouslyComplete);
+    }
+
+    private void persistAllocations(CreditAccount account,
+                                    List<PaymentAllocation> allocations,
+                                    Map<Long, CreditPayment> paymentsById,
+                                    List<CreditInstallment> installments,
+                                    CreditPayment newPayment,
+                                    Map<Long, Boolean> verifiedPayments,
+                                    Map<Long, Map<Long, CreditPaymentAllocation>> previousAllocations,
+                                    boolean previouslyComplete) {
+        Map<Long, CreditInstallment> installmentsById = new HashMap<>();
+        for (CreditInstallment installment : installments) {
+            installmentsById.put(installment.getId(), installment);
+        }
+        List<CreditPaymentAllocation> records = new ArrayList<>();
+        for (PaymentAllocation allocation : allocations) {
+            if (allocation.installmentId() == null
+                    || (allocation.collectedAmount().signum() <= 0 && allocation.impactAmount().signum() <= 0)) {
+                continue;
+            }
+            CreditPayment payment = newPayment != null ? newPayment : paymentsById.get(allocation.paymentId());
+            CreditInstallment installment = installmentsById.get(allocation.installmentId());
+            if (payment == null || installment == null) {
+                throw new InvalidSaleException("No se pudo persistir la asignacion del pago a la cuota");
+            }
+            CreditPaymentAllocation record = new CreditPaymentAllocation();
+            record.setAccount(account);
+            record.setPayment(payment);
+            record.setInstallment(installment);
+            record.setCollectedAmount(allocation.collectedAmount());
+            record.setImpactAmount(allocation.impactAmount());
+            CreditPaymentAllocation previous = newPayment == null ? previousAllocations
+                    .getOrDefault(payment.getId(), Map.of()).get(installment.getId()) : null;
+            boolean unchangedVerified = previous != null && previous.isVerified()
+                    && previous.getCollectedAmount().compareTo(allocation.collectedAmount()) == 0
+                    && previous.getImpactAmount().compareTo(allocation.impactAmount()) == 0;
+            record.setVerified(newPayment != null || unchangedVerified
+                    || (previouslyComplete && Boolean.TRUE.equals(verifiedPayments.get(payment.getId()))));
+            records.add(record);
+        }
+        creditPaymentAllocationRepository.saveAll(records);
     }
 
     private CreditInstallment restoreInstallmentForReimpact(CreditInstallment originalInstallment) {

@@ -7,6 +7,8 @@ import com.sales.maidav.model.settings.CompanySettings;
 import com.sales.maidav.model.user.Role;
 import com.sales.maidav.model.user.User;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
+import com.sales.maidav.repository.sale.CreditInstallmentRepository;
+import com.sales.maidav.repository.sale.CreditPaymentAllocationRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
 import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.quote.QuoteCalculator;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Set;
 
@@ -30,9 +33,11 @@ class CreditAccountExportServiceTest {
     void exportsOneRowPerProductWithCurrentInstallmentPricesAndEligibleCollectors() throws Exception {
         SaleItemRepository items = mock(SaleItemRepository.class);
         CreditPaymentRepository payments = mock(CreditPaymentRepository.class);
+        CreditInstallmentRepository installments = mock(CreditInstallmentRepository.class);
+        CreditPaymentAllocationRepository allocations = mock(CreditPaymentAllocationRepository.class);
         UserRepository users = mock(UserRepository.class);
         CompanySettingsService settingsService = mock(CompanySettingsService.class);
-        CreditAccountExportService service = new CreditAccountExportService(items, payments, users,
+        CreditAccountExportService service = new CreditAccountExportService(items, payments, installments, allocations, users,
                 settingsService, new QuoteCalculator(), new ExportDocumentService());
 
         Client client = new Client();
@@ -75,6 +80,35 @@ class CreditAccountExportServiceTest {
         settings.setCalcMonthlyLongMinCost(new BigDecimal("1500.00"));
         when(settingsService.getSettings()).thenReturn(settings);
 
+        CreditInstallment paidInstallment = new CreditInstallment();
+        paidInstallment.setId(31L);
+        paidInstallment.setAccount(account);
+        paidInstallment.setInstallmentNumber(1);
+        paidInstallment.setDueDate(LocalDate.now().minusDays(2));
+        paidInstallment.setAmount(new BigDecimal("500.00"));
+        paidInstallment.setCashAmount(new BigDecimal("400.00"));
+        paidInstallment.setPaidAmount(new BigDecimal("500.00"));
+        paidInstallment.setStatus(InstallmentStatus.PAID);
+        CreditInstallment partialInstallment = new CreditInstallment();
+        partialInstallment.setId(32L);
+        partialInstallment.setAccount(account);
+        partialInstallment.setInstallmentNumber(2);
+        partialInstallment.setDueDate(LocalDate.now().minusDays(1));
+        partialInstallment.setAmount(new BigDecimal("500.00"));
+        partialInstallment.setPaidAmount(new BigDecimal("100.00"));
+        partialInstallment.setStatus(InstallmentStatus.PARTIAL);
+        when(installments.findByAccount_IdInOrderByAccount_IdAscInstallmentNumberAsc(List.of(20L)))
+                .thenReturn(List.of(paidInstallment, partialInstallment));
+        valid.setPaidAt(LocalDate.now().minusDays(1));
+        valid.setPaymentMethod(PaymentCollectionMethod.TRANSFER);
+        CreditPayment debitPayment = payment(5L, account, "collector@example.com", false, null);
+        debitPayment.setPaidAt(LocalDate.now());
+        debitPayment.setPaymentMethod(PaymentCollectionMethod.DEBIT);
+        when(allocations.findByAccount_IdIn(List.of(20L))).thenReturn(List.of(
+                allocation(account, paidInstallment, valid, "200.00", "200.00", true),
+                allocation(account, paidInstallment, debitPayment, "300.00", "300.00", true)
+        ));
+
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(service.export(List.of(account))))) {
             var sheet = workbook.getSheetAt(0);
             assertThat(sheet.getLastRowNum()).isEqualTo(3);
@@ -92,6 +126,53 @@ class CreditAccountExportServiceTest {
             assertThat(sheet.getRow(2).getCell(23).getStringCellValue()).isEqualTo("No aplica");
             assertThat(sheet.getRow(3).getCell(15).getStringCellValue()).isEqualTo("P2 - Silla");
             assertThat(sheet.getRow(3).getCell(23).getCellType()).isEqualTo(CellType.NUMERIC);
+            var cuotas = workbook.getSheet("Cuotas");
+            assertThat(cuotas.getLastRowNum()).isEqualTo(3);
+            assertThat(cuotas.getRow(1).getCell(11).getStringCellValue()).isEqualTo("monto_pagado");
+            assertThat(cuotas.getRow(2).getCell(4).getNumericCellValue()).isEqualTo(4000.0);
+            assertThat(cuotas.getRow(2).getCell(9).getStringCellValue()).isEqualTo("Pagado");
+            assertThat(cuotas.getRow(2).getCell(11).getNumericCellValue()).isEqualTo(500.0);
+            assertThat(cuotas.getRow(2).getCell(12).getStringCellValue()).isEqualTo("Transferencia + Débito");
+            assertThat(cuotas.getRow(2).getCell(13).getStringCellValue()).isEqualTo("Sí");
+            assertThat(cuotas.getRow(3).getCell(9).getStringCellValue()).isEqualTo("Atrasado");
+            assertThat(cuotas.getRow(3).getCell(11).getStringCellValue()).isBlank();
+            assertThat(cuotas.getRow(3).getCell(13).getStringCellValue()).isEqualTo("No");
+        }
+    }
+
+    @Test
+    void dailyInstallmentShowsFinancedAmountForCashAndTransfer() throws Exception {
+        SaleItemRepository items = mock(SaleItemRepository.class);
+        CreditPaymentRepository payments = mock(CreditPaymentRepository.class);
+        CreditInstallmentRepository installments = mock(CreditInstallmentRepository.class);
+        CreditPaymentAllocationRepository allocations = mock(CreditPaymentAllocationRepository.class);
+        CompanySettingsService settingsService = mock(CompanySettingsService.class);
+        CreditAccountExportService service = new CreditAccountExportService(items, payments, installments,
+                allocations, mock(UserRepository.class), settingsService, new QuoteCalculator(),
+                new ExportDocumentService());
+        Sale sale = new Sale();
+        sale.setId(11L);
+        CreditAccount account = new CreditAccount();
+        account.setId(21L);
+        account.setSale(sale);
+        account.setPaymentFrequency(PaymentFrequency.DAILY);
+        CreditInstallment installment = new CreditInstallment();
+        installment.setId(31L);
+        installment.setAccount(account);
+        installment.setInstallmentNumber(1);
+        installment.setDueDate(LocalDate.now().plusDays(1));
+        installment.setAmount(new BigDecimal("750.00"));
+        installment.setPaidAmount(BigDecimal.ZERO);
+        installment.setStatus(InstallmentStatus.PENDING);
+        when(settingsService.getSettings()).thenReturn(new CompanySettings());
+        when(installments.findByAccount_IdInOrderByAccount_IdAscInstallmentNumberAsc(List.of(21L)))
+                .thenReturn(List.of(installment));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(service.export(List.of(account))))) {
+            var row = workbook.getSheet("Cuotas").getRow(2);
+            assertThat(row.getCell(7).getNumericCellValue()).isEqualTo(750.0);
+            assertThat(row.getCell(8).getNumericCellValue()).isEqualTo(750.0);
+            assertThat(row.getCell(9).getStringCellValue()).isEqualTo("Pendiente");
         }
     }
 
@@ -116,5 +197,18 @@ class CreditAccountExportServiceTest {
         payment.setReversal(reversal);
         payment.setReversalOfPaymentId(originalId);
         return payment;
+    }
+
+    private CreditPaymentAllocation allocation(CreditAccount account, CreditInstallment installment,
+                                               CreditPayment payment, String collected, String impact,
+                                               boolean verified) {
+        CreditPaymentAllocation allocation = new CreditPaymentAllocation();
+        allocation.setAccount(account);
+        allocation.setInstallment(installment);
+        allocation.setPayment(payment);
+        allocation.setCollectedAmount(new BigDecimal(collected));
+        allocation.setImpactAmount(new BigDecimal(impact));
+        allocation.setVerified(verified);
+        return allocation;
     }
 }

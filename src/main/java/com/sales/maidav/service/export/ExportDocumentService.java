@@ -67,6 +67,20 @@ public class ExportDocumentService {
                 Set.of(8, 9, 16, 17, 18, 19, 20, 21, 22, 23));
     }
 
+    public byte[] creditAccounts(List<String> headers, List<List<String>> rows,
+                                 List<String> installmentHeaders, List<List<String>> installmentRows) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            writeExcelSheet(workbook, "Cuentas de credito", headers, rows,
+                    Set.of(8, 9, 16, 17, 18, 19, 20, 21, 22, 23));
+            writeExcelSheet(workbook, "Cuotas", installmentHeaders, installmentRows,
+                    Set.of(4, 5, 7, 8, 11));
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo generar el Excel", ex);
+        }
+    }
+
     private byte[] generate(String title, List<String> headers, List<List<String>> rows, ExportFormat format) {
         return format == ExportFormat.PDF ? pdf(title, headers, rows) : excel(title, headers, rows);
     }
@@ -111,6 +125,16 @@ public class ExportDocumentService {
 
     private byte[] excel(String title, List<String> headers, List<List<String>> rows, Set<Integer> numericColumns) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            writeExcelSheet(workbook, title, headers, rows, numericColumns);
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo generar el Excel", ex);
+        }
+    }
+
+    private void writeExcelSheet(XSSFWorkbook workbook, String title, List<String> headers,
+                                 List<List<String>> rows, Set<Integer> numericColumns) {
             XSSFSheet sheet = workbook.createSheet(title.length() > 31 ? title.substring(0, 31) : title);
             CellStyle headerStyle = workbook.createCellStyle();
             headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
@@ -149,11 +173,6 @@ public class ExportDocumentService {
                 sheet.autoSizeColumn(column);
                 sheet.setColumnWidth(column, Math.min(sheet.getColumnWidth(column) + 512, 16000));
             }
-            workbook.write(output);
-            return output.toByteArray();
-        } catch (Exception ex) {
-            throw new IllegalStateException("No se pudo generar el Excel", ex);
-        }
     }
 
     private List<String> productHeaders(PriceListType type, CompanySettings settings) {
