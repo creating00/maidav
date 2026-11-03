@@ -6,6 +6,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -35,7 +38,8 @@ class ProductImageExportServiceImplTest {
 
     @Test
     void exportsCurrentImagesIncludingOutOfStockAndSkipsProductsWithoutImage() throws Exception {
-        Files.write(uploads.resolve("products/current.jpg"), new byte[]{1, 2, 3});
+        writeImage("current.jpg", "jpg");
+        byte[] original = Files.readAllBytes(uploads.resolve("products/current.jpg"));
         Files.writeString(uploads.resolve("products/old.jpg"), "obsolete");
         Product product = product("PRD-KDGAJ5PUM", "Colchón matrimonial", "current.jpg");
         product.setStockAvailable(0);
@@ -44,24 +48,24 @@ class ProductImageExportServiceImplTest {
         Map<String, byte[]> entries = export();
 
         assertThat(entries).containsOnlyKeys("PRD-KDGAJ5PUM.jpg");
-        assertThat(entries.get("PRD-KDGAJ5PUM.jpg")).containsExactly(1, 2, 3);
-        assertThat(Files.readAllBytes(uploads.resolve("products/current.jpg"))).containsExactly(1, 2, 3);
+        assertJpeg(entries.get("PRD-KDGAJ5PUM.jpg"));
+        assertThat(Files.readAllBytes(uploads.resolve("products/current.jpg"))).isEqualTo(original);
         assertThat(Files.readString(uploads.resolve("products/old.jpg"))).isEqualTo("obsolete");
     }
 
     @Test
     void createsSafeDistinctNamesEvenWithCaseInsensitiveCollisions() throws Exception {
-        Files.writeString(uploads.resolve("products/a.PNG"), "image");
+        writeImage("a.PNG", "png");
         when(repository.findAll()).thenReturn(List.of(
                 product("P/1", "Mesa: grande?", "a.PNG"),
                 product("p\\1", "mesa: grande?", "a.PNG")));
 
-        assertThat(export()).containsOnlyKeys("P_1.PNG", "p_1 (2).PNG");
+        assertThat(export()).containsOnlyKeys("P_1.jpg", "p_1 (2).jpg");
     }
 
     @Test
     void avoidsReservedWindowsNamesAndIgnoresDescription() throws Exception {
-        Files.writeString(uploads.resolve("products/a.jpg"), "image");
+        writeImage("a.jpg", "jpg");
         when(repository.findAll()).thenReturn(List.of(product("CON.code", "Colchón".repeat(100), "a.jpg")));
         String name = export().keySet().iterator().next();
         assertThat(name).isEqualTo("_CON.code.jpg");
@@ -78,14 +82,14 @@ class ProductImageExportServiceImplTest {
     @Test
     void skipsMissingImagesAndUnsafePathsAndContinuesWithAvailableImages() throws Exception {
         Files.writeString(uploads.resolve("secret.jpg"), "private");
-        Files.writeString(uploads.resolve("products/available.jpg"), "available");
+        writeImage("available.jpg", "jpg");
+        Files.writeString(uploads.resolve("products/broken.webp"), "invalid image content");
         Product available = product("P002", "Disponible", "available.jpg");
-        for (String path : List.of("missing.jpg", "../secret.jpg", "../../secret.jpg")) {
+        for (String path : List.of("missing.jpg", "../secret.jpg", "../../secret.jpg", "broken.webp")) {
             when(repository.findAll()).thenReturn(List.of(product("P001", "Producto", path), available));
             Map<String, byte[]> entries = export();
             assertThat(entries).containsOnlyKeys("P002.jpg");
-            assertThat(new String(entries.get("P002.jpg"), StandardCharsets.UTF_8))
-                    .isEqualTo("available");
+            assertJpeg(entries.get("P002.jpg"));
         }
         Product external = product("P003", "Externo", null);
         external.setImagePath("https://example.com/image.jpg");
@@ -98,6 +102,53 @@ class ProductImageExportServiceImplTest {
         when(repository.findAll()).thenReturn(List.of(product("PRD-9CKQK05H0", "Producto", "missing.jpg")));
         assertThatThrownBy(() -> export()).isInstanceOf(InvalidProductException.class)
                 .hasMessage("No hay imágenes de productos para exportar.");
+    }
+
+    @Test
+    void convertsWebpAndPngToRealJpegWithoutChangingOriginals() throws Exception {
+        for (String format : List.of("webp", "png")) {
+            String file = "source." + format;
+            writeImage(file, format);
+            Path originalPath = uploads.resolve("products").resolve(file);
+            byte[] original = Files.readAllBytes(originalPath);
+            when(repository.findAll()).thenReturn(List.of(product("PRD-KDGAJ5PUM", "Producto", file)));
+
+            Map<String, byte[]> entries = export();
+
+            assertThat(entries).containsOnlyKeys("PRD-KDGAJ5PUM.jpg");
+            assertJpeg(entries.get("PRD-KDGAJ5PUM.jpg"));
+            assertThat(Files.readAllBytes(originalPath)).isEqualTo(original);
+        }
+    }
+
+    @Test
+    void convertsTransparentPixelsToWhiteBackground() throws Exception {
+        BufferedImage transparent = new BufferedImage(16, 12, BufferedImage.TYPE_INT_ARGB);
+        assertThat(ImageIO.write(transparent, "png", uploads.resolve("products/transparent.png").toFile())).isTrue();
+        when(repository.findAll()).thenReturn(List.of(product("P001", "Transparente", "transparent.png")));
+
+        byte[] jpeg = export().get("P001.jpg");
+        assertJpeg(jpeg);
+        BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(jpeg));
+        assertThat(new Color(decoded.getRGB(8, 6))).isEqualTo(Color.WHITE);
+    }
+
+    private void writeImage(String file, String format) throws Exception {
+        BufferedImage image = new BufferedImage(16, 12, BufferedImage.TYPE_INT_RGB);
+        for (int y = 0; y < image.getHeight(); y++) {
+            for (int x = 0; x < image.getWidth(); x++) {
+                image.setRGB(x, y, Color.RED.getRGB());
+            }
+        }
+        assertThat(ImageIO.write(image, format, uploads.resolve("products").resolve(file).toFile())).isTrue();
+    }
+
+    private void assertJpeg(byte[] bytes) throws Exception {
+        assertThat(bytes).startsWith((byte) 0xff, (byte) 0xd8, (byte) 0xff);
+        BufferedImage decoded = ImageIO.read(new ByteArrayInputStream(bytes));
+        assertThat(decoded).isNotNull();
+        assertThat(decoded.getWidth()).isEqualTo(16);
+        assertThat(decoded.getHeight()).isEqualTo(12);
     }
 
     private Map<String, byte[]> export() throws Exception {
