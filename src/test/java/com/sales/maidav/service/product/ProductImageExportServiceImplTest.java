@@ -37,14 +37,14 @@ class ProductImageExportServiceImplTest {
     void exportsCurrentImagesIncludingOutOfStockAndSkipsProductsWithoutImage() throws Exception {
         Files.write(uploads.resolve("products/current.jpg"), new byte[]{1, 2, 3});
         Files.writeString(uploads.resolve("products/old.jpg"), "obsolete");
-        Product product = product("P001", "Colchón matrimonial", "current.jpg");
+        Product product = product("PRD-KDGAJ5PUM", "Colchón matrimonial", "current.jpg");
         product.setStockAvailable(0);
         when(repository.findAll()).thenReturn(List.of(product, product("P002", "Sin imagen", null)));
 
         Map<String, byte[]> entries = export();
 
-        assertThat(entries).containsOnlyKeys("P001 - Colchón matrimonial.jpg");
-        assertThat(entries.get("P001 - Colchón matrimonial.jpg")).containsExactly(1, 2, 3);
+        assertThat(entries).containsOnlyKeys("PRD-KDGAJ5PUM.jpg");
+        assertThat(entries.get("PRD-KDGAJ5PUM.jpg")).containsExactly(1, 2, 3);
         assertThat(Files.readAllBytes(uploads.resolve("products/current.jpg"))).containsExactly(1, 2, 3);
         assertThat(Files.readString(uploads.resolve("products/old.jpg"))).isEqualTo("obsolete");
     }
@@ -56,15 +56,15 @@ class ProductImageExportServiceImplTest {
                 product("P/1", "Mesa: grande?", "a.PNG"),
                 product("p\\1", "mesa: grande?", "a.PNG")));
 
-        assertThat(export()).containsOnlyKeys("P_1 - Mesa_ grande_.PNG", "p_1 - mesa_ grande_ (2).PNG");
+        assertThat(export()).containsOnlyKeys("P_1.PNG", "p_1 (2).PNG");
     }
 
     @Test
-    void limitsUnicodeNamesAndAvoidsReservedWindowsNames() throws Exception {
+    void avoidsReservedWindowsNamesAndIgnoresDescription() throws Exception {
         Files.writeString(uploads.resolve("products/a.jpg"), "image");
         when(repository.findAll()).thenReturn(List.of(product("CON.code", "Colchón".repeat(100), "a.jpg")));
         String name = export().keySet().iterator().next();
-        assertThat(name).startsWith("_CON.code - ").endsWith(".jpg");
+        assertThat(name).isEqualTo("_CON.code.jpg");
         assertThat(name.getBytes(StandardCharsets.UTF_8).length).isLessThan(255);
     }
 
@@ -83,14 +83,14 @@ class ProductImageExportServiceImplTest {
         for (String path : List.of("missing.jpg", "../secret.jpg", "../../secret.jpg")) {
             when(repository.findAll()).thenReturn(List.of(product("P001", "Producto", path), available));
             Map<String, byte[]> entries = export();
-            assertThat(entries).containsOnlyKeys("P002 - Disponible.jpg");
-            assertThat(new String(entries.get("P002 - Disponible.jpg"), StandardCharsets.UTF_8))
+            assertThat(entries).containsOnlyKeys("P002.jpg");
+            assertThat(new String(entries.get("P002.jpg"), StandardCharsets.UTF_8))
                     .isEqualTo("available");
         }
         Product external = product("P003", "Externo", null);
         external.setImagePath("https://example.com/image.jpg");
         when(repository.findAll()).thenReturn(List.of(external, available));
-        assertThat(export()).containsOnlyKeys("P002 - Disponible.jpg");
+        assertThat(export()).containsOnlyKeys("P002.jpg");
     }
 
     @Test
