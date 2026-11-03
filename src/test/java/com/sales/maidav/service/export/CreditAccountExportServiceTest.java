@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 
 class CreditAccountExportServiceTest {
     @Test
-    void exportsOneRowPerProductWithCurrentInstallmentPricesAndEligibleCollectors() throws Exception {
+    void exportsOneRowPerInstallmentWithPaymentIdsAndExampleColumns() throws Exception {
         SaleItemRepository items = mock(SaleItemRepository.class);
         CreditPaymentRepository payments = mock(CreditPaymentRepository.class);
         CreditInstallmentRepository installments = mock(CreditInstallmentRepository.class);
@@ -110,33 +110,27 @@ class CreditAccountExportServiceTest {
         ));
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(service.export(List.of(account))))) {
-            var sheet = workbook.getSheetAt(0);
-            assertThat(sheet.getLastRowNum()).isEqualTo(3);
-            assertThat(sheet.getRow(1).getCell(21).getStringCellValue()).isEqualTo("precio_13_semanas");
-            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("C-000020");
-            assertThat(sheet.getRow(2).getCell(13).getStringCellValue()).isEqualTo("collector@example.com");
-            assertThat(sheet.getRow(2).getCell(14).getStringCellValue()).isEqualTo("13 semanas");
-            assertThat(sheet.getRow(2).getCell(15).getStringCellValue()).isEqualTo("P1 - Mesa");
-            assertThat(sheet.getRow(2).getCell(17).getCellType()).isEqualTo(CellType.NUMERIC);
-            assertThat(sheet.getRow(2).getCell(17).getNumericCellValue()).isEqualTo(1000.0);
-            assertThat(sheet.getRow(2).getCell(18).getNumericCellValue()).isEqualTo(1300.0);
-            assertThat(sheet.getRow(2).getCell(19).getNumericCellValue()).isEqualTo(1500.0);
-            assertThat(sheet.getRow(2).getCell(21).getCellType()).isEqualTo(CellType.NUMERIC);
-            assertThat(sheet.getRow(2).getCell(21).getNumericCellValue()).isEqualTo(200.0);
-            assertThat(sheet.getRow(2).getCell(23).getStringCellValue()).isEqualTo("No aplica");
-            assertThat(sheet.getRow(3).getCell(15).getStringCellValue()).isEqualTo("P2 - Silla");
-            assertThat(sheet.getRow(3).getCell(23).getCellType()).isEqualTo(CellType.NUMERIC);
-            var cuotas = workbook.getSheet("Cuotas");
-            assertThat(cuotas.getLastRowNum()).isEqualTo(3);
-            assertThat(cuotas.getRow(1).getCell(11).getStringCellValue()).isEqualTo("monto_pagado");
-            assertThat(cuotas.getRow(2).getCell(4).getNumericCellValue()).isEqualTo(4000.0);
-            assertThat(cuotas.getRow(2).getCell(9).getStringCellValue()).isEqualTo("Pagado");
-            assertThat(cuotas.getRow(2).getCell(11).getNumericCellValue()).isEqualTo(500.0);
-            assertThat(cuotas.getRow(2).getCell(12).getStringCellValue()).isEqualTo("Transferencia + Débito");
-            assertThat(cuotas.getRow(2).getCell(13).getStringCellValue()).isEqualTo("Sí");
-            assertThat(cuotas.getRow(3).getCell(9).getStringCellValue()).isEqualTo("Atrasado");
-            assertThat(cuotas.getRow(3).getCell(11).getStringCellValue()).isBlank();
-            assertThat(cuotas.getRow(3).getCell(13).getStringCellValue()).isEqualTo("No");
+            assertThat(workbook.getNumberOfSheets()).isEqualTo(1);
+            var sheet = workbook.getSheet("Cuotas");
+            assertThat(sheet.getLastRowNum()).isEqualTo(2);
+            assertThat(sheet.getRow(0).getLastCellNum()).isEqualTo((short) 14);
+            assertThat(java.util.stream.IntStream.range(0, 14)
+                    .mapToObj(column -> sheet.getRow(0).getCell(column).getStringCellValue()).toList())
+                    .containsExactly("id_pago", "numero_cuenta", "cliente", "vendedor", "producto",
+                            "costo_producto", "nro_cuota", "fecha_vencimiento", "monto_cuota_efectivo",
+                            "monto_cuota_transferencia", "estado_cuota", "fecha_pago_real",
+                            "monto_pagado", "metodo_pago");
+            assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("1, 5");
+            assertThat(sheet.getRow(1).getCell(1).getStringCellValue()).isEqualTo("C-000020");
+            assertThat(sheet.getRow(1).getCell(4).getStringCellValue()).isEqualTo("Mesa | Silla");
+            assertThat(sheet.getRow(1).getCell(5).getCellType()).isEqualTo(CellType.NUMERIC);
+            assertThat(sheet.getRow(1).getCell(5).getNumericCellValue()).isEqualTo(4000.0);
+            assertThat(sheet.getRow(1).getCell(10).getStringCellValue()).isEqualTo("Pagado");
+            assertThat(sheet.getRow(1).getCell(12).getNumericCellValue()).isEqualTo(500.0);
+            assertThat(sheet.getRow(1).getCell(13).getStringCellValue()).isEqualTo("Transferencia + Débito");
+            assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isBlank();
+            assertThat(sheet.getRow(2).getCell(10).getStringCellValue()).isEqualTo("Atrasada");
+            assertThat(sheet.getRow(2).getCell(12).getStringCellValue()).isBlank();
         }
     }
 
@@ -169,10 +163,58 @@ class CreditAccountExportServiceTest {
                 .thenReturn(List.of(installment));
 
         try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(service.export(List.of(account))))) {
-            var row = workbook.getSheet("Cuotas").getRow(2);
-            assertThat(row.getCell(7).getNumericCellValue()).isEqualTo(750.0);
+            var row = workbook.getSheet("Cuotas").getRow(1);
             assertThat(row.getCell(8).getNumericCellValue()).isEqualTo(750.0);
-            assertThat(row.getCell(9).getStringCellValue()).isEqualTo("Pendiente");
+            assertThat(row.getCell(9).getNumericCellValue()).isEqualTo(750.0);
+            assertThat(row.getCell(10).getStringCellValue()).isEqualTo("Pendiente");
+            assertThat(row.getCell(12).getStringCellValue()).isBlank();
+        }
+    }
+
+    @Test
+    void partialPaymentsRemainOverdueAndShowActualCollections() throws Exception {
+        SaleItemRepository items = mock(SaleItemRepository.class);
+        CreditInstallmentRepository installments = mock(CreditInstallmentRepository.class);
+        CreditPaymentAllocationRepository allocations = mock(CreditPaymentAllocationRepository.class);
+        CompanySettingsService settingsService = mock(CompanySettingsService.class);
+        CreditAccountExportService service = new CreditAccountExportService(items, mock(CreditPaymentRepository.class),
+                installments, allocations, mock(UserRepository.class), settingsService, new QuoteCalculator(),
+                new ExportDocumentService());
+        Sale sale = new Sale();
+        sale.setId(12L);
+        CreditAccount account = new CreditAccount();
+        account.setId(22L);
+        account.setSale(sale);
+        account.setPaymentFrequency(PaymentFrequency.DAILY);
+        CreditInstallment installment = new CreditInstallment();
+        installment.setId(33L);
+        installment.setAccount(account);
+        installment.setInstallmentNumber(3);
+        installment.setDueDate(LocalDate.now().minusDays(3));
+        installment.setAmount(new BigDecimal("750.00"));
+        installment.setPaidAmount(new BigDecimal("250.00"));
+        installment.setStatus(InstallmentStatus.PARTIAL);
+        CreditPayment first = payment(11L, account, "collector@example.com", false, null);
+        first.setPaidAt(LocalDate.now().minusDays(2));
+        first.setPaymentMethod(PaymentCollectionMethod.CASH);
+        CreditPayment second = payment(12L, account, "collector@example.com", false, null);
+        second.setPaidAt(LocalDate.now().minusDays(1));
+        second.setPaymentMethod(PaymentCollectionMethod.TRANSFER);
+        when(settingsService.getSettings()).thenReturn(new CompanySettings());
+        when(installments.findByAccount_IdInOrderByAccount_IdAscInstallmentNumberAsc(List.of(22L)))
+                .thenReturn(List.of(installment));
+        when(allocations.findByAccount_IdIn(List.of(22L))).thenReturn(List.of(
+                allocation(account, installment, first, "100.00", "100.00", true),
+                allocation(account, installment, second, "150.00", "150.00", true)));
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(service.export(List.of(account))))) {
+            var row = workbook.getSheet("Cuotas").getRow(1);
+            assertThat(row.getCell(0).getStringCellValue()).isEqualTo("11, 12");
+            assertThat(row.getCell(10).getStringCellValue()).isEqualTo("Atrasada");
+            assertThat(row.getCell(11).getStringCellValue()).isEqualTo(
+                    LocalDate.now().minusDays(1).format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")));
+            assertThat(row.getCell(12).getNumericCellValue()).isEqualTo(250.0);
+            assertThat(row.getCell(13).getStringCellValue()).isEqualTo("Efectivo + Transferencia");
         }
     }
 
