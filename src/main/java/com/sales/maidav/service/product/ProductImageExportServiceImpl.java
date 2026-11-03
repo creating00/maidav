@@ -7,12 +7,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -42,27 +45,19 @@ public class ProductImageExportServiceImpl implements ProductImageExportService 
                 if (product.getImagePath() == null || product.getImagePath().isBlank()) {
                     continue;
                 }
-                Path image;
                 try {
-                    image = resolveImage(product);
-                    // Read the complete source before adding an entry, avoiding partial images in the ZIP.
-                    Files.copy(image, stagedImage, StandardCopyOption.REPLACE_EXISTING);
+                    // Complete conversion before adding an entry, avoiding partial images in the ZIP.
+                    convertToJpeg(resolveImage(product), stagedImage);
                 } catch (InvalidProductException | IOException ex) {
                     log.warn("Se omite la imagen del producto {} durante la exportación: {}",
                             product.getProductCode(), ex.getMessage());
                     continue;
                 }
-                String originalName = image.getFileName().toString();
-                int dot = originalName.lastIndexOf('.');
-                String extension = dot < 0 ? "" : originalName.substring(dot);
-                if (!extension.matches("\\.[a-zA-Z0-9]{1,10}")) {
-                    extension = "";
-                }
                 String base = safePart(product.getProductCode(), 70);
-                String name = base + extension;
+                String name = base + ".jpg";
                 int suffix = 2;
                 while (!names.add(name.toLowerCase(Locale.ROOT))) {
-                    name = base + " (" + suffix++ + ")" + extension;
+                    name = base + " (" + suffix++ + ").jpg";
                 }
                 zip.putNextEntry(new ZipEntry(name));
                 Files.copy(stagedImage, zip);
@@ -74,6 +69,32 @@ public class ProductImageExportServiceImpl implements ProductImageExportService 
             }
         } finally {
             Files.deleteIfExists(stagedImage);
+        }
+    }
+
+    private void convertToJpeg(Path image, Path target) throws IOException {
+        BufferedImage source = ImageIO.read(image.toFile());
+        if (source == null) {
+            throw new IOException("Formato de imagen no reconocido");
+        }
+        BufferedImage rgb = new BufferedImage(source.getWidth(), source.getHeight(), BufferedImage.TYPE_INT_RGB);
+        try {
+            Graphics2D graphics = rgb.createGraphics();
+            try {
+                graphics.setColor(Color.WHITE);
+                graphics.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+                graphics.drawImage(source, 0, 0, null);
+            } finally {
+                graphics.dispose();
+            }
+            try (OutputStream converted = Files.newOutputStream(target)) {
+                if (!ImageIO.write(rgb, "jpg", converted)) {
+                    throw new IOException("No se pudo convertir la imagen a JPG");
+                }
+            }
+        } finally {
+            source.flush();
+            rgb.flush();
         }
     }
 
