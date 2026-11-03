@@ -58,8 +58,7 @@ public class ProductImageExportServiceImpl implements ProductImageExportService 
                 if (!extension.matches("\\.[a-zA-Z0-9]{1,10}")) {
                     extension = "";
                 }
-                String base = safePart(product.getProductCode(), 70) + " - "
-                        + safePart(product.getDescription(), 140);
+                String base = safePart(product.getProductCode(), 70);
                 String name = base + extension;
                 int suffix = 2;
                 while (!names.add(name.toLowerCase(Locale.ROOT))) {
