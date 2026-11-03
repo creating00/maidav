@@ -52,10 +52,10 @@ public class CreditAccountExportService {
             "precio_4_meses", "precio_8_meses"
     );
     private static final List<String> INSTALLMENT_HEADERS = List.of(
-            "numero_cuenta", "cliente", "vendedor", "producto", "costo_producto",
+            "id_pago", "numero_cuenta", "cliente", "vendedor", "producto", "costo_producto",
             "nro_cuota", "fecha_vencimiento", "monto_cuota_efectivo",
             "monto_cuota_transferencia", "estado_cuota", "fecha_pago_real",
-            "monto_pagado", "metodo_pago", "detalle_pago_disponible"
+            "monto_pagado", "metodo_pago"
     );
 
     private final SaleItemRepository saleItemRepository;
@@ -70,26 +70,13 @@ public class CreditAccountExportService {
     @Transactional(readOnly = true)
     public byte[] export(List<CreditAccount> accounts) {
         CompanySettings settings = companySettingsService.getSettings();
-        List<String> headers = headers(settings);
         if (accounts.isEmpty()) {
-            return exportDocumentService.creditAccounts(headers, List.of(), INSTALLMENT_HEADERS, List.of());
+            return exportDocumentService.creditAccountInstallments(INSTALLMENT_HEADERS, List.of());
         }
         List<Long> saleIds = accounts.stream().map(account -> account.getSale().getId()).toList();
         Map<Long, List<SaleItem>> items = saleItemRepository.findBySale_IdInOrderBySale_IdAscIdAsc(saleIds)
                 .stream().collect(Collectors.groupingBy(item -> item.getSale().getId()));
-        Map<Long, String> collectors = collectors(accounts);
-        List<List<String>> rows = new ArrayList<>();
-        for (CreditAccount account : accounts) {
-            List<SaleItem> saleItems = items.getOrDefault(account.getSale().getId(), List.of());
-            if (saleItems.isEmpty()) {
-                rows.add(row(account, collectors.getOrDefault(account.getId(), ""), null, settings));
-            } else {
-                for (SaleItem item : saleItems) {
-                    rows.add(row(account, collectors.getOrDefault(account.getId(), ""), item, settings));
-                }
-            }
-        }
-        return exportDocumentService.creditAccounts(headers, rows,
+        return exportDocumentService.creditAccountInstallments(
                 INSTALLMENT_HEADERS, installmentRows(accounts, items, settings));
     }
 
@@ -140,11 +127,15 @@ public class CreditAccountExportService {
             boolean costAvailable = !saleItems.isEmpty() && saleItems.stream().allMatch(item ->
                     item.getProduct() != null && item.getProduct().getCost() != null && item.getQuantity() != null);
             String products = saleItems.stream().map(item -> item.getProduct() == null ? ""
-                    : item.getQuantity() + " x " + text(item.getProduct().getProductCode())
-                    + " - " + text(item.getProduct().getDescription()))
+                    : text(item.getProduct().getDescription()))
                     .filter(product -> !product.isBlank()).collect(Collectors.joining(" | "));
+            String paymentIds = detailAvailable ? allocations.stream()
+                    .filter(allocation -> allocation.getCollectedAmount().signum() > 0)
+                    .map(allocation -> allocation.getPayment().getId())
+                    .filter(id -> id != null).distinct().sorted()
+                    .map(String::valueOf).collect(Collectors.joining(", ")) : "";
             rows.add(List.of(
-                    text(account.getAccountNumber()), customerName,
+                    paymentIds, text(account.getAccountNumber()), customerName,
                     account.getSale().getSeller() == null ? "" : text(account.getSale().getSeller().getEmail()),
                     products, costAvailable ? amount(totalCost) : "",
                     String.valueOf(installment.getInstallmentNumber()),
@@ -153,9 +144,8 @@ public class CreditAccountExportService {
                     amount(installment.getAmount()), installmentStatus(installment),
                     lastPaidAt != null ? DATE.format(lastPaidAt)
                             : installment.getPaidAt() == null ? "" : DATE.format(installment.getPaidAt()),
-                    detailAvailable ? amount(collected) : "",
-                    detailAvailable ? methodLabel(methods) : "",
-                    detailAvailable ? "Sí" : "No"
+                    detailAvailable && collected.signum() > 0 ? amount(collected) : "",
+                    detailAvailable ? methodLabel(methods) : ""
             ));
         }
         return rows;
@@ -164,7 +154,7 @@ public class CreditAccountExportService {
     private String installmentStatus(CreditInstallment installment) {
         if (value(installment.getPaidAmount()).compareTo(value(installment.getAmount())) >= 0) return "Pagado";
         return installment.getDueDate() != null && installment.getDueDate().isBefore(LocalDate.now())
-                ? "Atrasado" : "Pendiente";
+                ? "Atrasada" : "Pendiente";
     }
 
     private String methodLabel(Set<PaymentCollectionMethod> methods) {

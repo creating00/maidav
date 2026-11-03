@@ -80,6 +80,16 @@ public class ExportDocumentService {
         }
     }
 
+    public byte[] creditAccountInstallments(List<String> headers, List<List<String>> rows) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            writeExcelSheet(workbook, "Cuotas", headers, rows, Set.of(5, 6, 8, 9, 12), false);
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo generar el Excel", ex);
+        }
+    }
+
     private byte[] generate(String title, List<String> headers, List<List<String>> rows, ExportFormat format) {
         return format == ExportFormat.PDF ? pdf(title, headers, rows) : excel(title, headers, rows);
     }
@@ -134,6 +144,11 @@ public class ExportDocumentService {
 
     private void writeExcelSheet(XSSFWorkbook workbook, String title, List<String> headers,
                                  List<List<String>> rows, Set<Integer> numericColumns) {
+        writeExcelSheet(workbook, title, headers, rows, numericColumns, true);
+    }
+
+    private void writeExcelSheet(XSSFWorkbook workbook, String title, List<String> headers,
+                                 List<List<String>> rows, Set<Integer> numericColumns, boolean includeTitle) {
             XSSFSheet sheet = workbook.createSheet(title.length() > 31 ? title.substring(0, 31) : title);
             CellStyle headerStyle = workbook.createCellStyle();
             headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
@@ -143,8 +158,10 @@ public class ExportDocumentService {
             font.setBold(true);
             headerStyle.setFont(font);
             int rowIndex = 0;
-            org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowIndex++);
-            titleRow.createCell(0).setCellValue(title);
+            if (includeTitle) {
+                org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowIndex++);
+                titleRow.createCell(0).setCellValue(title);
+            }
             org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(rowIndex++);
             for (int column = 0; column < headers.size(); column++) {
                 Cell cell = headerRow.createCell(column);
@@ -167,7 +184,7 @@ public class ExportDocumentService {
                     }
                 }
             }
-            sheet.createFreezePane(0, 2);
+            sheet.createFreezePane(0, includeTitle ? 2 : 1);
             for (int column = 0; column < headers.size(); column++) {
                 sheet.autoSizeColumn(column);
                 sheet.setColumnWidth(column, Math.min(sheet.getColumnWidth(column) + 512, 16000));
