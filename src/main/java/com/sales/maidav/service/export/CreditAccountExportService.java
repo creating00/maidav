@@ -27,22 +27,29 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class CreditAccountExportService {
     private static final DateTimeFormatter DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final Pattern PAYMENT_REFERENCE = Pattern.compile(
+            "^Cuota #(\\d+): (?:se aplican|recibe) \\$ ([\\d.]+,\\d{2})\\b.*$");
+    private static final Pattern SINGLE_LEGACY_REFERENCE = Pattern.compile(
+            "^Cuota #(\\d+) (?:total|parcial) \\(valor (?:contado|financiado)\\)$");
     private static final List<String> HEADERS = List.of(
             "numero_cuenta", "dni_cuit", "nombre", "apellido", "telefono", "direccion",
             "fecha_alta", "fecha_cuenta", "total_credito", "saldo_total_cuenta",
@@ -84,35 +91,73 @@ public class CreditAccountExportService {
                                                 Map<Long, List<SaleItem>> items,
                                                 CompanySettings settings) {
         List<Long> accountIds = accounts.stream().map(CreditAccount::getId).toList();
-        Map<Long, List<CreditPaymentAllocation>> allocationsByInstallment =
-                creditPaymentAllocationRepository.findByAccount_IdIn(accountIds).stream()
-                        .collect(Collectors.groupingBy(allocation -> allocation.getInstallment().getId()));
+        List<CreditPayment> payments = creditPaymentRepository.findByAccount_IdIn(accountIds);
+        List<CreditInstallment> installments = creditInstallmentRepository
+                .findByAccount_IdInOrderByAccount_IdAscInstallmentNumberAsc(accountIds);
+        Map<Long, Map<Integer, CreditInstallment>> installmentsByNumber = new HashMap<>();
+        Map<Long, Integer> installmentNumbersById = new HashMap<>();
+        for (CreditInstallment installment : installments) {
+            installmentNumbersById.put(installment.getId(), installment.getInstallmentNumber());
+            if (!installment.isVoided()
+                    && installment.getStatus() != com.sales.maidav.model.sale.InstallmentStatus.VOID) {
+                installmentsByNumber.computeIfAbsent(installment.getAccount().getId(), ignored -> new HashMap<>())
+                        .put(installment.getInstallmentNumber(), installment);
+            }
+        }
+        Map<Long, Map<Integer, BigDecimal>> reversalsByPayment = new HashMap<>();
+        for (CreditPayment reversal : payments) {
+            if (!reversal.isReversal() || reversal.getReversalOfPaymentId() == null) {
+                continue;
+            }
+            Integer installmentNumber = installmentNumbersById.get(reversal.getTargetInstallmentId());
+            if (installmentNumber != null) {
+                reversalsByPayment.computeIfAbsent(reversal.getReversalOfPaymentId(), ignored -> new HashMap<>())
+                        .merge(installmentNumber, value(reversal.getAmount()).abs(), BigDecimal::add);
+            }
+        }
+        Map<Long, List<PaymentLine>> paymentsByInstallment = new HashMap<>();
+        Set<Long> linkedPaymentIds = new HashSet<>();
+        for (CreditPaymentAllocation allocation : creditPaymentAllocationRepository.findByAccount_IdIn(accountIds)) {
+            CreditPayment payment = allocation.getPayment();
+            if (!allocation.isVerified() || payment.isReversal()
+                    || value(allocation.getCollectedAmount()).signum() <= 0) {
+                continue;
+            }
+            paymentsByInstallment.computeIfAbsent(allocation.getInstallment().getId(), ignored -> new ArrayList<>())
+                    .add(new PaymentLine(payment, allocation.getCollectedAmount()));
+            linkedPaymentIds.add(payment.getId());
+        }
+        for (CreditPayment payment : payments) {
+            if (payment.isReversal() || linkedPaymentIds.contains(payment.getId())) {
+                continue;
+            }
+            Map<Integer, BigDecimal> historicalAmounts = historicalAmounts(payment);
+            Map<Integer, CreditInstallment> accountInstallments =
+                    installmentsByNumber.getOrDefault(payment.getAccount().getId(), Map.of());
+            if (historicalAmounts.isEmpty() || !accountInstallments.keySet().containsAll(historicalAmounts.keySet())) {
+                continue;
+            }
+            Map<Integer, BigDecimal> reversedAmounts = reversalsByPayment.getOrDefault(payment.getId(), Map.of());
+            historicalAmounts.forEach((number, paidAmount) -> {
+                CreditInstallment installment = accountInstallments.get(number);
+                BigDecimal remaining = paidAmount.subtract(reversedAmounts.getOrDefault(number, BigDecimal.ZERO));
+                if (remaining.signum() > 0 && value(installment.getPaidAmount()).signum() > 0) {
+                    paymentsByInstallment.computeIfAbsent(installment.getId(), ignored -> new ArrayList<>())
+                            .add(new PaymentLine(payment, remaining));
+                }
+            });
+        }
         Map<Long, CreditAccount> accountsById = accounts.stream()
                 .collect(Collectors.toMap(CreditAccount::getId, account -> account));
         List<List<String>> rows = new ArrayList<>();
-        for (CreditInstallment installment : creditInstallmentRepository
-                .findByAccount_IdInOrderByAccount_IdAscInstallmentNumberAsc(accountIds)) {
+        for (CreditInstallment installment : installments) {
             if (installment.isVoided() || installment.getStatus() == com.sales.maidav.model.sale.InstallmentStatus.VOID) {
                 continue;
             }
             CreditAccount account = accountsById.get(installment.getAccount().getId());
             if (account == null) continue;
             List<SaleItem> saleItems = items.getOrDefault(account.getSale().getId(), List.of());
-            List<CreditPaymentAllocation> allocations = allocationsByInstallment.getOrDefault(installment.getId(), List.of());
-            BigDecimal paidImpact = allocations.stream().map(CreditPaymentAllocation::getImpactAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            boolean detailAvailable = paidImpact.compareTo(value(installment.getPaidAmount())) == 0
-                    && allocations.stream().allMatch(CreditPaymentAllocation::isVerified);
-            BigDecimal collected = allocations.stream().map(CreditPaymentAllocation::getCollectedAmount)
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            LocalDate lastPaidAt = allocations.stream().filter(a -> a.getCollectedAmount().signum() > 0)
-                    .map(a -> a.getPayment().getPaidAt()).filter(date -> date != null)
-                    .max(LocalDate::compareTo).orElse(null);
-            Set<PaymentCollectionMethod> methods = allocations.stream()
-                    .filter(a -> a.getCollectedAmount().signum() > 0)
-                    .map(a -> a.getPayment().getPaymentMethod() == null
-                            ? PaymentCollectionMethod.BANK : a.getPayment().getPaymentMethod())
-                    .collect(Collectors.toSet());
+            List<PaymentLine> paymentLines = paymentsByInstallment.getOrDefault(installment.getId(), List.of());
             BigDecimal cashAmount = account.getPaymentFrequency() == PaymentFrequency.DAILY
                     ? installment.getAmount()
                     : installment.getCashAmount() != null ? installment.getCashAmount()
@@ -129,27 +174,83 @@ public class CreditAccountExportService {
             String products = saleItems.stream().map(item -> item.getProduct() == null ? ""
                     : text(item.getProduct().getDescription()))
                     .filter(product -> !product.isBlank()).collect(Collectors.joining(" | "));
-            String paymentIds = detailAvailable ? allocations.stream()
-                    .filter(allocation -> allocation.getCollectedAmount().signum() > 0)
-                    .map(allocation -> allocation.getPayment().getId())
-                    .filter(id -> id != null).distinct().sorted()
-                    .map(String::valueOf).collect(Collectors.joining(", ")) : "";
-            rows.add(List.of(
-                    paymentIds, text(account.getAccountNumber()), customerName,
-                    account.getSale().getSeller() == null ? "" : text(account.getSale().getSeller().getEmail()),
-                    products, costAvailable ? amount(totalCost) : "",
-                    String.valueOf(installment.getInstallmentNumber()),
-                    installment.getDueDate() == null ? "" : DATE.format(installment.getDueDate()),
-                    cashAmount == null || cashAmount.signum() == 0 ? "" : amount(cashAmount),
-                    amount(installment.getAmount()), installmentStatus(installment),
-                    lastPaidAt != null ? DATE.format(lastPaidAt)
-                            : installment.getPaidAt() == null ? "" : DATE.format(installment.getPaidAt()),
-                    detailAvailable && collected.signum() > 0 ? amount(collected) : "",
-                    detailAvailable ? methodLabel(methods) : ""
-            ));
+            List<PaymentLine> visiblePayments = paymentLines.stream()
+                    .sorted(java.util.Comparator.comparing((PaymentLine line) ->
+                                    line.payment().getPaidAt(), java.util.Comparator.nullsFirst(LocalDate::compareTo))
+                            .thenComparing(line -> line.payment().getId(),
+                                    java.util.Comparator.nullsFirst(Long::compareTo)))
+                    .toList();
+            if (visiblePayments.isEmpty()) {
+                rows.add(installmentRow(account, customerName, products, costAvailable ? amount(totalCost) : "",
+                        installment, cashAmount, null, null));
+            } else {
+                for (PaymentLine line : visiblePayments) {
+                    CreditPayment payment = line.payment();
+                    rows.add(installmentRow(account, customerName, products, costAvailable ? amount(totalCost) : "",
+                            installment, cashAmount, payment, line.amount()));
+                }
+            }
         }
         return rows;
     }
+
+    private Map<Integer, BigDecimal> historicalAmounts(CreditPayment payment) {
+        String summary = payment.getAllocationSummary();
+        if (summary == null || summary.isBlank() || value(payment.getAmount()).signum() <= 0) {
+            return Map.of();
+        }
+        String[] references = summary.split("\\s*\\|\\s*");
+        if (references.length == 1) {
+            Matcher legacy = SINGLE_LEGACY_REFERENCE.matcher(references[0].trim());
+            if (legacy.matches()) {
+                return Map.of(Integer.parseInt(legacy.group(1)), payment.getAmount());
+            }
+        }
+        Map<Integer, BigDecimal> amounts = new LinkedHashMap<>();
+        BigDecimal total = BigDecimal.ZERO;
+        for (String reference : references) {
+            Matcher matcher = PAYMENT_REFERENCE.matcher(reference.trim());
+            if (!matcher.matches()) {
+                return Map.of();
+            }
+            int installmentNumber = Integer.parseInt(matcher.group(1));
+            BigDecimal collected = new BigDecimal(matcher.group(2).replace(".", "").replace(',', '.'));
+            if (collected.signum() <= 0 || amounts.putIfAbsent(installmentNumber, collected) != null) {
+                return Map.of();
+            }
+            total = total.add(collected);
+        }
+        if (amounts.size() == 1) {
+            int number = amounts.keySet().iterator().next();
+            return Map.of(number, payment.getAmount());
+        }
+        return total.compareTo(payment.getAmount()) == 0 ? amounts : Map.of();
+    }
+
+    private record PaymentLine(CreditPayment payment, BigDecimal amount) { }
+
+    private List<String> installmentRow(CreditAccount account, String customerName, String products,
+                                        String productCost, CreditInstallment installment, BigDecimal cashAmount,
+                                        CreditPayment payment, BigDecimal collectedAmount) {
+        return List.of(paymentId(payment), text(account.getAccountNumber()), customerName,
+                seller(account), products, productCost,
+                String.valueOf(installment.getInstallmentNumber()), date(installment.getDueDate()),
+                cashAmount == null || cashAmount.signum() == 0 ? "" : amount(cashAmount),
+                amount(installment.getAmount()), installmentStatus(installment),
+                payment == null ? "" : date(payment.getPaidAt()),
+                collectedAmount == null ? "" : amount(collectedAmount),
+                payment == null ? "" : methodLabel(payment.getPaymentMethod()));
+    }
+
+    private String paymentId(CreditPayment payment) {
+        return payment == null || payment.getId() == null ? "" : String.valueOf(payment.getId());
+    }
+
+    private String seller(CreditAccount account) {
+        return account.getSale().getSeller() == null ? "" : text(account.getSale().getSeller().getEmail());
+    }
+
+    private String date(LocalDate date) { return date == null ? "" : DATE.format(date); }
 
     private String installmentStatus(CreditInstallment installment) {
         if (value(installment.getPaidAmount()).compareTo(value(installment.getAmount())) >= 0) return "Pagado";
@@ -157,14 +258,13 @@ public class CreditAccountExportService {
                 ? "Atrasada" : "Pendiente";
     }
 
-    private String methodLabel(Set<PaymentCollectionMethod> methods) {
-        if (methods.isEmpty()) return "";
-        return methods.stream().sorted().map(method -> switch (method) {
+    private String methodLabel(PaymentCollectionMethod method) {
+        return switch (method == null ? PaymentCollectionMethod.BANK : method) {
             case CASH -> "Efectivo";
             case TRANSFER -> "Transferencia";
             case DEBIT -> "Débito";
-            case BANK -> "Débito/Transferencia (sin discriminar)";
-        }).collect(Collectors.joining(" + "));
+            case BANK -> "Débito/Transferencia";
+        };
     }
 
     private List<String> headers(CompanySettings settings) {
