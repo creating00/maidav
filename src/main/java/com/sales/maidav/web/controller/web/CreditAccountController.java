@@ -151,6 +151,10 @@ public class CreditAccountController {
                 .filter(installment -> installment.getStatus() == InstallmentStatus.VOID || installment.isVoided())
                 .toList();
         Map<Long, BigDecimal> carryForwardAmounts = creditAccountService.getAppliedCarryForwardAmounts(id);
+        Map<Long, BigDecimal> appliedCashAmounts = creditAccountService.getAppliedCashAmounts(id);
+        if (appliedCashAmounts == null) {
+            appliedCashAmounts = Map.of();
+        }
         BigDecimal currentInstallment = null;
         Integer currentInstallmentNumber = null;
         BigDecimal currentInstallmentCashAmount = null;
@@ -165,15 +169,16 @@ public class CreditAccountController {
         BigDecimal cashRecargo = resolveCashRecargo();
         for (CreditInstallment installment : activeInstallments) {
             BigDecimal remaining = remainingAmount(installment.getAmount(), installment.getPaidAmount());
-            BigDecimal chargeAmount = resolveChargeAmount(account, installment, remaining, LocalDate.now(), cashRecargo);
+            boolean usesCashValue = CreditPaymentPricingSupport.usesCashValue(
+                    account.getPaymentFrequency(), installment.getDueDate(), LocalDate.now());
             BigDecimal fullCashAmount = resolveFullCashAmount(account, installment, cashRecargo);
+            BigDecimal cashRemaining = fullCashAmount
+                    .subtract(appliedCashAmounts.getOrDefault(installment.getId(), BigDecimal.ZERO))
+                    .max(BigDecimal.ZERO)
+                    .setScale(2, RoundingMode.HALF_UP);
+            BigDecimal chargeAmount = usesCashValue ? cashRemaining : remaining;
             chargeAmounts.put(installment.getId(), chargeAmount);
             financedAmounts.put(installment.getId(), remaining);
-            boolean usesCashValue = CreditPaymentPricingSupport.usesCashValue(
-                    account.getPaymentFrequency(),
-                    installment.getDueDate(),
-                    LocalDate.now()
-            );
             cashPricingAvailable.put(installment.getId(), usesCashValue);
             BigDecimal expiredCashAmount = !usesCashValue && fullCashAmount.compareTo(BigDecimal.ZERO) > 0
                     ? fullCashAmount

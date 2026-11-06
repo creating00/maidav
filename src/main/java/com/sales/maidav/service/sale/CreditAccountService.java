@@ -24,6 +24,7 @@ public interface CreditAccountService {
     void voidInstallment(Long accountId, Long installmentId, String voidedBy, String reason);
     MoraWarningInfo getMoraWarning(Long accountId);
     Map<Long, BigDecimal> getAppliedCarryForwardAmounts(Long accountId);
+    Map<Long, BigDecimal> getAppliedCashAmounts(Long accountId);
     long countMoroseClients();
     java.util.List<MorositySummary> getMorosity(MorosityLevel levelFilter);
     java.util.List<MorositySummary> getMorosity(MorosityLevel levelFilter, Long requestedSellerId);
