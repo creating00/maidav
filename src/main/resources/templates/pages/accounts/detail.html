@@ -141,8 +141,7 @@
                    class="border rounded px-3 py-2 w-48"/>
             <input type="hidden" name="operationToken" id="paymentOperationToken"/>
             <select name="paymentMethod" class="border rounded px-3 py-2">
-                <option value="TRANSFER">Transferencia</option>
-                <option value="DEBIT">Débito</option>
+                <option value="BANK">Débito/Transferencia</option>
                 <option value="CASH">Efectivo</option>
             </select>
             <button id="paymentSubmitButton" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">
@@ -326,7 +325,7 @@
                 <td class="px-4 py-3 font-semibold"
                     th:text="${'$ ' + #numbers.formatDecimal(pay.impactAmount, 1, 'POINT', 2, 'COMMA')}"></td>
                 <td class="px-4 py-3"
-                    th:text="${pay.paymentMethod == null || pay.paymentMethod.name() == 'BANK' ? 'Débito/Transferencia (sin distinguir)' : (pay.paymentMethod.name() == 'CASH' ? 'Efectivo' : (pay.paymentMethod.name() == 'DEBIT' ? 'Débito' : 'Transferencia'))}"></td>
+                    th:text="${pay.paymentMethod != null && pay.paymentMethod.name() == 'CASH' ? 'Efectivo' : 'Débito/Transferencia'}"></td>
                 <td class="px-4 py-3 text-xs text-slate-600"
                     th:text="${'Por ' + (pay.registeredBy != null ? pay.registeredBy : '-') + (pay.createdAt != null ? ' el ' + #temporals.format(pay.createdAt, 'yyyy-MM-dd HH:mm') : '')}"></td>
                 <td class="px-4 py-3" th:text="${pay.allocationSummary != null ? pay.allocationSummary : '-'}"></td>
@@ -346,17 +345,9 @@
                         <select name="paymentMethod"
                                 class="border rounded px-2 py-1 text-xs payment-method-input"
                                 required>
-                            <option value="BANK"
-                                    th:selected="${pay.paymentMethod == null || pay.paymentMethod.name() == 'BANK'}">
-                                Débito/Transferencia (sin distinguir)
-                            </option>
-                            <option value="TRANSFER"
-                                    th:selected="${pay.paymentMethod != null && pay.paymentMethod.name() == 'TRANSFER'}">
-                                Transferencia
-                            </option>
-                            <option value="DEBIT"
-                                    th:selected="${pay.paymentMethod != null && pay.paymentMethod.name() == 'DEBIT'}">
-                                Débito
+                            <option th:value="${pay.paymentMethod == null || pay.paymentMethod.name() == 'CASH' ? 'BANK' : pay.paymentMethod.name()}"
+                                    th:selected="${pay.paymentMethod == null || pay.paymentMethod.name() != 'CASH'}">
+                                Débito/Transferencia
                             </option>
                             <option value="CASH"
                                     th:selected="${pay.paymentMethod != null && pay.paymentMethod.name() == 'CASH'}">
@@ -557,8 +548,7 @@
                 }
 
                 const amount = parseNumber(amountInput ? amountInput.value : 0);
-                const paymentMethod = methodSelect?.value === 'CASH' ? 'efectivo'
-                    : methodSelect?.value === 'DEBIT' ? 'débito' : 'transferencia';
+                const paymentMethod = methodSelect?.value === 'CASH' ? 'efectivo' : 'débito/transferencia';
                 const installments = selectedInstallmentsLabel();
                 // CONFIRMACION REGISTRO PAGO
                 const confirmed = window.confirm(

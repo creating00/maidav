@@ -141,9 +141,7 @@ public class CollectionWorkbenchService {
                 normalize(payment.getAmount()),
                 switch (payment.getPaymentMethod() == null ? PaymentCollectionMethod.BANK : payment.getPaymentMethod()) {
                     case CASH -> "Efectivo";
-                    case TRANSFER -> "Transferencia";
-                    case DEBIT -> "Débito";
-                    case BANK -> "Débito/Transferencia (sin distinguir)";
+                    case TRANSFER, DEBIT, BANK -> "Débito/Transferencia";
                 },
                 "/accounts/" + accountId + "#payments-section"
         );

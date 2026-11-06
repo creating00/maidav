@@ -231,8 +231,7 @@
 
                     <div class="botones">
                         <button type="button" class="efectivo">Efectivo</button>
-                        <button type="button" class="transferencia">Transferencia</button>
-                        <button type="button" class="debito">Débito</button>
+                        <button type="button" class="transferencia">Débito/Transferencia</button>
                     </div>
 
                     <div class="cobrado"></div>
@@ -254,9 +253,6 @@
                 });
                 card.querySelector('.transferencia').addEventListener('click', function () {
                     registrar(card, 'transferencia');
-                });
-                card.querySelector('.debito').addEventListener('click', function () {
-                    registrar(card, 'debito');
                 });
                 card.querySelector('.idcredito').addEventListener('keydown', function (event) {
                     if (event.key === 'Enter') {
@@ -404,8 +400,8 @@
                     return;
                 }
 
-                const paymentMethod = tipo === 'efectivo' ? 'CASH' : tipo === 'debito' ? 'DEBIT' : 'TRANSFER';
-                const paymentLabel = tipo === 'efectivo' ? 'efectivo' : tipo === 'debito' ? 'débito' : 'transferencia';
+                const paymentMethod = tipo === 'efectivo' ? 'CASH' : 'BANK';
+                const paymentLabel = tipo === 'efectivo' ? 'efectivo' : 'débito/transferencia';
                 const confirmed = window.confirm(`Vas a registrar un pago en ${paymentLabel} por $${money(monto)}. Deseas continuar?`);
                 if (!confirmed) {
                     return;
