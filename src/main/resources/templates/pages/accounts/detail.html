@@ -53,16 +53,16 @@
                th:text="${currentInstallmentAmount != null ? '$ ' + #numbers.formatDecimal(currentInstallmentAmount, 1, 'POINT', 2, 'COMMA') : '-'}"></p>
             <div th:if="${currentInstallmentNumber != null}" class="mt-2 text-xs text-slate-600 space-y-1">
                 <div th:text="${'Cuota #' + currentInstallmentNumber}"></div>
-                <div class="text-slate-500">Saldo real pendiente</div>
+                <div class="text-slate-500">Saldo financiado pendiente</div>
                 <div th:if="${currentInstallmentCarryForwardAmount != null and currentInstallmentCarryForwardAmount.compareTo(T(java.math.BigDecimal).ZERO) > 0}"
                      class="rounded bg-sky-50 px-2 py-1 text-sky-700 font-semibold">
                     <span th:text="${'Descuento por saldo a favor: $ ' + #numbers.formatDecimal(currentInstallmentCarryForwardAmount, 1, 'POINT', 2, 'COMMA')}"></span>
                 </div>
-                <div th:if="${currentInstallmentCashPricing != null and currentInstallmentCashPricing and currentInstallmentCashAmount != null and currentInstallmentCashAmount.compareTo(currentInstallmentAmount) < 0}"
+                <div th:if="${currentInstallmentCashPricing != null and currentInstallmentCashPricing and currentInstallmentCashAmount != null}"
                      class="rounded bg-emerald-50 px-2 py-1 text-emerald-700 font-semibold">
-                    <span th:text="${'Si paga hoy en efectivo: $ ' + #numbers.formatDecimal(currentInstallmentCashAmount, 1, 'POINT', 2, 'COMMA')}"></span>
+                    <span th:text="${'Saldo contado pendiente: $ ' + #numbers.formatDecimal(currentInstallmentCashAmount, 1, 'POINT', 2, 'COMMA')}"></span>
                 </div>
-                <div th:if="${currentInstallmentCashPricing != null and (!currentInstallmentCashPricing or currentInstallmentCashAmount == null or currentInstallmentCashAmount.compareTo(currentInstallmentAmount) >= 0)}"
+                <div th:if="${currentInstallmentCashPricing != null and !currentInstallmentCashPricing}"
                      th:text="${currentInstallmentCashPricing ? 'Hoy se cobra valor contado.' : 'Hoy se cobra valor financiado.'}"></div>
                 <div th:if="${currentInstallmentExpiredCash > 0}" class="text-rose-600 line-through"
                      th:text="${'Contado vencido: $ ' + #numbers.formatDecimal(currentInstallmentExpiredCash, 1, 'POINT', 2, 'COMMA')}"></div>
@@ -167,7 +167,7 @@
                 <th class="px-4 py-3">#</th>
                 <th class="px-4 py-3">Vencimiento</th>
                 <th class="px-4 py-3">Monto</th>
-                <th class="px-4 py-3">Saldo pendiente</th>
+                <th class="px-4 py-3">Saldos pendientes</th>
                 <th class="px-4 py-3">Estado</th>
                 <th class="px-4 py-3">Pago</th>
                 <th class="px-4 py-3 text-right">Acciones</th>
@@ -193,13 +193,13 @@
                     <div class="font-semibold"
                          th:text="${'$ ' + #numbers.formatDecimal(financedAmounts[inst.id], 1, 'POINT', 2, 'COMMA')}"
                          th:classappend="${financedAmounts[inst.id] > 0 ? ' text-rose-600' : ' text-green-700'}"></div>
-                    <div class="text-xs text-gray-500">Saldo real pendiente</div>
+                    <div class="text-xs text-gray-500">Saldo financiado (debito / transferencia)</div>
                     <div th:if="${carryForwardAmounts[inst.id] != null and carryForwardAmounts[inst.id].compareTo(T(java.math.BigDecimal).ZERO) > 0}"
                          class="mt-1 rounded bg-sky-50 px-2 py-1 text-xs font-semibold text-sky-700"
                          th:text="${'Descuento por saldo a favor: $ ' + #numbers.formatDecimal(carryForwardAmounts[inst.id], 1, 'POINT', 2, 'COMMA')}"></div>
-                    <div th:if="${cashPricingAvailable[inst.id] and chargeAmounts[inst.id].compareTo(financedAmounts[inst.id]) < 0}"
+                    <div th:if="${cashPricingAvailable[inst.id]}"
                          class="mt-1 rounded bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700"
-                         th:text="${'Si paga hoy en efectivo: $ ' + #numbers.formatDecimal(chargeAmounts[inst.id], 1, 'POINT', 2, 'COMMA')}"></div>
+                         th:text="${'Saldo contado pendiente: $ ' + #numbers.formatDecimal(chargeAmounts[inst.id], 1, 'POINT', 2, 'COMMA')}"></div>
                     <div th:if="${!cashPricingAvailable[inst.id]}"
                          class="text-xs text-slate-500">Hoy se cobra valor financiado.</div>
                     <div th:if="${expiredCashAmounts[inst.id] > 0}"

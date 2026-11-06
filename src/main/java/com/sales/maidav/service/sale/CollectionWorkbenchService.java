@@ -68,10 +68,12 @@ public class CollectionWorkbenchService {
                     currentInstallment.getDueDate(),
                     LocalDate.now()
             );
+            BigDecimal collected = creditAccountService.getAppliedCashAmounts(accountId)
+                    .getOrDefault(currentInstallment.getId(), BigDecimal.ZERO);
             cashAmount = cashPricingAvailable
-                    ? resolveCashAmount(account, currentInstallment, remaining)
+                    ? normalize(fullCashAmount.subtract(collected).max(BigDecimal.ZERO))
                     : BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
-            chargeAmount = resolveCashAmount(account, currentInstallment, remaining);
+            chargeAmount = cashPricingAvailable ? cashAmount : normalize(remaining);
             chargeModeLabel = cashPricingAvailable ? "Valor contado" : "Valor financiado";
             appliedCreditAmount = cashPricingAvailable
                     ? normalize(fullCashAmount.subtract(chargeAmount))

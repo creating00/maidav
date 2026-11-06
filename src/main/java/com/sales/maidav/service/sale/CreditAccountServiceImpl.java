@@ -35,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -145,6 +146,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         payment.setPaymentMethod(resolvedMethod);
 
         List<CreditInstallment> installments = resolveInstallments(accountId, installmentIds);
+        List<PaymentAllocation> priorAllocations = collectCurrentAllocations(account);
         PaymentApplicationResult applicationResult = applyPaymentToInstallments(
                 account,
                 installments,
@@ -153,11 +155,17 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 LocalDate.now(),
                 payment.getId(),
                 selectedInstallmentIds(installmentIds),
-                new ArrayList<>()
+                priorAllocations
         );
         BigDecimal impactAmount = applicationResult.impactAmount();
 
-        if (impactAmount.compareTo(BigDecimal.ZERO) <= 0) {
+        List<PaymentAllocation> newAllocations = applicationResult.allocations().stream()
+                .filter(allocation -> Objects.equals(payment.getId(), allocation.paymentId()))
+                .toList();
+        boolean hasCollectedAmount = newAllocations.stream()
+                .anyMatch(allocation -> allocation.collectedAmount() != null
+                        && allocation.collectedAmount().compareTo(BigDecimal.ZERO) > 0);
+        if (!hasCollectedAmount) {
             throw new InvalidSaleException("El pago no pudo aplicarse a cuotas pendientes");
         }
         BigDecimal newBalance = account.getBalance().subtract(impactAmount);
@@ -176,7 +184,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             }
             throw ex;
         }
-        persistAllocations(account, applicationResult.allocations(),
+        persistAllocations(account, newAllocations,
                 Map.of(), installments, payment, Map.of(), Map.of(), true);
         account.setBalance(newBalance.setScale(2, RoundingMode.HALF_UP));
         if (account.getBalance().compareTo(BigDecimal.ZERO) == 0) {
@@ -277,6 +285,30 @@ public class CreditAccountServiceImpl implements CreditAccountService {
         }
         carryForwardAmounts.replaceAll((installmentId, amount) -> amount.setScale(2, RoundingMode.HALF_UP));
         return carryForwardAmounts;
+    }
+
+    @Override
+    public Map<Long, BigDecimal> getAppliedCashAmounts(Long accountId) {
+        CreditAccount account = findById(accountId);
+        Map<Long, LocalDate> dueDatesByInstallment = new HashMap<>();
+        for (CreditInstallment installment : creditInstallmentRepository.findByAccount_IdOrderByInstallmentNumber(accountId)) {
+            dueDatesByInstallment.put(installment.getId(), installment.getDueDate());
+        }
+        Map<Long, BigDecimal> cashAmounts = new HashMap<>();
+        for (PaymentAllocation allocation : collectCurrentAllocations(account)) {
+            LocalDate dueDate = allocation.installmentId() == null ? null : dueDatesByInstallment.get(allocation.installmentId());
+            if (allocation.installmentId() == null
+                    || allocation.collectedAmount() == null
+                    || allocation.collectedAmount().compareTo(BigDecimal.ZERO) <= 0
+                    || allocation.paidAt() == null
+                    || dueDate == null
+                    || allocation.paidAt().isAfter(dueDate)) {
+                continue;
+            }
+            cashAmounts.merge(allocation.installmentId(), allocation.collectedAmount(), BigDecimal::add);
+        }
+        cashAmounts.replaceAll((installmentId, amount) -> amount.setScale(2, RoundingMode.HALF_UP));
+        return cashAmounts;
     }
 
     @Override
@@ -405,28 +437,29 @@ public class CreditAccountServiceImpl implements CreditAccountService {
             }
             // SALDO A FAVOR
             // APLICAR SALDO A FAVOR A PROXIMA CUOTA
-            boolean manualCashPricing = usesManualCashAmount(account, installment, paymentMethod, paidAt);
+            boolean manualCashPricing = usesCashPricing(account, installment, paymentMethod, paidAt);
             boolean carriedForward = carryForwardAvailable
-                    && !manualCashPricing
+                    && !(manualCashPricing && installment.getCashAmount() != null
+                         && installment.getCashAmount().compareTo(BigDecimal.ZERO) > 0)
                     && !isExplicitlySelectedInstallment(installment, selectedInstallmentIds);
             BigDecimal collectedNeeded = carriedForward
                     ? financedRemaining
-                    : resolveCollectedAmountDue(account, installment, financedRemaining, cashRecargo, paymentMethod, paidAt);
+                    : resolveCollectedAmountDue(account, installment, financedRemaining, cashRecargo, paymentMethod, paidAt, allocations);
             BigDecimal collectedApplied = remainingInput.min(collectedNeeded).setScale(2, RoundingMode.HALF_UP);
             BigDecimal allocationImpact = carriedForward
                     ? collectedApplied
-                    : resolveImpactAmount(account, installment, financedRemaining, collectedApplied, cashRecargo, paymentMethod, paidAt);
-            if (allocationImpact.compareTo(BigDecimal.ZERO) <= 0) {
+                    : resolveImpactAmount(account, installment, financedRemaining, collectedApplied, collectedNeeded, cashRecargo, paymentMethod, paidAt);
+            if (allocationImpact.compareTo(BigDecimal.ZERO) <= 0 && collectedApplied.compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
 
             BigDecimal newPaidAmount = paidAmount.add(allocationImpact).setScale(2, RoundingMode.HALF_UP);
             installment.setPaidAmount(newPaidAmount);
-            installment.setStatus(
-                    newPaidAmount.compareTo(installment.getAmount().setScale(2, RoundingMode.HALF_UP)) >= 0
-                            ? InstallmentStatus.PAID
-                            : InstallmentStatus.PARTIAL
-            );
+            installment.setStatus(newPaidAmount.compareTo(BigDecimal.ZERO) <= 0
+                    ? InstallmentStatus.PENDING
+                    : newPaidAmount.compareTo(installment.getAmount().setScale(2, RoundingMode.HALF_UP)) >= 0
+                    ? InstallmentStatus.PAID
+                    : InstallmentStatus.PARTIAL);
             installment.setPaidAt(paidAt);
             BigDecimal remainingAfterAllocation = installment.getAmount()
                     .subtract(newPaidAmount)
@@ -442,13 +475,16 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                         paymentMethod,
                         paidAt,
                         collectedApplied,
-                        remainingAfterAllocation,
+                        manualCashPricing
+                                ? collectedNeeded.subtract(collectedApplied).max(BigDecimal.ZERO)
+                                : remainingAfterAllocation,
                         carriedForward,
                         installment.getStatus() == InstallmentStatus.PAID
                 )
             );
             allocations.add(new PaymentAllocation(
                     paymentId,
+                    paidAt,
                     installment.getId(),
                     installment.getInstallmentNumber(),
                     paymentMethod,
@@ -471,9 +507,15 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                                                  BigDecimal financedRemaining,
                                                  BigDecimal cashRecargo,
                                                  PaymentCollectionMethod paymentMethod,
-                                                 LocalDate paidAt) {
-        if (usesManualCashAmount(account, installment, paymentMethod, paidAt)) {
-            return prorateManualCashAmount(installment, financedRemaining);
+                                                 LocalDate paidAt,
+                                                 List<PaymentAllocation> allocations) {
+        if (usesCashPricing(account, installment, paymentMethod, paidAt)) {
+            BigDecimal alreadyCollected = allocations.stream()
+                    .filter(allocation -> installment.getId().equals(allocation.installmentId()))
+                    .map(PaymentAllocation::collectedAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            return resolveFullCashAmount(account, installment, cashRecargo).subtract(alreadyCollected).max(BigDecimal.ZERO)
+                    .setScale(2, RoundingMode.HALF_UP);
         }
         return CreditPaymentPricingSupport.resolveCollectedAmountDue(
                 financedRemaining,
@@ -489,10 +531,11 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                                            CreditInstallment installment,
                                            BigDecimal financedRemaining,
                                            BigDecimal collectedAmount,
+                                           BigDecimal collectedNeeded,
                                            BigDecimal cashRecargo,
                                            PaymentCollectionMethod paymentMethod,
                                            LocalDate paidAt) {
-        if (!usesManualCashAmount(account, installment, paymentMethod, paidAt)) {
+        if (!usesCashPricing(account, installment, paymentMethod, paidAt)) {
             return CreditPaymentPricingSupport.resolveImpactAmount(
                     financedRemaining,
                     collectedAmount,
@@ -503,47 +546,38 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                     paidAt
             );
         }
-        BigDecimal collectedNeeded = prorateManualCashAmount(installment, financedRemaining);
         if (collectedNeeded.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
         }
-        BigDecimal ratio = collectedAmount
-                .divide(collectedNeeded, 8, RoundingMode.HALF_UP)
-                .min(BigDecimal.ONE);
-        BigDecimal impact = financedRemaining
-                .multiply(ratio)
-                .setScale(2, RoundingMode.HALF_UP)
-                .min(financedRemaining);
-        return collectedAmount.compareTo(collectedNeeded) < 0
-                ? CreditPaymentPricingSupport.roundToNearestFifty(impact).min(financedRemaining)
-                : impact;
+        if (collectedAmount.compareTo(collectedNeeded) >= 0) {
+            return financedRemaining.setScale(2, RoundingMode.HALF_UP);
+        }
+        return collectedAmount.min(financedRemaining).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private boolean usesManualCashAmount(CreditAccount account,
-                                         CreditInstallment installment,
-                                         PaymentCollectionMethod paymentMethod,
-                                         LocalDate paidAt) {
-        return paymentMethod == PaymentCollectionMethod.CASH
-                && installment.getCashAmount() != null
-                && installment.getCashAmount().compareTo(BigDecimal.ZERO) > 0
-                && CreditPaymentPricingSupport.usesCashValue(
+    private boolean usesCashPricing(CreditAccount account,
+                                    CreditInstallment installment,
+                                    PaymentCollectionMethod paymentMethod,
+                                    LocalDate paidAt) {
+        return CreditPaymentPricingSupport.usesCashValue(
+                paymentMethod,
                 account.getPaymentFrequency(),
                 installment.getDueDate(),
                 paidAt
         );
     }
 
-    private BigDecimal prorateManualCashAmount(CreditInstallment installment, BigDecimal financedRemaining) {
-        BigDecimal financedAmount = installment.getAmount() == null
-                ? BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)
-                : installment.getAmount().setScale(2, RoundingMode.HALF_UP);
-        if (financedAmount.compareTo(BigDecimal.ZERO) <= 0) {
-            return BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP);
+    private BigDecimal resolveFullCashAmount(CreditAccount account,
+                                             CreditInstallment installment,
+                                             BigDecimal cashRecargo) {
+        if (installment.getCashAmount() != null && installment.getCashAmount().compareTo(BigDecimal.ZERO) > 0) {
+            return installment.getCashAmount().setScale(2, RoundingMode.HALF_UP);
         }
-        BigDecimal cashAmount = installment.getCashAmount().setScale(2, RoundingMode.HALF_UP);
-        return cashAmount
-                .multiply(financedRemaining)
-                .divide(financedAmount, 2, RoundingMode.HALF_UP);
+        return CreditPaymentPricingSupport.resolveInstallmentCashValue(
+                installment.getAmount(),
+                cashRecargo,
+                account.getPaymentFrequency()
+        );
     }
 
     private BigDecimal resolveCashRecargo() {
@@ -1082,6 +1116,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                     index,
                     new PaymentAllocation(
                             allocation.paymentId(),
+                            allocation.paidAt(),
                             allocation.installmentId(),
                             allocation.installmentNumber(),
                             allocation.paymentMethod(),
@@ -1482,6 +1517,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
     }
 
     private record PaymentAllocation(Long paymentId,
+                                     LocalDate paidAt,
                                      Long installmentId,
                                      Integer installmentNumber,
                                      PaymentCollectionMethod paymentMethod,
