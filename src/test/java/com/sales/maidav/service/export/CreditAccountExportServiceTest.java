@@ -46,6 +46,7 @@ class CreditAccountExportServiceTest {
         Client client = new Client();
         client.setNationalId("12345678");
         client.setFirstName("Ana");
+        client.setPhone("01123456789");
         Sale sale = new Sale();
         sale.setId(10L);
         User seller = new User();
@@ -128,13 +129,13 @@ class CreditAccountExportServiceTest {
             assertThat(workbook.getNumberOfSheets()).isEqualTo(1);
             var sheet = workbook.getSheet("Cuotas");
             assertThat(sheet.getLastRowNum()).isEqualTo(3);
-            assertThat(sheet.getRow(0).getLastCellNum()).isEqualTo((short) 14);
-            assertThat(java.util.stream.IntStream.range(0, 14)
+            assertThat(sheet.getRow(0).getLastCellNum()).isEqualTo((short) 15);
+            assertThat(java.util.stream.IntStream.range(0, 15)
                     .mapToObj(column -> sheet.getRow(0).getCell(column).getStringCellValue()).toList())
                     .containsExactly("id_pago", "numero_cuenta", "cliente", "vendedor", "producto",
                             "costo_producto", "nro_cuota", "fecha_vencimiento", "monto_cuota_efectivo",
                             "monto_cuota_transferencia", "estado_cuota", "fecha_pago_real",
-                            "monto_pagado", "metodo_pago");
+                            "monto_pagado", "metodo_pago", "telefono");
             assertThat(sheet.getRow(1).getCell(0).getStringCellValue()).isEqualTo("1");
             assertThat(sheet.getRow(1).getCell(1).getStringCellValue()).isEqualTo("C-000020");
             assertThat(sheet.getRow(1).getCell(4).getStringCellValue()).isEqualTo("Mesa | Silla");
@@ -143,13 +144,17 @@ class CreditAccountExportServiceTest {
             assertThat(sheet.getRow(1).getCell(10).getStringCellValue()).isEqualTo("Pagado");
             assertThat(sheet.getRow(1).getCell(12).getNumericCellValue()).isEqualTo(200.0);
             assertThat(sheet.getRow(1).getCell(13).getStringCellValue()).isEqualTo("Transferencia");
+            assertThat(sheet.getRow(1).getCell(14).getCellType()).isEqualTo(CellType.STRING);
+            assertThat(sheet.getRow(1).getCell(14).getStringCellValue()).isEqualTo("01123456789");
             assertThat(sheet.getRow(2).getCell(0).getStringCellValue()).isEqualTo("5");
             assertThat(sheet.getRow(2).getCell(6).getNumericCellValue()).isEqualTo(1.0);
             assertThat(sheet.getRow(2).getCell(12).getNumericCellValue()).isEqualTo(300.0);
             assertThat(sheet.getRow(2).getCell(13).getStringCellValue()).isEqualTo("Débito");
+            assertThat(sheet.getRow(2).getCell(14).getStringCellValue()).isEqualTo("01123456789");
             assertThat(sheet.getRow(3).getCell(0).getStringCellValue()).isBlank();
             assertThat(sheet.getRow(3).getCell(10).getStringCellValue()).isEqualTo("Atrasada");
             assertThat(sheet.getRow(3).getCell(12).getStringCellValue()).isBlank();
+            assertThat(sheet.getRow(3).getCell(14).getStringCellValue()).isEqualTo("01123456789");
         }
     }
 

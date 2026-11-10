@@ -62,7 +62,7 @@ public class CreditAccountExportService {
             "id_pago", "numero_cuenta", "cliente", "vendedor", "producto", "costo_producto",
             "nro_cuota", "fecha_vencimiento", "monto_cuota_efectivo",
             "monto_cuota_transferencia", "estado_cuota", "fecha_pago_real",
-            "monto_pagado", "metodo_pago"
+            "monto_pagado", "metodo_pago", "telefono"
     );
 
     private final SaleItemRepository saleItemRepository;
@@ -239,7 +239,8 @@ public class CreditAccountExportService {
                 amount(installment.getAmount()), installmentStatus(installment),
                 payment == null ? "" : date(payment.getPaidAt()),
                 collectedAmount == null ? "" : amount(collectedAmount),
-                payment == null ? "" : methodLabel(payment.getPaymentMethod()));
+                payment == null ? "" : methodLabel(payment.getPaymentMethod()),
+                account.getClient() == null ? "" : text(account.getClient().getPhone()));
     }
 
     private String paymentId(CreditPayment payment) {
