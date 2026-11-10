@@ -29,6 +29,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +59,35 @@ public class ExportDocumentService {
                 money(sale.getTotalAmount())
         )).toList();
         return generate("Ventas", headers, rows, format);
+    }
+
+    public byte[] creditAccounts(List<String> headers, List<List<String>> rows) {
+        return excel("Cuentas de credito", headers, rows,
+                Set.of(8, 9, 16, 17, 18, 19, 20, 21, 22, 23));
+    }
+
+    public byte[] creditAccounts(List<String> headers, List<List<String>> rows,
+                                 List<String> installmentHeaders, List<List<String>> installmentRows) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            writeExcelSheet(workbook, "Cuentas de credito", headers, rows,
+                    Set.of(8, 9, 16, 17, 18, 19, 20, 21, 22, 23));
+            writeExcelSheet(workbook, "Cuotas", installmentHeaders, installmentRows,
+                    Set.of(4, 5, 7, 8, 11));
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo generar el Excel", ex);
+        }
+    }
+
+    public byte[] creditAccountInstallments(List<String> headers, List<List<String>> rows) {
+        try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            writeExcelSheet(workbook, "Cuotas", headers, rows, Set.of(5, 6, 8, 9, 12), false);
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo generar el Excel", ex);
+        }
     }
 
     private byte[] generate(String title, List<String> headers, List<List<String>> rows, ExportFormat format) {
@@ -99,7 +129,26 @@ public class ExportDocumentService {
     }
 
     private byte[] excel(String title, List<String> headers, List<List<String>> rows) {
+        return excel(title, headers, rows, Set.of());
+    }
+
+    private byte[] excel(String title, List<String> headers, List<List<String>> rows, Set<Integer> numericColumns) {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+            writeExcelSheet(workbook, title, headers, rows, numericColumns);
+            workbook.write(output);
+            return output.toByteArray();
+        } catch (Exception ex) {
+            throw new IllegalStateException("No se pudo generar el Excel", ex);
+        }
+    }
+
+    private void writeExcelSheet(XSSFWorkbook workbook, String title, List<String> headers,
+                                 List<List<String>> rows, Set<Integer> numericColumns) {
+        writeExcelSheet(workbook, title, headers, rows, numericColumns, true);
+    }
+
+    private void writeExcelSheet(XSSFWorkbook workbook, String title, List<String> headers,
+                                 List<List<String>> rows, Set<Integer> numericColumns, boolean includeTitle) {
             XSSFSheet sheet = workbook.createSheet(title.length() > 31 ? title.substring(0, 31) : title);
             CellStyle headerStyle = workbook.createCellStyle();
             headerStyle.setFillForegroundColor(IndexedColors.GREY_25_PERCENT.getIndex());
@@ -109,8 +158,10 @@ public class ExportDocumentService {
             font.setBold(true);
             headerStyle.setFont(font);
             int rowIndex = 0;
-            org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowIndex++);
-            titleRow.createCell(0).setCellValue(title);
+            if (includeTitle) {
+                org.apache.poi.ss.usermodel.Row titleRow = sheet.createRow(rowIndex++);
+                titleRow.createCell(0).setCellValue(title);
+            }
             org.apache.poi.ss.usermodel.Row headerRow = sheet.createRow(rowIndex++);
             for (int column = 0; column < headers.size(); column++) {
                 Cell cell = headerRow.createCell(column);
@@ -120,19 +171,24 @@ public class ExportDocumentService {
             for (List<String> values : rows) {
                 org.apache.poi.ss.usermodel.Row row = sheet.createRow(rowIndex++);
                 for (int column = 0; column < values.size(); column++) {
-                    row.createCell(column).setCellValue(values.get(column));
+                    Cell cell = row.createCell(column);
+                    String value = values.get(column);
+                    if (numericColumns.contains(column) && value != null && !value.isBlank()) {
+                        try {
+                            cell.setCellValue(new BigDecimal(value).doubleValue());
+                        } catch (NumberFormatException ex) {
+                            cell.setCellValue(value);
+                        }
+                    } else {
+                        cell.setCellValue(value);
+                    }
                 }
             }
-            sheet.createFreezePane(0, 2);
+            sheet.createFreezePane(0, includeTitle ? 2 : 1);
             for (int column = 0; column < headers.size(); column++) {
                 sheet.autoSizeColumn(column);
                 sheet.setColumnWidth(column, Math.min(sheet.getColumnWidth(column) + 512, 16000));
             }
-            workbook.write(output);
-            return output.toByteArray();
-        } catch (Exception ex) {
-            throw new IllegalStateException("No se pudo generar el Excel", ex);
-        }
     }
 
     private List<String> productHeaders(PriceListType type, CompanySettings settings) {

@@ -2421,6 +2421,7 @@ body.auth-shell::before {
     color: #fff;
 }
 
+.collections-page .transferencia,
 .collections-page .debito {
     background: linear-gradient(135deg, #294d60 0%, #193543 100%);
     color: #fff;

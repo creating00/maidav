@@ -38,6 +38,11 @@
            th:classappend="${priorityFirst ? ' border-red-200 bg-red-50 text-red-700 hover:bg-red-100' : ' border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'}"
            th:text="${priorityFirst ? 'Quitar filtro de prioridad' : 'Ordenar por Prioridad (Mora primero)'}">
         </a>
+        <a sec:authorize="hasRole('ADMIN')"
+           th:href="@{/accounts/export(q=${q},sellerId=${sellerId})}"
+           class="px-4 py-2 rounded bg-emerald-700 text-white font-semibold hover:bg-emerald-800">
+            Exportar Excel
+        </a>
     </form>
 
     <div class="grid gap-5">

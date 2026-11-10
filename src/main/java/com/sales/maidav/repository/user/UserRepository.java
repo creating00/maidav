@@ -4,6 +4,7 @@ import com.sales.maidav.model.user.User;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,10 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByEmail(String email);
     Optional<User> findByEmailIgnoreCase(String email);
+
+    @EntityGraph(attributePaths = "roles")
+    @Query("select u from User u where lower(u.email) in :emails")
+    List<User> findByEmailIn(@Param("emails") List<String> emails);
 
     @EntityGraph(attributePaths = "roles")
     List<User> findAll();

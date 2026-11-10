@@ -5,6 +5,7 @@ import com.sales.maidav.model.sale.CreditAccount;
 import com.sales.maidav.repository.sale.CreditInstallmentRepository;
 import com.sales.maidav.repository.sale.CreditPaymentRepository;
 import com.sales.maidav.repository.sale.SaleItemRepository;
+import com.sales.maidav.service.export.CreditAccountExportService;
 import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import com.sales.maidav.service.user.UserService;
@@ -37,6 +38,8 @@ class CreditAccountControllerTest {
     private SaleItemRepository saleItemRepository;
     @Mock
     private UserService userService;
+    @Mock
+    private CreditAccountExportService creditAccountExportService;
 
     private CreditAccountController controller;
 
@@ -48,7 +51,8 @@ class CreditAccountControllerTest {
                 creditPaymentRepository,
                 companySettingsService,
                 saleItemRepository,
-                userService
+                userService,
+                creditAccountExportService
         );
     }
 
