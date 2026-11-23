@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout/main :: layout(~{::content}, 'Compras')}">
+<section th:fragment="content" class="purchases">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Finanzas</p><h1>Compras</h1>
+        <p>Historial de mercadería recibida y pagada.</p></div>
+        <a sec:authorize="hasAuthority('PURCHASE_CREATE')" th:href="@{/purchases/new}" class="purchase-button">+ Nueva compra</a></header>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <p th:if="${formError}" th:text="${formError}" class="purchase-error" role="alert"></p>
+    <form method="get" th:action="@{/purchases}" class="purchase-panel purchase-filters">
+        <div><label for="from">Desde</label><input id="from" name="from" type="date" th:value="${from}"></div>
+        <div><label for="to">Hasta</label><input id="to" name="to" type="date" th:value="${to}"></div>
+        <div><label for="provider-filter">Proveedor</label><select id="provider-filter" name="providerId">
+            <option value="">Todos</option><option th:each="provider : ${providers}" th:value="${provider.id}"
+                th:selected="${provider.id == providerId}" th:text="${provider.name}"></option></select></div>
+        <div><label for="product-filter">Producto</label><select id="product-filter" name="productId">
+            <option value="">Todos</option><option th:each="product : ${products}" th:value="${product.id}"
+                th:selected="${product.id == productId}" th:text="${product.productCode + ' · ' + product.description}"></option></select></div>
+        <div class="purchase-filter-actions"><button class="purchase-button" type="submit">Filtrar</button>
+            <a th:href="@{/purchases}" class="purchase-link">Limpiar</a></div>
+    </form>
+    <div class="purchase-panel">
+        <p class="purchase-count" th:text="${purchases.totalElements + ' compras encontradas'}"></p>
+        <div th:if="${purchases.empty}" class="purchase-empty"><h2>No hay compras para mostrar</h2>
+            <p>Registrá una compra o ajustá los filtros de búsqueda.</p></div>
+        <div th:unless="${purchases.empty}" class="purchase-table-wrap"><table>
+            <thead><tr><th scope="col">Compra</th><th scope="col">Fecha</th><th scope="col">Proveedor</th>
+                <th scope="col">Forma de pago</th><th scope="col" class="purchase-number">Total pagado</th><th scope="col">Detalle</th></tr></thead>
+            <tbody><tr th:each="purchase : ${purchases.content}">
+                <td th:text="${'C-' + purchase.id}"></td><td th:text="${#temporals.format(purchase.purchaseDate, 'dd/MM/yyyy')}"></td>
+                <td th:text="${purchase.providerName ?: 'Sin proveedor informado'}"></td>
+                <td th:text="${paymentMethods[purchase.paymentMethod]}"></td>
+                <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(purchase.totalAmount, 1, 'POINT', 2, 'COMMA')}"></td>
+                <td><a class="purchase-link" th:href="@{/purchases/{id}(id=${purchase.id})}" th:aria-label="${'Ver compra C-' + purchase.id}">Ver compra</a></td>
+            </tr></tbody>
+        </table></div>
+        <nav th:if="${purchases.totalPages > 1}" class="purchase-pagination" aria-label="Páginas de compras">
+            <a th:if="${purchases.hasPrevious()}" class="purchase-link"
+               th:href="@{/purchases(from=${from},to=${to},providerId=${providerId},productId=${productId},page=${purchases.number - 1})}">Anterior</a>
+            <span th:text="${'Página ' + (purchases.number + 1) + ' de ' + purchases.totalPages}"></span>
+            <a th:if="${purchases.hasNext()}" class="purchase-link"
+               th:href="@{/purchases(from=${from},to=${to},providerId=${providerId},productId=${productId},page=${purchases.number + 1})}">Siguiente</a>
+        </nav>
+    </div>
+</section>
+</html>

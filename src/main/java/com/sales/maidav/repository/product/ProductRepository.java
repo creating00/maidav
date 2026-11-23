@@ -51,6 +51,16 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             """, nativeQuery = true)
     int incrementStock(@Param("productId") Long productId, @Param("quantity") int quantity);
 
+    @Modifying(flushAutomatically = true)
+    @Query(value = """
+            update products
+            set stock_available = stock_available + :quantity,
+                updated_at = current_timestamp
+            where id = :productId
+              and cast(stock_available as bigint) + :quantity <= 2147483647
+            """, nativeQuery = true)
+    int incrementStockForPurchase(@Param("productId") Long productId, @Param("quantity") int quantity);
+
     @Query("select count(p) from Product p where p.stockAvailable <= p.stockMin")
     long countLowStock();
 

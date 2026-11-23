@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout/main :: layout(~{::content}, 'Nueva compra')}">
+<section th:fragment="content" class="purchases">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}">
+    <header class="purchase-heading">
+        <div><p class="purchase-eyebrow">Finanzas / Compras</p><h1>Nueva compra</h1>
+            <p>Registrá la mercadería recibida y el importe pagado.</p></div>
+        <a sec:authorize="hasAuthority('PURCHASE_READ')" th:href="@{/purchases}" class="purchase-link">Ver historial</a>
+    </header>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <p class="purchase-notice">Esta compra se registra como recibida y pagada en la fecha indicada. Suma stock; no modifica el costo ni los precios del catálogo. Los importes son finales, sin cálculo adicional de impuestos o flete.</p>
+    <form id="purchase-form" th:action="@{/purchases}" method="post" th:object="${purchaseForm}">
+        <input type="hidden" th:field="*{operationKey}">
+        <p th:if="${formError}" th:text="${formError}" class="purchase-error" role="alert"></p>
+        <div class="purchase-panel purchase-fields">
+            <div><label for="purchaseDate">Fecha de compra y pago</label>
+                <input type="date" th:field="*{purchaseDate}" th:max="${today}" required></div>
+            <div><label for="providerId">Proveedor <span>(opcional)</span></label>
+                <select th:field="*{providerId}"><option value="">Sin proveedor informado</option>
+                    <option th:each="provider : ${providers}" th:value="${provider.id}" th:text="${provider.name}"></option>
+                </select></div>
+            <div><label for="paymentMethod">Forma de pago</label>
+                <select th:field="*{paymentMethod}" required><option value="">Seleccionar</option>
+                    <option th:each="method : ${paymentMethods}" th:value="${method.key}" th:text="${method.value}"></option>
+                </select></div>
+        </div>
+        <section class="purchase-panel sale-products-section" aria-labelledby="items-title">
+            <div class="purchase-heading"><div><h2 id="items-title">Mercadería recibida</h2>
+                <p>Seleccioná productos existentes del catálogo. Hasta 100 ítems.</p></div>
+                <button id="add-purchase-item" type="button" class="purchase-button purchase-button-secondary">+ Agregar producto</button></div>
+            <div th:replace="~{fragments/product-picker :: catalog('Volver a la compra')}"></div>
+            <div id="purchase-items" class="purchase-items">
+                <div class="purchase-item" th:each="item, row : *{items}">
+                    <div class="purchase-product"><label th:for="${'product-' + row.index}">Producto</label>
+                        <select th:id="${'product-' + row.index}" th:field="*{items[__${row.index}__].productId}" required data-field="productId" class="product-select">
+                            <option value="">Seleccionar producto</option>
+                            <option th:each="product : ${products}" th:value="${product.id}"
+                                    th:data-barcode="${product.barcode}" th:data-product-code="${product.productCode}"
+                                    th:data-description="${product.description}" th:data-image="${product.imagePath}"
+                                    th:data-stock="${product.stockAvailable}" th:data-cost="${product.cost}"
+                                    th:text="${product.productCode + ' · ' + product.description}"></option>
+                        </select>
+                        <div th:replace="~{fragments/product-picker :: combobox}"></div></div>
+                    <div><label th:for="${'quantity-' + row.index}">Cantidad</label>
+                        <input th:id="${'quantity-' + row.index}" th:field="*{items[__${row.index}__].quantity}"
+                               type="number" min="1" max="2147483647" step="1" required data-field="quantity" inputmode="numeric"></div>
+                    <div><label th:for="${'price-' + row.index}">Precio unitario ($)</label>
+                        <input th:id="${'price-' + row.index}" th:field="*{items[__${row.index}__].unitPrice}"
+                               type="number" min="0.01" max="9999999999.99" step="0.01" required data-field="unitPrice" inputmode="decimal"></div>
+                    <div class="purchase-subtotal"><span>Subtotal</span><output data-subtotal>$ 0,00</output></div>
+                    <button type="button" class="purchase-remove" data-remove aria-label="Quitar producto">Quitar</button>
+                </div>
+            </div>
+            <p th:if="${#lists.isEmpty(products)}" class="purchase-notice">No hay productos disponibles. Cargalos en el catálogo antes de registrar una compra.</p>
+        </section>
+        <div class="purchase-panel"><label for="notes">Observaciones <span>(opcional)</span></label>
+            <textarea th:field="*{notes}" rows="3" maxlength="2000" placeholder="Referencia del comprobante o detalle de la compra"></textarea></div>
+        <footer class="purchase-panel purchase-total">
+            <div><span>Total pagado</span><output id="purchase-total" aria-live="polite">$ 0,00</output></div>
+            <div><p>Al registrar se confirma el ingreso de stock. Revisá los datos antes de continuar.</p>
+                <button type="submit" class="purchase-button" th:disabled="${#lists.isEmpty(products)}">Registrar compra y sumar stock</button></div>
+        </footer>
+    </form>
+    <script defer th:src="@{/js/purchase-products.js}"></script>
+    <script defer th:src="@{/js/purchases.js}"></script>
+</section>
+</html>
