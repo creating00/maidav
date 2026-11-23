@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout/main :: layout(~{::content}, 'Nuevo gasto')}">
+<section th:fragment="content" class="purchases expenses">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}">
+    <link rel="stylesheet" th:href="@{/css/expenses.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Finanzas / Gastos</p><h1>Nuevo gasto</h1>
+        <p>Registrá los egresos operativos del negocio.</p></div>
+        <a sec:authorize="hasAuthority('EXPENSE_READ')" th:href="@{/expenses}" class="purchase-link">Ver historial</a></header>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <p class="purchase-notice">El gasto se considera pagado en la fecha indicada. No modifica el stock ni los precios del catálogo.</p>
+    <form id="expense-form" th:action="@{/expenses}" method="post" enctype="multipart/form-data" th:object="${expenseForm}">
+        <input type="hidden" th:field="*{operationKey}">
+        <p th:if="${formError}" th:text="${formError}" class="purchase-error" role="alert"></p>
+        <p th:if="${receiptMustReselect == true}" class="purchase-notice">Volvé a seleccionar el comprobante antes de registrar el gasto.</p>
+        <div class="purchase-panel">
+            <div class="expense-fields">
+                <div><label for="expenseDate">Fecha del gasto y pago</label><input type="date" th:field="*{expenseDate}" th:max="${today}" required></div>
+                <div><label for="category">Categoría</label><select th:field="*{category}" required>
+                    <option value="">Seleccionar categoría</option><option th:each="category : ${categories}" th:value="${category}" th:text="${category.label}"></option></select></div>
+                <div><label for="amount">Importe pagado ($)</label><input type="number" th:field="*{amount}" min="0.01" max="9999999999.99" step="0.01" inputmode="decimal" required></div>
+                <div><label for="paymentMethod">Forma de pago</label><select th:field="*{paymentMethod}" required>
+                    <option value="">Seleccionar</option><option th:each="method : ${paymentMethods}" th:value="${method.key}" th:text="${method.value}"></option></select></div>
+            </div>
+            <div class="expense-description"><label for="description">Descripción</label>
+                <textarea th:field="*{description}" rows="3" maxlength="1000" required placeholder="Por ejemplo: servicio de electricidad del local"></textarea></div>
+        </div>
+        <section class="purchase-panel" aria-labelledby="receipt-title"><h2 id="receipt-title">Comprobante <span class="expense-optional">(opcional)</span></h2>
+            <p class="expense-help" id="receipt-help">PDF, JPG o PNG de hasta 5 MB. Solo los usuarios con permiso de consulta de gastos podrán descargarlo.</p>
+            <label for="receipt">Adjuntar archivo</label><input id="receipt" name="receipt" type="file" accept="application/pdf,image/jpeg,image/png" aria-describedby="receipt-help">
+        </section>
+        <footer class="purchase-panel purchase-total"><p>Revisá la fecha, la categoría y el importe antes de registrar.</p>
+            <button type="submit" class="purchase-button">Registrar gasto</button></footer>
+    </form>
+</section>
+</html>
