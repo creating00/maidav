@@ -76,6 +76,11 @@ public class GlobalModelAttributes {
                                               HttpServletRequest request,
                                               HttpServletResponse response) {
         FlashMap flashMap = RequestContextUtils.getOutputFlashMap(request);
+        if (request.getRequestURI().equals(request.getContextPath() + "/expenses")) {
+            flashMap.put("formError", "El comprobante es demasiado pesado. Seleccione un PDF, JPG o PNG de hasta 5 MB");
+            RequestContextUtils.getFlashMapManager(request).saveOutputFlashMap(flashMap, request, response);
+            return "redirect:/expenses/new";
+        }
         flashMap.put("formError", "La imagen es demasiado pesada. Proba con una foto mas liviana o comprimida.");
         RequestContextUtils.getFlashMapManager(request).saveOutputFlashMap(flashMap, request, response);
 

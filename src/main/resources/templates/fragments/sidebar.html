@@ -219,6 +219,54 @@
                     </a>
                 </div>
 
+                <div class="nav-section" sec:authorize="hasAnyAuthority('CAMPAIGN_READ', 'CAMPAIGN_CREATE')">
+                    <p class="nav-section__label">Campañas comerciales</p>
+                    <a th:href="${#authorization.expression('hasAuthority(''CAMPAIGN_READ'')') ? '/campaigns' : '/campaigns/new'}" class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/campaigns')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 4h8l8 8-8 8-8-8V4Z"></path><circle cx="8" cy="8" r="1"></circle></svg></span>
+                        <span class="nav-link__text"><span class="nav-link__label">Ofertas y campañas</span><span class="nav-link__hint">Productos, vigencia y venta directa</span></span>
+                    </a>
+                </div>
+                <div class="nav-section" sec:authorize="hasAnyAuthority('PURCHASE_READ', 'PURCHASE_CREATE', 'EXPENSE_READ', 'EXPENSE_CREATE', 'FINANCE_READ')">
+                    <p class="nav-section__label">Finanzas</p>
+                    <a th:href="@{/finances}" sec:authorize="hasAuthority('FINANCE_READ')" class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/finances')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon"><svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M4 20h16M7 16v-4M12 16V4M17 16V8"></path>
+                        </svg></span>
+                        <span class="nav-link__text"><span class="nav-link__label">Resumen</span>
+                            <span class="nav-link__hint">Cobros, pagos y diferencia del período</span></span>
+                    </a>
+                    <a th:href="${#authorization.expression('hasAuthority(''PURCHASE_READ'')') ? '/purchases' : '/purchases/new'}"
+                       sec:authorize="hasAnyAuthority('PURCHASE_READ', 'PURCHASE_CREATE')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/purchases')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 4h16v17l-4-2-4 2-4-2-4 2V4Z"></path>
+                                <path d="M8 8h8M8 12h8"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text"><span class="nav-link__label">Compras</span>
+                            <span class="nav-link__hint">Ingreso de mercadería y pagos</span></span>
+                    </a>
+                    <a th:href="${#authorization.expression('hasAuthority(''EXPENSE_READ'')') ? '/expenses' : '/expenses/new'}"
+                       sec:authorize="hasAnyAuthority('EXPENSE_READ', 'EXPENSE_CREATE')"
+                       class="nav-link"
+                       th:classappend="${#strings.startsWith(currentPath, '/expenses')} ? ' nav-link--active' : ''">
+                        <span class="nav-link__icon">
+                            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 5h16v14H4zM4 9h16M8 14h4"></path>
+                            </svg>
+                        </span>
+                        <span class="nav-link__text"><span class="nav-link__label">Gastos</span>
+                            <span class="nav-link__hint">Egresos operativos y comprobantes</span></span>
+                    </a>
+                </div>
+
                 <div class="nav-section">
                     <p class="nav-section__label">Sistema</p>
 

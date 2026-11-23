@@ -101,7 +101,8 @@ class SaleServiceImplTest {
                 saleSellerChangeRepository,
                 userRepository,
                 entityManager,
-                companySettingsService
+                companySettingsService,
+                org.mockito.Mockito.mock(com.sales.maidav.service.campaign.CampaignService.class)
         );
         lenient().when(productRepository.decrementStockIfAvailable(anyLong(), anyInt())).thenReturn(1);
     }

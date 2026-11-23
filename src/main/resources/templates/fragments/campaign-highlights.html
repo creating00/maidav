@@ -1,0 +1,13 @@
+<div th:fragment="highlights" xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+     th:if="${activeOffers != null and !#lists.isEmpty(activeOffers)}" class="purchases campaigns campaign-home">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}"><link rel="stylesheet" th:href="@{/css/campaigns.css}">
+    <div class="purchase-heading"><div><p class="purchase-eyebrow">Para tus clientes</p><h2>Ofertas activas de contado</h2></div>
+        <a th:href="@{/campaigns}" class="purchase-link">Ver todas las campañas</a></div>
+    <div class="campaign-highlights"><article th:each="offer : ${activeOffers}" class="purchase-panel">
+        <p class="purchase-eyebrow" th:text="${offer.campaignName}"></p><h2 th:text="${offer.productDescription}"></h2>
+        <p class="campaign-help" th:text="${'Hasta ' + #temporals.format(offer.endDate,'dd/MM/yyyy')}"></p>
+        <strong class="campaign-highlight-price" th:text="${'$ ' + #numbers.formatDecimal(offer.offerPrice,1,'POINT',2,'COMMA')}"></strong>
+        <a sec:authorize="hasAuthority('SALES_CREATE')" th:if="${offer.stock > 0}" th:href="@{/sales/new(campaignItemId=${offer.itemId})}" class="purchase-button">Crear venta</a>
+        <a th:href="@{/campaigns/{id}(id=${offer.campaignId})}" class="purchase-link">Ver campaña</a>
+    </article></div>
+</div>

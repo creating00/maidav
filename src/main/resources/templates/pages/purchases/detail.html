@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout/main :: layout(~{::content}, 'Detalle de compra')}">
+<section th:fragment="content" class="purchases">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Finanzas / Compras</p>
+        <h1 th:text="${'Compra C-' + purchase.id}"></h1><p>Mercadería recibida y pagada · Stock incorporado</p></div>
+        <a th:href="@{/purchases}" class="purchase-link">Volver al historial</a></header>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <dl class="purchase-panel purchase-fields purchase-facts">
+        <div><dt>Fecha de compra y pago</dt><dd th:text="${#temporals.format(purchase.purchaseDate, 'dd/MM/yyyy')}"></dd></div>
+        <div><dt>Proveedor</dt><dd th:text="${purchase.providerName ?: 'Sin proveedor informado'}"></dd></div>
+        <div><dt>Forma de pago</dt><dd th:text="${paymentMethods[purchase.paymentMethod]}"></dd></div>
+        <div><dt>Registrada por</dt><dd th:text="${purchase.registeredBy.email}"></dd></div>
+        <div><dt>Fecha de registro</dt><dd th:text="${#temporals.format(purchase.createdAt, 'dd/MM/yyyy HH:mm')}"></dd></div>
+    </dl>
+    <section class="purchase-panel"><h2>Detalle recibido</h2><div class="purchase-table-wrap"><table>
+        <thead><tr><th scope="col">Código</th><th scope="col">Producto</th><th scope="col">Cantidad</th>
+            <th scope="col" class="purchase-number">Precio unitario</th><th scope="col" class="purchase-number">Subtotal</th></tr></thead>
+        <tbody><tr th:each="item : ${purchase.items}"><td th:text="${item.productCode}"></td>
+            <td th:text="${item.productDescription}"></td><td th:text="${item.quantity}"></td>
+            <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(item.unitPrice, 1, 'POINT', 2, 'COMMA')}"></td>
+            <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(item.lineTotal, 1, 'POINT', 2, 'COMMA')}"></td>
+        </tr></tbody></table></div>
+        <div class="purchase-total"><span>Total pagado</span><strong th:text="${'$ ' + #numbers.formatDecimal(purchase.totalAmount, 1, 'POINT', 2, 'COMMA')}"></strong></div>
+    </section>
+    <section class="purchase-panel" th:if="${!#strings.isEmpty(purchase.notes)}"><h2>Observaciones</h2>
+        <p class="purchase-notes" th:text="${purchase.notes}"></p></section>
+    <p class="purchase-notice">El historial conserva los datos de los productos y sus precios al registrar la compra. Esta versión no permite editar, anular ni registrar devoluciones.</p>
+</section>
+</html>

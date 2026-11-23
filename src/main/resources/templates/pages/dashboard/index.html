@@ -3,6 +3,7 @@
       th:replace="layout/main :: layout(~{::content}, 'Dashboard de cartera')">
 
 <section th:fragment="content">
+    <div th:replace="~{fragments/campaign-highlights :: highlights}"></div>
 
     <div class="overflow-hidden rounded-[2rem] bg-[radial-gradient(circle_at_top_left,_rgba(255,255,255,0.28),_transparent_38%),linear-gradient(135deg,_#0f172a,_#1d4ed8_55%,_#22c55e)] p-6 text-white shadow-xl md:p-8">
         <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">

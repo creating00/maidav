@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{layout/main :: layout(~{::content}, 'Detalle de campaña')}">
+<section th:fragment="content" class="purchases campaigns">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}"><link rel="stylesheet" th:href="@{/css/campaigns.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Comercial / Campañas</p><h1 th:text="${campaign.name}"></h1>
+        <p th:text="${#temporals.format(campaign.startDate,'dd/MM/yyyy') + ' al ' + #temporals.format(campaign.endDate,'dd/MM/yyyy') + ' · ' + campaign.state.label}"></p></div>
+        <a th:href="@{/campaigns}" class="purchase-link">Ver campañas</a></header>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <p th:if="${formError}" th:text="${formError}" class="purchase-error" role="alert"></p>
+    <p class="purchase-notice">Oferta minorista de contado. El precio normal es la referencia guardada al crear la campaña. La vigencia y el stock se comprueban nuevamente al confirmar la venta.</p>
+    <p th:if="${!#strings.isEmpty(campaign.description)}" th:text="${campaign.description}" class="purchase-panel purchase-notes"></p>
+    <div class="campaign-offers"><article th:each="item : ${campaign.items}" class="purchase-panel campaign-offer">
+        <img th:if="${item.imagePath != null}" th:src="${item.imagePath}" th:alt="${item.productDescription}" loading="lazy">
+        <div th:if="${item.imagePath == null}" class="campaign-image-placeholder">Sin imagen</div>
+        <div><p class="purchase-eyebrow" th:text="${item.productCode}"></p><h2 th:text="${item.productDescription}"></h2></div>
+        <div class="campaign-prices"><div><span>Normal de referencia</span><del th:text="${'$ ' + #numbers.formatDecimal(item.normalPrice,1,'POINT',2,'COMMA')}"></del></div>
+            <div><span>Precio de oferta</span><strong th:text="${'$ ' + #numbers.formatDecimal(item.offerPrice,1,'POINT',2,'COMMA')}"></strong></div></div>
+        <p class="campaign-help" th:text="${item.product == null ? 'Producto no disponible' : 'Stock disponible: ' + item.product.stockAvailable}"></p>
+        <a sec:authorize="hasAuthority('SALES_CREATE')" th:if="${campaign.state.name() == 'ACTIVE' and item.product != null and item.product.stockAvailable > 0}"
+           th:href="@{/sales/new(campaignItemId=${item.id})}" class="purchase-button">Crear venta</a>
+        <p th:if="${campaign.state.name() != 'ACTIVE'}" class="campaign-help">Disponible para consulta de historial; esta campaña no está activa.</p>
+    </article></div>
+    <form sec:authorize="hasAuthority('CAMPAIGN_UPDATE')" th:if="${!campaign.cancelled}" th:action="@{/campaigns/{id}/cancel(id=${campaign.id})}" method="post" class="purchase-panel campaign-cancel">
+        <div><h2>Cancelar campaña</h2><p>Impide nuevas ventas con esta oferta. Las ventas confirmadas conservan sus precios.</p></div>
+        <button class="purchase-button purchase-button-secondary" type="submit" onclick="return confirm('¿Cancelar esta campaña para nuevas ventas?')">Cancelar campaña</button>
+    </form>
+</section>
+</html>

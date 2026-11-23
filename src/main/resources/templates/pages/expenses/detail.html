@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout/main :: layout(~{::content}, 'Detalle de gasto')}">
+<section th:fragment="content" class="purchases expenses">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}"><link rel="stylesheet" th:href="@{/css/expenses.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Finanzas / Gastos</p><h1 th:text="${'Gasto G-' + expense.id}"></h1>
+        <p>Egreso operativo pagado</p></div><a th:href="@{/expenses}" class="purchase-link">Volver al historial</a></header>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <dl class="purchase-panel purchase-facts expense-fields">
+        <div><dt>Fecha del gasto y pago</dt><dd th:text="${#temporals.format(expense.expenseDate, 'dd/MM/yyyy')}"></dd></div>
+        <div><dt>Categoría</dt><dd th:text="${expense.category.label}"></dd></div>
+        <div><dt>Forma de pago</dt><dd th:text="${paymentMethods[expense.paymentMethod]}"></dd></div>
+        <div><dt>Registrado por</dt><dd th:text="${expense.registeredBy.email}"></dd></div>
+        <div><dt>Fecha de registro</dt><dd th:text="${#temporals.format(expense.createdAt, 'dd/MM/yyyy HH:mm')}"></dd></div>
+    </dl>
+    <section class="purchase-panel"><h2>Descripción</h2><p class="purchase-notes" th:text="${expense.description}"></p>
+        <div class="purchase-total"><span>Importe pagado</span><strong th:text="${'$ ' + #numbers.formatDecimal(expense.amount, 1, 'POINT', 2, 'COMMA')}"></strong></div></section>
+    <section class="purchase-panel"><h2>Comprobante</h2>
+        <p th:if="${expense.receiptName == null}" class="expense-help">Este gasto no tiene comprobante adjunto.</p>
+        <div th:if="${expense.receiptName != null}" class="expense-receipt">
+            <div><p class="expense-filename" th:text="${expense.receiptName}"></p><p class="expense-help" th:text="${#numbers.formatDecimal(expense.receiptSize / 1024.0, 1, 1) + ' KB · Acceso protegido'}"></p></div>
+            <a th:href="@{/expenses/{id}/receipt(id=${expense.id})}" class="purchase-button">Descargar comprobante</a>
+        </div>
+    </section>
+    <p class="purchase-notice">Esta versión registra gastos pagados. No permite editar ni anular gastos; las correcciones se definirán en la validación con el usuario.</p>
+</section>
+</html>

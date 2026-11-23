@@ -1,0 +1,16 @@
+.expenses { max-width: 1160px; }
+.expense-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.expense-description { margin-top: 24px; }
+.expense-help { font-size: 13px; color: var(--ink-soft); margin: 12px 0 !important; line-height: 1.6; }
+.expense-optional { font-size: 13px; font-weight: 400; color: var(--ink-soft); }
+.expense-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.expense-summary { max-width: 280px; min-width: 160px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.expense-receipt { display: flex; justify-content: space-between; gap: 24px; align-items: center; }
+.expense-filename { overflow-wrap: anywhere; font-weight: 700; }
+.expenses input[type="file"] { padding: 12px; font-size: 14px; }
+.expenses .purchase-total { margin-top: 16px; }
+@media (max-width: 640px) {
+    .expense-fields, .expense-filters { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+    .expense-receipt { flex-direction: column; align-items: stretch; }
+    .expenses .purchase-panel { padding: 16px; }
+}

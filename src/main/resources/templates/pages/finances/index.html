@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout/main :: layout(~{::content}, 'Resumen de cobros y pagos')}">
+<section th:fragment="content" class="purchases finances">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}"><link rel="stylesheet" th:href="@{/css/finances.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Finanzas / Resumen</p><h1>Cobros y pagos</h1>
+        <p>Movimientos registrados en Maidav durante el período seleccionado.</p></div></header>
+    <form th:action="@{/finances}" method="get" class="purchase-panel finance-filters">
+        <div><label for="from">Desde</label><input id="from" name="from" type="date" th:value="${from}" th:max="${today}" required></div>
+        <div><label for="to">Hasta</label><input id="to" name="to" type="date" th:value="${to}" th:max="${today}" required></div>
+        <button type="submit" class="purchase-button">Consultar período</button><a th:href="@{/finances}" class="purchase-link">Mes actual</a>
+    </form>
+    <p th:if="${formError}" th:text="${formError}" class="purchase-error" role="alert"></p>
+    <div th:if="${report != null}" class="finance-content">
+        <div class="finance-ledger">
+            <section class="purchase-panel finance-side" aria-labelledby="income-title"><h2 id="income-title">Cobros registrados</h2>
+                <dl class="finance-lines">
+                    <div><dt>Ventas de contado</dt><dd th:text="${'$ ' + #numbers.formatDecimal(report.cashSales, 1, 'POINT', 2, 'COMMA')}"></dd></div>
+                    <div><dt>Cobros de crédito</dt><dd th:text="${'$ ' + #numbers.formatDecimal(report.creditCollections, 1, 'POINT', 2, 'COMMA')}"></dd></div>
+                    <div><dt>Ajustes por reversiones</dt><dd th:text="${'$ ' + #numbers.formatDecimal(report.creditAdjustments, 1, 'POINT', 2, 'COMMA')}"></dd></div>
+                    <div class="finance-subtotal"><dt>Cobros netos</dt><dd id="finance-income" th:text="${'$ ' + #numbers.formatDecimal(report.income, 1, 'POINT', 2, 'COMMA')}"></dd></div>
+                </dl>
+            </section>
+            <section class="purchase-panel finance-side" aria-labelledby="payments-title"><h2 id="payments-title">Pagos registrados</h2>
+                <dl class="finance-lines">
+                    <div><dt>Compras pagadas</dt><dd th:text="${'$ ' + #numbers.formatDecimal(report.purchases, 1, 'POINT', 2, 'COMMA')}"></dd></div>
+                    <div><dt>Gastos operativos pagados</dt><dd th:text="${'$ ' + #numbers.formatDecimal(report.expenses, 1, 'POINT', 2, 'COMMA')}"></dd></div>
+                    <div class="finance-subtotal"><dt>Total de pagos</dt><dd id="finance-payments" th:text="${'$ ' + #numbers.formatDecimal(report.payments, 1, 'POINT', 2, 'COMMA')}"></dd></div>
+                </dl>
+            </section>
+        </div>
+        <section class="finance-difference" aria-labelledby="difference-title">
+            <div><p class="purchase-eyebrow">Cobros netos − compras − gastos</p><h2 id="difference-title">Diferencia del período</h2>
+                <p>Sin saldo inicial. Este importe no representa rentabilidad ni un saldo bancario.</p></div>
+            <strong id="finance-difference" th:classappend="${report.difference.signum() < 0} ? ' finance-negative' : ''"
+                    th:text="${'$ ' + #numbers.formatDecimal(report.difference, 1, 'POINT', 2, 'COMMA')}"></strong>
+        </section>
+        <div class="finance-sales-note"><div><span>Ventas registradas en el período</span><strong th:text="${'$ ' + #numbers.formatDecimal(report.exclusions.registeredSales, 1, 'POINT', 2, 'COMMA')}"></strong></div>
+            <p>Incluye ventas de contado y a crédito activas. Se muestra como referencia comercial y no se vuelve a sumar a los cobros.</p></div>
+        <details class="purchase-panel finance-criteria"><summary>Criterio de cálculo y alcance</summary>
+            <p>Contado: total de la venta activa en su fecha de venta. Crédito: importe del cobro en su fecha de pago; no se suma el total financiado ni el impacto sobre la deuda.</p>
+            <p>Las reversiones ajustan el cobro en la fecha registrada y no acreditan por sí solas una devolución de dinero. Compras y Gastos se consideran pagados íntegramente en su fecha.</p>
+            <p>Se excluyen ventas y cuentas anuladas y cobros que ya no corresponden a una venta a crédito. Los períodos anteriores se recalculan con el estado actual de los registros.</p>
+        </details>
+        <section th:if="${report.exclusions.present}" class="purchase-notice finance-exclusions" aria-labelledby="excluded-title">
+            <h2 id="excluded-title">Registros excluidos de los cobros</h2>
+            <p th:if="${report.exclusions.voidCashCount > 0}" th:text="${report.exclusions.voidCashCount + ' ventas de contado anuladas: $ ' + #numbers.formatDecimal(report.exclusions.voidCashAmount, 1, 'POINT', 2, 'COMMA')}"></p>
+            <p th:if="${report.exclusions.excludedCreditCount > 0}" th:text="${report.exclusions.excludedCreditCount + ' cobros o reversiones de cuentas/ventas anuladas o fuera de crédito: $ ' + #numbers.formatDecimal(report.exclusions.excludedCreditAmount, 1, 'POINT', 2, 'COMMA')}"></p>
+        </section>
+        <section th:unless="${#lists.isEmpty(report.methods)}" class="purchase-panel"><h2>Por medio de pago</h2>
+            <div class="purchase-table-wrap"><table><thead><tr><th scope="col">Medio</th><th scope="col" class="purchase-number">Cobros netos</th>
+                <th scope="col" class="purchase-number">Pagos</th><th scope="col" class="purchase-number">Diferencia</th></tr></thead>
+                <tbody><tr th:each="method : ${report.methods}"><td th:text="${method.label}"></td>
+                    <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(method.income, 1, 'POINT', 2, 'COMMA')}"></td>
+                    <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(method.payments, 1, 'POINT', 2, 'COMMA')}"></td>
+                    <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(method.difference, 1, 'POINT', 2, 'COMMA')}"></td></tr></tbody>
+                <tfoot><tr><th scope="row">Total del período</th>
+                    <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(report.income, 1, 'POINT', 2, 'COMMA')}"></td>
+                    <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(report.payments, 1, 'POINT', 2, 'COMMA')}"></td>
+                    <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(report.difference, 1, 'POINT', 2, 'COMMA')}"></td></tr></tfoot></table></div>
+        </section>
+        <section class="purchase-panel"><h2>Detalle de movimientos</h2>
+            <p class="finance-help" th:text="${report.movements.totalElements + ' movimientos encontrados · Ingresos positivos, pagos y ajustes negativos'}"></p>
+            <div th:if="${report.movements.empty}" class="purchase-empty"><h2>Sin movimientos en este período</h2><p>Probá con otras fechas.</p></div>
+            <div th:unless="${report.movements.empty}" class="purchase-table-wrap"><table>
+                <thead><tr><th scope="col">Fecha</th><th scope="col">Tipo</th><th scope="col">Referencia</th><th scope="col">Medio</th>
+                    <th scope="col" class="purchase-number">Importe</th><th scope="col">Origen</th></tr></thead>
+                <tbody><tr th:each="movement : ${report.movements.content}">
+                    <td th:text="${#temporals.format(movement.date, 'dd/MM/yyyy')}"></td><td th:text="${movement.kindLabel}"></td>
+                    <td th:text="${movement.reference}"></td><td th:text="${paymentMethods.getOrDefault(movement.paymentMethod, 'Otro')}"></td>
+                    <td class="purchase-number" th:classappend="${movement.amount.signum() < 0} ? ' finance-outgoing' : ' finance-incoming'"
+                        th:text="${'$ ' + #numbers.formatDecimal(movement.amount, 1, 'POINT', 2, 'COMMA')}"></td>
+                    <td><a th:if="${allowedDetails.contains(movement.requiredPermission)}" th:href="${movement.detailPath}" class="purchase-link"
+                           th:aria-label="${'Ver origen de ' + movement.reference}">Ver detalle</a>
+                        <span th:unless="${allowedDetails.contains(movement.requiredPermission)}" class="finance-help">Sin permiso de detalle</span></td>
+                </tr></tbody></table></div>
+            <nav th:if="${report.movements.totalPages > 1}" class="purchase-pagination" aria-label="Páginas de movimientos">
+                <a th:if="${report.movements.hasPrevious()}" class="purchase-link" th:href="@{/finances(from=${from},to=${to},page=${report.movements.number - 1})}">Anterior</a>
+                <span th:text="${'Página ' + (report.movements.number + 1) + ' de ' + report.movements.totalPages}"></span>
+                <a th:if="${report.movements.hasNext()}" class="purchase-link" th:href="@{/finances(from=${from},to=${to},page=${report.movements.number + 1})}">Siguiente</a>
+            </nav>
+        </section>
+    </div>
+</section>
+</html>

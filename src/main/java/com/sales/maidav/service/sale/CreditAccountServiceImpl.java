@@ -35,7 +35,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -147,6 +146,7 @@ public class CreditAccountServiceImpl implements CreditAccountService {
 
         List<CreditInstallment> installments = resolveInstallments(accountId, installmentIds);
         List<PaymentAllocation> priorAllocations = collectCurrentAllocations(account);
+        int priorAllocationCount = priorAllocations.size();
         PaymentApplicationResult applicationResult = applyPaymentToInstallments(
                 account,
                 installments,
@@ -157,11 +157,10 @@ public class CreditAccountServiceImpl implements CreditAccountService {
                 selectedInstallmentIds(installmentIds),
                 priorAllocations
         );
+        List<PaymentAllocation> newAllocations = new ArrayList<>(applicationResult.allocations()
+                .subList(priorAllocationCount, applicationResult.allocations().size()));
         BigDecimal impactAmount = applicationResult.impactAmount();
 
-        List<PaymentAllocation> newAllocations = applicationResult.allocations().stream()
-                .filter(allocation -> Objects.equals(payment.getId(), allocation.paymentId()))
-                .toList();
         boolean hasCollectedAmount = newAllocations.stream()
                 .anyMatch(allocation -> allocation.collectedAmount() != null
                         && allocation.collectedAmount().compareTo(BigDecimal.ZERO) > 0);

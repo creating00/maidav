@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+      th:replace="~{layout/main :: layout(~{::content}, 'Gastos')}">
+<section th:fragment="content" class="purchases expenses">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}"><link rel="stylesheet" th:href="@{/css/expenses.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Finanzas</p><h1>Gastos</h1><p>Historial de egresos operativos pagados.</p></div>
+        <a sec:authorize="hasAuthority('EXPENSE_CREATE')" th:href="@{/expenses/new}" class="purchase-button">+ Nuevo gasto</a></header>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <p th:if="${formError}" th:text="${formError}" class="purchase-error" role="alert"></p>
+    <form th:action="@{/expenses}" method="get" class="purchase-panel expense-filters">
+        <div><label for="from">Desde</label><input type="date" id="from" name="from" th:value="${from}"></div>
+        <div><label for="to">Hasta</label><input type="date" id="to" name="to" th:value="${to}"></div>
+        <div><label for="category">Categoría</label><select id="category" name="category"><option value="">Todas</option>
+            <option th:each="option : ${categories}" th:value="${option}" th:text="${option.label}" th:selected="${option == category}"></option></select></div>
+        <div><label for="minAmount">Importe mínimo ($)</label><input type="number" id="minAmount" name="minAmount" th:value="${minAmount}" min="0" max="9999999999.99" step="0.01"></div>
+        <div><label for="maxAmount">Importe máximo ($)</label><input type="number" id="maxAmount" name="maxAmount" th:value="${maxAmount}" min="0" max="9999999999.99" step="0.01"></div>
+        <div class="purchase-filter-actions"><button type="submit" class="purchase-button">Filtrar</button><a th:href="@{/expenses}" class="purchase-link">Limpiar</a></div>
+    </form>
+    <div class="purchase-panel"><p class="purchase-count" th:text="${expenses.totalElements + ' gastos encontrados'}"></p>
+        <div th:if="${expenses.empty}" class="purchase-empty"><h2>No hay gastos para mostrar</h2><p>Registrá un gasto o ajustá los filtros de búsqueda.</p></div>
+        <div th:unless="${expenses.empty}" class="purchase-table-wrap"><table>
+            <thead><tr><th scope="col">Gasto</th><th scope="col">Fecha</th><th scope="col">Categoría</th><th scope="col">Descripción</th>
+                <th scope="col">Forma de pago</th><th scope="col" class="purchase-number">Importe</th><th scope="col">Detalle</th></tr></thead>
+            <tbody><tr th:each="expense : ${expenses.content}"><td th:text="${'G-' + expense.id}"></td>
+                <td th:text="${#temporals.format(expense.expenseDate, 'dd/MM/yyyy')}"></td><td th:text="${expense.category.label}"></td>
+                <td class="expense-summary" th:text="${expense.description}"></td><td th:text="${paymentMethods[expense.paymentMethod]}"></td>
+                <td class="purchase-number" th:text="${'$ ' + #numbers.formatDecimal(expense.amount, 1, 'POINT', 2, 'COMMA')}"></td>
+                <td><a class="purchase-link" th:href="@{/expenses/{id}(id=${expense.id})}" th:aria-label="${'Ver gasto G-' + expense.id}">Ver gasto</a></td>
+            </tr></tbody></table></div>
+        <nav th:if="${expenses.totalPages > 1}" class="purchase-pagination" aria-label="Páginas de gastos">
+            <a th:if="${expenses.hasPrevious()}" class="purchase-link" th:href="@{/expenses(from=${from},to=${to},category=${category},minAmount=${minAmount},maxAmount=${maxAmount},page=${expenses.number - 1})}">Anterior</a>
+            <span th:text="${'Página ' + (expenses.number + 1) + ' de ' + expenses.totalPages}"></span>
+            <a th:if="${expenses.hasNext()}" class="purchase-link" th:href="@{/expenses(from=${from},to=${to},category=${category},minAmount=${minAmount},maxAmount=${maxAmount},page=${expenses.number + 1})}">Siguiente</a>
+        </nav>
+    </div>
+</section>
+</html>

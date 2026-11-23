@@ -23,6 +23,8 @@ import com.sales.maidav.service.sale.CreditAccountService;
 import com.sales.maidav.service.sale.InvalidSaleException;
 import com.sales.maidav.service.sale.SaleItemInput;
 import com.sales.maidav.service.sale.SaleService;
+import com.sales.maidav.service.campaign.CampaignService;
+import com.sales.maidav.service.campaign.InvalidCampaignException;
 import com.sales.maidav.service.settings.CompanySettingsService;
 import com.sales.maidav.service.export.ExportDocumentService;
 import com.sales.maidav.service.user.UserService;
@@ -68,6 +70,7 @@ public class SaleController {
     private final CreditAccountRepository creditAccountRepository;
     private final CreditInstallmentRepository creditInstallmentRepository;
     private final ExportDocumentService exportDocumentService;
+    private final CampaignService campaignService;
 
     @GetMapping
     @PreAuthorize("hasAuthority('SALES_READ')")
@@ -145,9 +148,18 @@ public class SaleController {
     }
 
     @GetMapping("/new")
-    @PreAuthorize("hasAuthority('SALES_CREATE')")
-    public String createForm(Authentication authentication, Model model) {
+    @PreAuthorize("hasAuthority('SALES_CREATE') and (#campaignItemId == null or hasAuthority('CAMPAIGN_READ'))")
+    public String createForm(@RequestParam(required = false) Long campaignItemId, Authentication authentication, Model model, RedirectAttributes redirect) {
         addCreateFormAttributes(model, authentication);
+        if (campaignItemId != null) {
+            try {
+                model.addAttribute("campaignOffer", campaignService.findActiveOffer(campaignItemId));
+                model.addAttribute("campaignItemId", campaignItemId);
+            } catch (InvalidCampaignException ex) {
+                redirect.addFlashAttribute("formError", ex.getMessage());
+                return "redirect:/campaigns";
+            }
+        }
         return "pages/sales/form";
     }
 
@@ -155,7 +167,9 @@ public class SaleController {
     @PreAuthorize("hasAuthority('SALES_READ')")
     public String detail(@PathVariable Long id, Model model) {
         model.addAttribute("sale", saleService.findById(id));
-        model.addAttribute("items", saleItemRepository.findBySale_IdOrderByIdAsc(id));
+        var items = saleItemRepository.findBySale_IdOrderByIdAsc(id);
+        model.addAttribute("items", items);
+        model.addAttribute("campaignSale", items.stream().anyMatch(item -> item.getCampaignItemId() != null));
         model.addAttribute("sellerChanges", saleService.findSellerChanges(id));
         return "pages/sales/detail";
     }
@@ -172,13 +186,17 @@ public class SaleController {
 
     @GetMapping("/{id}/edit")
     @PreAuthorize("hasAuthority('SALES_CREATE')")
-    public String editForm(@PathVariable Long id, Authentication authentication, Model model) {
+    public String editForm(@PathVariable Long id, Authentication authentication, Model model, RedirectAttributes redirect) {
         Sale sale = saleService.findById(id);
         if (sale.getStatus() == SaleStatus.VOID) {
             model.addAttribute("formError", "No se puede editar una venta anulada");
             return "redirect:/sales/" + id;
         }
         List<SaleItem> items = saleItemRepository.findBySale_IdOrderByIdAsc(id);
+        if (items.stream().anyMatch(item -> item.getCampaignItemId() != null)) {
+            redirect.addFlashAttribute("formError", "La venta conserva las condiciones de la campaña y no se edita. Puede anularla con el permiso correspondiente");
+            return "redirect:/sales/" + id;
+        }
         model.addAttribute("sale", sale);
         model.addAttribute("existingItems", items);
         model.addAttribute("clients", clientService.findAll());
@@ -298,7 +316,7 @@ public class SaleController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('SALES_CREATE')")
+    @PreAuthorize("hasAuthority('SALES_CREATE') and (#campaignItemId == null or hasAuthority('CAMPAIGN_READ'))")
     public String create(@RequestParam(required = false) Long clientId,
                          @RequestParam PaymentType paymentType,
                          @RequestParam(required = false) PaymentCollectionMethod paymentCollectionMethod,
@@ -319,12 +337,14 @@ public class SaleController {
                          @RequestParam(required = false) String quickClientLastName,
                          @RequestParam(required = false) String quickClientPhone,
                          @RequestParam(required = false) String quickClientAddress,
+                         @RequestParam(required = false) Long campaignItemId,
                           @RequestParam String idempotencyKey,
                          @RequestParam(required = false) String draftState,
                          Authentication authentication,
                          Model model,
                          RedirectAttributes redirectAttributes) {
 
+        if (campaignItemId != null) model.addAttribute("campaignItemId", campaignItemId);
         try {
             User loggedUser = userService.findByEmail(authentication.getName());
             boolean admin = isAdmin(authentication);
@@ -333,6 +353,15 @@ public class SaleController {
             Client client = resolveClient(clientId, seller, quickClientNationalId, quickClientFirstName,
                     quickClientLastName, quickClientPhone, quickClientAddress);
             List<SaleItemInput> items = buildItems(productIds, quantities, unitPrices);
+            if (campaignItemId != null) {
+                var offer = campaignService.findOffer(campaignItemId);
+                model.addAttribute("campaignOffer", offer);
+                if (items.stream().noneMatch(item -> item.getProductId().equals(offer.getProductId()))) {
+                    throw new InvalidSaleException("Agregue el producto de la oferta o inicie una venta nueva sin campaña");
+                }
+                items = items.stream().map(item -> item.getProductId().equals(offer.getProductId())
+                        ? new SaleItemInput(item.getProductId(), item.getQuantity(), item.getUnitPrice(), campaignItemId) : item).toList();
+            }
             // FIX FECHA VENCIMIENTO
             // REMOVER CONFLICTO FRECUENCIA
             List<String> dueDays = resolveDueDays(paymentFrequency, firstDueDate);
@@ -349,6 +378,7 @@ public class SaleController {
                     effectiveDiscount, weeksCount, effectiveManualInstallments, effectiveManualCashInstallments, items,
                     loggedUser.getId(), idempotencyKey);
             redirectAttributes.addFlashAttribute("saleNumber", sale.getSaleNumber());
+            if (campaignItemId != null) redirectAttributes.addFlashAttribute("completedCampaignItemId", campaignItemId);
             if (paymentType == PaymentType.CREDIT) {
                 CreditAccount account = creditAccountService.findBySaleId(sale.getId());
                 redirectAttributes.addFlashAttribute("creditAccountId", account.getId());
@@ -363,7 +393,7 @@ public class SaleController {
                 redirectAttributes.addFlashAttribute("successMessage", "Venta registrada correctamente");
             }
             return "redirect:/sales/new";
-        } catch (InvalidSaleException | DuplicateNationalIdException | InvalidNationalIdException ex) {
+        } catch (InvalidSaleException | InvalidCampaignException | DuplicateNationalIdException | InvalidNationalIdException ex) {
             model.addAttribute("formError", ex.getMessage());
             model.addAttribute("draftState", draftState);
             model.addAttribute("idempotencyKey", idempotencyKey);
@@ -404,6 +434,7 @@ public class SaleController {
     }
 
     private void addCreateFormAttributes(Model model, Authentication authentication) {
+        model.addAttribute("campaignToday", LocalDate.now());
         if (!model.containsAttribute("editing")) {
             model.addAttribute("editing", false);
         }
@@ -464,6 +495,9 @@ public class SaleController {
     private List<SaleItemInput> buildItems(List<Long> productIds,
                                            List<Integer> quantities,
                                            List<BigDecimal> unitPrices) {
+        if (productIds.size() != quantities.size() || productIds.size() != unitPrices.size()) {
+            throw new InvalidSaleException("Revise productos, cantidades y precios de la venta");
+        }
         List<SaleItemInput> items = new ArrayList<>();
         for (int i = 0; i < productIds.size(); i++) {
             Long productId = productIds.get(i);

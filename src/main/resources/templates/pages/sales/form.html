@@ -24,6 +24,16 @@
         </div>
         <input type="hidden" name="draftState" id="draftStateInput" th:value="${draftState}"/>
         <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}"/>
+        <input th:if="${campaignItemId != null}" type="hidden" name="campaignItemId" th:value="${campaignItemId}">
+        <input th:if="${completedCampaignItemId != null}" type="hidden" id="completedCampaignItemId" th:value="${completedCampaignItemId}">
+        <div th:if="${campaignItemId != null}" class="mb-4 rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+            <p class="font-semibold" th:text="${campaignOffer != null ? 'Campaña: ' + campaignOffer.campaignName : 'Venta iniciada desde una oferta'}"></p>
+            <p class="text-sm">Oferta minorista de contado, sin financiación ni descuentos adicionales. Confirmá el cliente y la forma de cobro.</p>
+            <a th:href="@{/campaigns}" class="text-sm underline">Consultar campañas</a>
+        </div>
+        <div th:if="${campaignOffer != null}" id="campaignSaleData" class="hidden"
+             th:data-product-id="${campaignOffer.productId}" th:data-price="${campaignOffer.offerPrice}"
+             th:data-name="${campaignOffer.campaignName}" th:data-today="${campaignToday}"></div>
         <div id="calcConfig"
              th:attr="data-recargo=${calculatorConfig.recargo},
                       data-mult-contado=${calculatorConfig.multContado},
@@ -330,127 +340,7 @@
 
         <div class="sale-products-section mt-8">
             <h2 class="text-lg font-semibold mb-3">Productos</h2>
-            <button type="button" id="toggleSaleCatalogBtn"
-                    class="mb-4 block w-full rounded-3xl bg-slate-800 px-4 py-4 text-sm font-semibold uppercase tracking-[0.2em] text-white hover:bg-slate-900 md:!hidden"
-                    style="display:block">
-                Mostrar catalogo
-            </button>
-            <div class="mb-3 hidden flex-col gap-3 md:flex md:flex-row md:items-center">
-                <input type="text" id="productSearch" placeholder="Buscar por codigo de barra"
-                       class="w-full md:w-1/2 border rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-                <button type="button" id="startBarcodeScannerBtn"
-                        class="rounded border border-blue-300 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-50">
-                    Usar camara
-                </button>
-                <button type="button" id="stopBarcodeScannerBtn"
-                        class="hidden rounded border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100">
-                    Detener camara
-                </button>
-            </div>
-            <p class="mb-3 hidden text-xs text-gray-600 md:block">
-                Escanee o escriba el codigo y presione Enter para previsualizar el producto antes de agregarlo al carrito.
-            </p>
-            <div id="saleCatalogPanel" class="mb-4 hidden rounded-3xl border border-slate-200 bg-slate-50 p-4 md:hidden">
-                <div class="mb-3 flex flex-col gap-3 md:flex-row md:items-center">
-                    <input type="text" id="productSearchMobile" placeholder="Buscar por codigo o descripcion"
-                           class="w-full md:w-1/2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"/>
-                    <button type="button" id="startBarcodeScannerBtnMobile"
-                            class="rounded-2xl border border-blue-300 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-700 hover:bg-blue-100">
-                        Escanear con camara
-                    </button>
-                    <button type="button" id="stopBarcodeScannerBtnMobile"
-                            class="hidden rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100">
-                        Detener
-                    </button>
-                </div>
-                <p class="mb-3 text-xs text-gray-600">
-                    Escanee o busque por codigo para agregar productos al carrito desde el catalogo.
-                </p>
-                <div id="saleCatalogFeedback"
-                     class="mb-3 hidden rounded-2xl border px-4 py-3 text-sm font-medium"></div>
-                <div id="barcodeScannerPanel" class="hidden mb-4 rounded-[1.6rem] border border-blue-100 bg-blue-50/70 p-4">
-                <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                        <p class="text-sm font-semibold text-blue-900">Lector de codigo de barras</p>
-                        <p id="barcodeScannerStatus" class="text-xs text-blue-700">
-                            Preparando camara...
-                        </p>
-                    </div>
-                </div>
-                    <video id="barcodeScannerVideo" class="mt-3 hidden w-full max-w-xl rounded-[1.35rem] border border-blue-200 bg-black" autoplay playsinline muted></video>
-                    <div id="barcodeScannerReader" class="mt-3 hidden w-full max-w-xl overflow-hidden rounded-[1.35rem] border border-blue-200 bg-black"></div>
-                </div>
-                <div id="saleCatalogEmpty"
-                     class="hidden rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-5 text-center text-sm text-slate-500">
-                    No se encontraron productos.
-                </div>
-                <div id="saleCatalogList" class="grid max-h-[16rem] gap-3 overflow-y-auto pr-1"></div>
-                <button type="button" id="saleCatalogLoadMore" hidden
-                        class="mt-3 w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold hover:bg-slate-100">
-                    Mostrar mas productos
-                </button>
-            </div>
-            <div id="productActionToast"
-                 class="pointer-events-none fixed right-4 top-4 z-50 hidden max-w-sm rounded-lg border px-4 py-3 text-sm font-medium shadow-lg transition-opacity duration-200">
-            </div>
-            <div id="productPreviewModal"
-                 class="fixed inset-0 z-50 hidden items-end justify-center bg-slate-900/75 px-4 pb-4 pt-8 md:items-center">
-                <div class="w-full max-w-xl overflow-hidden rounded-3xl bg-white shadow-2xl">
-                    <div class="border-b border-slate-200 px-5 py-4">
-                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500" id="productPreviewSource">Previsualizacion</p>
-                        <h3 class="mt-1 text-xl font-semibold text-slate-900" id="productPreviewTitle">Producto detectado</h3>
-                        <p class="mt-1 text-sm text-slate-600" id="productPreviewMessage">Revise el producto antes de agregarlo.</p>
-                    </div>
-                    <div class="space-y-4 px-5 py-5">
-                        <div class="overflow-hidden rounded-2xl bg-slate-100">
-                            <img id="productPreviewImage"
-                                 src=""
-                                 alt="Vista previa del producto"
-                                 class="hidden h-72 w-full object-cover"/>
-                            <div id="productPreviewImagePlaceholder"
-                                 class="flex h-48 items-center justify-center text-sm text-slate-500">
-                                Sin imagen
-                            </div>
-                        </div>
-                        <div>
-                            <p class="text-lg font-semibold text-slate-900" id="productPreviewDescription">-</p>
-                            <div class="mt-2 grid grid-cols-1 gap-2 text-sm text-slate-600 sm:grid-cols-3">
-                                <div class="rounded-xl bg-slate-50 px-3 py-2">
-                                    <span class="block text-xs uppercase tracking-wide text-slate-500">Codigo</span>
-                                    <strong id="productPreviewCode" class="text-slate-900">-</strong>
-                                </div>
-                                <div class="rounded-xl bg-slate-50 px-3 py-2">
-                                    <span class="block text-xs uppercase tracking-wide text-slate-500">Precio</span>
-                                    <strong id="productPreviewPrice" class="text-slate-900">$0.00</strong>
-                                </div>
-                                <div class="rounded-xl bg-slate-50 px-3 py-2">
-                                    <span class="block text-xs uppercase tracking-wide text-slate-500">Stock</span>
-                                    <strong id="productPreviewStock" class="text-slate-900">-</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="flex flex-col gap-3 border-t border-slate-200 px-5 py-4">
-                        <button type="button"
-                                id="confirmAddProductBtn"
-                                class="rounded-2xl bg-blue-600 px-4 py-3 text-base font-semibold text-white hover:bg-blue-700">
-                            Agregar producto
-                        </button>
-                        <div id="productPreviewAfterActions" class="hidden grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <button type="button"
-                                    id="continueAfterAddBtn"
-                                    class="rounded-2xl border border-emerald-300 px-4 py-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-50">
-                                Seguir escaneando
-                            </button>
-                            <button type="button"
-                                    id="closeProductPreviewBtn"
-                                    class="rounded-2xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
-                                Volver a la venta
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div th:replace="~{fragments/product-picker :: catalog('Volver a la venta')}"></div>
             <div class="sale-items-shell">
             <table class="min-w-full text-sm" id="itemsTable">
                 <thead class="bg-gray-100 text-left">
@@ -487,41 +377,7 @@
                                     th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
                             </option>
                         </select>
-                        <div class="product-combobox sale-product-combobox mt-0">
-                            <div class="product-combobox__control">
-                                <input type="text"
-                                       class="product-combobox__input"
-                                       placeholder="Buscar por codigo o descripcion"
-                                       data-placeholder-default="Buscar por codigo o descripcion"
-                                       data-placeholder-mobile="Abrir catalogo de productos"
-                                       autocomplete="off"
-                                       spellcheck="false"
-                                       aria-label="Buscar producto"/>
-                                <button type="button"
-                                        class="product-combobox__toggle hidden sm:inline-flex"
-                                        aria-label="Mostrar productos">
-                                    ▼
-                                </button>
-                            </div>
-                            <div class="product-combobox__panel hidden">
-                                <div class="product-combobox__sheet-head">
-                                    <p class="product-combobox__sheet-kicker">Catalogo</p>
-                                    <p class="product-combobox__sheet-title">Elegi un producto</p>
-                                    <p class="product-combobox__sheet-copy">Vista mobile con imagen, codigo, stock y precio.</p>
-                                    <div class="product-combobox__sheet-search-wrap">
-                                        <input type="search"
-                                               class="product-combobox__sheet-search"
-                                               placeholder="Buscar por codigo o descripcion"
-                                               autocomplete="off"
-                                               spellcheck="false"
-                                               inputmode="search"
-                                               aria-label="Buscar producto dentro del catalogo"/>
-                                    </div>
-                                </div>
-                                <div class="product-combobox__empty hidden">No se encontraron productos</div>
-                                <div class="product-combobox__options"></div>
-                            </div>
-                        </div>
+                        <div th:replace="~{fragments/product-picker :: combobox}"></div>
                     </td>
                     <td class="px-3 py-2">
                         <input type="number" name="quantities"
@@ -561,41 +417,7 @@
                                     th:text="${product.productCode + ' - ' + product.description + ' (Stock: ' + product.stockAvailable + ')'}">
                             </option>
                         </select>
-                        <div class="product-combobox sale-product-combobox mt-0">
-                            <div class="product-combobox__control">
-                                <input type="text"
-                                       class="product-combobox__input"
-                                       placeholder="Buscar por codigo o descripcion"
-                                       data-placeholder-default="Buscar por codigo o descripcion"
-                                       data-placeholder-mobile="Abrir catalogo de productos"
-                                       autocomplete="off"
-                                       spellcheck="false"
-                                       aria-label="Buscar producto"/>
-                                <button type="button"
-                                        class="product-combobox__toggle hidden sm:inline-flex"
-                                        aria-label="Mostrar productos">
-                                    ▼
-                                </button>
-                            </div>
-                            <div class="product-combobox__panel hidden">
-                                <div class="product-combobox__sheet-head">
-                                    <p class="product-combobox__sheet-kicker">Catalogo</p>
-                                    <p class="product-combobox__sheet-title">Elegi un producto</p>
-                                    <p class="product-combobox__sheet-copy">Vista mobile con imagen, codigo, stock y precio.</p>
-                                    <div class="product-combobox__sheet-search-wrap">
-                                        <input type="search"
-                                               class="product-combobox__sheet-search"
-                                               placeholder="Buscar por codigo o descripcion"
-                                               autocomplete="off"
-                                               spellcheck="false"
-                                               inputmode="search"
-                                               aria-label="Buscar producto dentro del catalogo"/>
-                                    </div>
-                                </div>
-                                <div class="product-combobox__empty hidden">No se encontraron productos</div>
-                                <div class="product-combobox__options"></div>
-                            </div>
-                        </div>
+                        <div th:replace="~{fragments/product-picker :: combobox}"></div>
                     </td>
                     <td class="px-3 py-2">
                         <input type="number" name="quantities" value="1" min="1"
@@ -738,7 +560,9 @@
             const hasFormError = Boolean(document.querySelector('[data-form-error="true"]'));
             const hasSuccessMessage = Boolean(document.getElementById('saleSuccessMessage'));
             const formErrorBox = document.getElementById('formErrorBox');
-            const draftKey = 'sales-form-draft-v1';
+            const campaignContext = document.querySelector('input[name="campaignItemId"]');
+            const campaignData = document.getElementById('campaignSaleData');
+            const draftKey = 'sales-form-draft-v1' + (campaignContext ? ':campaign:' + campaignContext.value : '');
             const draftStateInput = document.getElementById('draftStateInput');
             const editManualInstallmentsData = document.getElementById('editManualInstallmentsData');
             const firstRowTemplate = body.querySelector('tr') ? body.querySelector('tr').cloneNode(true) : null;
@@ -921,6 +745,7 @@
                 if (!option) {
                     return '';
                 }
+                if (campaignData && option.value === campaignData.dataset.productId) return campaignData.dataset.price;
                 const mode = priceMode ? priceMode.value : 'RETAIL';
                 return mode === 'WHOLESALE' ? option.dataset.wholesale : option.dataset.retail;
             }
@@ -1027,6 +852,7 @@
                 if (!item) {
                     return '';
                 }
+                if (campaignData && item.value === campaignData.dataset.productId) return campaignData.dataset.price;
                 const mode = priceMode ? priceMode.value : 'RETAIL';
                 return mode === 'WHOLESALE' ? item.wholesale : item.retail;
             }
@@ -1979,6 +1805,7 @@
             }
 
             function updateTotals(options) {
+                enforceCampaignPricing();
                 const opts = options || {};
                 let totalItems = 0;
                 let totalAmount = 0;
@@ -2239,6 +2066,7 @@
             }
 
             function applyTargetTotal(targetTotal) {
+                if (campaignContext) return false;
                 const rows = Array.from(body.querySelectorAll('tr')).filter(row => {
                     const select = row.querySelector('.product-select');
                     const qty = parseNumber(row.querySelector('input[name="quantities"]').value);
@@ -2961,6 +2789,7 @@
             }
 
             function applyPlanToCart(planKey) {
+                if (campaignContext) return;
                 const base = getBaseCartTotal();
                 const data = calculatePlans(base);
                 if (planKey === 'MONTHLY_LONG' && !data.monthlyLongEnabled) {
@@ -3768,6 +3597,8 @@
 
             if (hasSuccessMessage) {
                 localStorage.removeItem(draftKey);
+                const completed = document.getElementById('completedCampaignItemId');
+                if (completed) localStorage.removeItem('sales-form-draft-v1:campaign:' + completed.value);
             }
             const serverDraft = draftStateInput ? draftStateInput.value : '';
             if (hasFormError && serverDraft) {
@@ -3788,6 +3619,37 @@
             } else if (!hasSuccessMessage && localStorage.getItem(draftKey)) {
                 restoreDraft(localStorage.getItem(draftKey));
             }
+            if (campaignData && !hasFormError && !hasSuccessMessage
+                    && !Array.from(body.querySelectorAll('.product-select')).some(select => select.value === campaignData.dataset.productId)) {
+                restoreDraft(JSON.stringify({ paymentType: 'CASH', paymentCollectionMethod: 'CASH', priceMode: 'RETAIL',
+                    saleDate: campaignData.dataset.today, discountAmount: '0', rows: [{ productId: campaignData.dataset.productId, quantity: '1', unitPrice: campaignData.dataset.price }] }));
+            }
+            function enforceCampaignPricing() {
+                if (!campaignContext) return;
+                appliedPricingPreset = null;
+                if (paymentType) {
+                    const wasCredit = paymentType.value !== 'CASH';
+                    paymentType.value = 'CASH';
+                    Array.from(paymentType.options).forEach(option => { if (option.value === 'CREDIT') option.disabled = true; });
+                    if (wasCredit) toggleCreditFields();
+                }
+                if (priceMode) { priceMode.value = 'RETAIL'; priceMode.disabled = true; }
+                if (discountInput) { discountInput.value = '0'; discountInput.readOnly = true; }
+                if (manualInstallmentsEnabled) { manualInstallmentsEnabled.checked = false; manualInstallmentsEnabled.disabled = true; }
+                [applyCashBtn, applyDebitBtn, ...document.querySelectorAll('.apply-plan')].forEach(button => { if (button) button.disabled = true; });
+                if (campaignData) {
+                    const dateInput = document.querySelector('input[name="saleDate"]');
+                    if (dateInput) { dateInput.value = campaignData.dataset.today; dateInput.readOnly = true; }
+                    body.querySelectorAll('tr').forEach(row => {
+                        const selected = row.querySelector('.product-select');
+                        const price = row.querySelector('input[name="unitPrices"]');
+                        const promotion = selected && selected.value === campaignData.dataset.productId;
+                        price.readOnly = promotion;
+                        if (promotion) price.value = campaignData.dataset.price;
+                    });
+                }
+            }
+            enforceCampaignPricing();
             if (saleForm) {
                 saleForm.addEventListener('input', saveDraft);
                 saleForm.addEventListener('change', saveDraft);
