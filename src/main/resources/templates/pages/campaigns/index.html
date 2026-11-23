@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{layout/main :: layout(~{::content}, 'Ofertas y campañas')}">
+<section th:fragment="content" class="purchases campaigns">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}"><link rel="stylesheet" th:href="@{/css/campaigns.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Comercial</p><h1>Ofertas y campañas</h1><p>Promociones temporales para comunicar y vender a tus clientes.</p></div>
+        <a sec:authorize="hasAuthority('CAMPAIGN_CREATE')" th:href="@{/campaigns/new}" class="purchase-button">+ Nueva campaña</a></header>
+    <p th:if="${formError}" th:text="${formError}" class="purchase-error" role="alert"></p>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <form method="get" th:action="@{/campaigns}" class="purchase-panel campaign-filter"><div><label for="state">Estado</label><select id="state" name="state">
+        <option th:each="option : ${states}" th:value="${option}" th:text="${option.label}" th:selected="${option == state}"></option></select></div>
+        <button class="purchase-button" type="submit">Consultar</button></form>
+    <div class="purchase-panel"><p class="purchase-count" th:text="${campaigns.totalElements + ' campañas encontradas'}"></p>
+        <div th:if="${campaigns.empty}" class="purchase-empty"><h2>No hay campañas en este estado</h2><p>Consultá otra opción para ver campañas futuras o el historial.</p></div>
+        <div th:unless="${campaigns.empty}" class="campaign-list"><article th:each="campaign : ${campaigns.content}" class="campaign-list-item">
+            <div><span class="campaign-badge" th:text="${campaign.state.label}"></span><h2 th:text="${campaign.name}"></h2>
+                <p th:text="${#temporals.format(campaign.startDate,'dd/MM/yyyy') + ' al ' + #temporals.format(campaign.endDate,'dd/MM/yyyy') + ' · ' + campaign.itemCount + ' productos'}"></p></div>
+            <a th:href="@{/campaigns/{id}(id=${campaign.id})}" class="purchase-link">Ver productos y ofertas</a>
+        </article></div>
+        <nav th:if="${campaigns.totalPages > 1}" class="purchase-pagination" aria-label="Páginas de campañas">
+            <a th:if="${campaigns.hasPrevious()}" class="purchase-link" th:href="@{/campaigns(state=${state},page=${campaigns.number - 1})}">Anterior</a>
+            <span th:text="${'Página ' + (campaigns.number + 1) + ' de ' + campaigns.totalPages}"></span>
+            <a th:if="${campaigns.hasNext()}" class="purchase-link" th:href="@{/campaigns(state=${state},page=${campaigns.number + 1})}">Siguiente</a>
+        </nav>
+    </div>
+</section>
+</html>

@@ -9,6 +9,9 @@ import com.sales.maidav.repository.product.ProductRepository;
 import com.sales.maidav.repository.sale.*;
 import com.sales.maidav.repository.user.UserRepository;
 import com.sales.maidav.service.settings.CompanySettingsService;
+import com.sales.maidav.service.campaign.CampaignService;
+import com.sales.maidav.service.campaign.CampaignOffer;
+import com.sales.maidav.service.campaign.InvalidCampaignException;
 import com.sales.maidav.util.SearchTextNormalizer;
 import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
@@ -52,6 +55,7 @@ public class SaleServiceImpl implements SaleService {
     private final UserRepository userRepository;
     private final EntityManager entityManager;
     private final CompanySettingsService companySettingsService;
+    private final CampaignService campaignService;
 
     @Override
     public List<Sale> findAll() {
@@ -192,6 +196,14 @@ public class SaleServiceImpl implements SaleService {
             throw new InvalidSaleException("El descuento no puede ser negativo");
         }
 
+        boolean hasCampaign = items.stream().anyMatch(input -> input.getCampaignItemId() != null);
+        if (hasCampaign && (paymentType != PaymentType.CASH || discount.signum() != 0 || manualInstallmentAmounts != null || manualCashInstallmentAmounts != null
+                || (saleDate != null && !saleDate.equals(LocalDate.now())))) {
+            throw new InvalidSaleException("Las ofertas se venden de contado, con fecha de hoy y sin descuentos ni planes adicionales");
+        }
+        if (items.stream().map(SaleItemInput::getCampaignItemId).filter(java.util.Objects::nonNull).distinct().count() > 1) {
+            throw new InvalidSaleException("Use una sola oferta por venta");
+        }
         List<SaleItem> saleItems = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         BigDecimal costTotal = BigDecimal.ZERO;
@@ -212,6 +224,17 @@ public class SaleServiceImpl implements SaleService {
                     .setScale(2, RoundingMode.HALF_UP);
 
             SaleItem item = new SaleItem();
+            if (input.getCampaignItemId() != null) {
+                CampaignOffer offer;
+                try { offer = campaignService.lockActiveOffer(input.getCampaignItemId()); }
+                catch (InvalidCampaignException ex) { throw new InvalidSaleException(ex.getMessage()); }
+                if (!offer.getProductId().equals(input.getProductId()) || offer.getOfferPrice().compareTo(input.getUnitPrice()) != 0) {
+                    throw new InvalidSaleException("El producto o precio no coincide con la oferta. Vuelva a cargar la campaña");
+                }
+                item.setCampaignItemId(offer.getItemId());
+                item.setCampaignName(offer.getCampaignName());
+                item.setCampaignNormalPrice(offer.getNormalPrice());
+            }
             item.setProduct(product);
             item.setQuantity(input.getQuantity());
             item.setUnitPrice(input.getUnitPrice());
@@ -354,6 +377,9 @@ public class SaleServiceImpl implements SaleService {
         }
 
         List<SaleItem> oldItems = saleItemRepository.findBySale_IdOrderByIdAsc(saleId);
+        if (oldItems.stream().anyMatch(item -> item.getCampaignItemId() != null) || items.stream().anyMatch(item -> item.getCampaignItemId() != null)) {
+            throw new InvalidSaleException("Las ventas con campaña conservan sus condiciones originales y no se editan. Puede anular la venta con el permiso correspondiente");
+        }
         List<SaleItem> saleItems = new ArrayList<>();
         BigDecimal total = BigDecimal.ZERO;
         BigDecimal costTotal = BigDecimal.ZERO;

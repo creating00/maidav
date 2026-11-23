@@ -9,6 +9,19 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "sale_items")
 public class SaleItem extends BaseEntity {
+    @Column(name = "campaign_item_id")
+    private Long campaignItemId;
+    @Column(name = "campaign_name", length = 150)
+    private String campaignName;
+    @Column(name = "campaign_normal_price", precision = 12, scale = 2)
+    private BigDecimal campaignNormalPrice;
+
+    public Long getCampaignItemId() { return campaignItemId; }
+    public void setCampaignItemId(Long value) { campaignItemId = value; }
+    public String getCampaignName() { return campaignName; }
+    public void setCampaignName(String value) { campaignName = value; }
+    public BigDecimal getCampaignNormalPrice() { return campaignNormalPrice; }
+    public void setCampaignNormalPrice(BigDecimal value) { campaignNormalPrice = value; }
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sale_id", nullable = false)

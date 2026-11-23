@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security" th:replace="~{layout/main :: layout(~{::content}, 'Nueva campaña')}">
+<section th:fragment="content" class="purchases campaigns">
+    <link rel="stylesheet" th:href="@{/css/purchases.css}"><link rel="stylesheet" th:href="@{/css/campaigns.css}">
+    <header class="purchase-heading"><div><p class="purchase-eyebrow">Comercial / Campañas</p><h1>Nueva campaña</h1><p>Elegí productos, precios y vigencia de la promoción.</p></div>
+        <a sec:authorize="hasAuthority('CAMPAIGN_READ')" th:href="@{/campaigns}" class="purchase-link">Ver campañas</a></header>
+    <p th:if="${successMessage}" th:text="${successMessage}" class="purchase-success" role="status"></p>
+    <p class="purchase-notice">Ofertas minoristas de contado. Los precios se guardan al crear la campaña, sin cambiar el catálogo. Inicio y fin están incluidos. Las ofertas no se acumulan con financiación ni descuentos adicionales.</p>
+    <form id="campaign-form" th:action="@{/campaigns}" th:object="${campaignForm}" method="post">
+        <input type="hidden" th:field="*{operationKey}"><p th:if="${formError}" th:text="${formError}" class="purchase-error" role="alert"></p>
+        <div class="purchase-panel campaign-fields"><div class="campaign-name"><label for="name">Nombre de la campaña</label><input th:field="*{name}" maxlength="150" required placeholder="Por ejemplo: Ofertas de primavera"></div>
+            <div><label for="startDate">Fecha de inicio</label><input type="date" th:field="*{startDate}" required></div>
+            <div><label for="endDate">Fecha de finalización</label><input type="date" th:field="*{endDate}" required></div>
+            <div class="campaign-name"><label for="description">Descripción <span>(opcional)</span></label><textarea th:field="*{description}" maxlength="2000" rows="3"></textarea></div>
+        </div>
+        <section class="purchase-panel"><div class="purchase-heading"><div><h2>Productos en oferta</h2><p>Hasta 100 productos, sin repetir.</p></div>
+            <button id="add-campaign-item" type="button" class="purchase-button purchase-button-secondary">+ Agregar producto</button></div>
+            <div id="campaign-items"><div th:each="item,row : *{items}" class="campaign-item">
+                <div class="campaign-product"><label th:for="${'product-' + row.index}">Producto</label>
+                    <select th:id="${'product-' + row.index}" th:field="*{items[__${row.index}__].productId}" data-field="productId" required>
+                        <option value="">Seleccionar producto</option><option th:each="product : ${products}" th:value="${product.id}"
+                            th:data-description="${product.description}" th:data-code="${product.productCode}" th:data-image="${product.imagePath}" th:data-price="${product.priceRetail}"
+                            th:text="${product.productCode + ' · ' + product.description}"></option></select>
+                    <div th:replace="~{fragments/product-picker :: combobox}"></div></div>
+                <div><label th:for="${'mode-' + row.index}">Tipo de oferta</label><select th:id="${'mode-' + row.index}" th:field="*{items[__${row.index}__].discountMode}" data-field="discountMode">
+                    <option value="FIXED_PRICE">Precio fijo ($)</option><option value="PERCENTAGE">Descuento (%)</option></select></div>
+                <div><label th:for="${'value-' + row.index}">Precio o descuento</label><input th:id="${'value-' + row.index}" th:field="*{items[__${row.index}__].discountValue}" data-field="discountValue" type="number" min="0.01" max="9999999999.99" step="0.01" required></div>
+                <div class="campaign-price-preview"><span>Normal de referencia</span><output data-normal>$ 0,00</output><span>Precio de oferta</span><strong data-offer>$ 0,00</strong></div>
+                <button type="button" class="purchase-remove" data-remove>Quitar</button>
+            </div></div>
+        </section>
+        <footer class="purchase-panel purchase-total"><p>Revisá los precios y fechas. Luego podés cancelar la campaña, conservando su historial.</p><button class="purchase-button" type="submit" th:disabled="${#lists.isEmpty(products)}">Crear campaña</button></footer>
+    </form>
+    <script defer th:src="@{/js/campaigns.js}"></script>
+</section>
+</html>
