@@ -12,6 +12,17 @@ import java.util.List;
 @Table(name = "quotes")
 public class Quote extends BaseEntity {
 
+    @Column(nullable = false)
+    private boolean pinned;
+
+    public boolean isPinned() {
+        return pinned;
+    }
+
+    public void setPinned(boolean pinned) {
+        this.pinned = pinned;
+    }
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "seller_id", nullable = false)
     private User seller;

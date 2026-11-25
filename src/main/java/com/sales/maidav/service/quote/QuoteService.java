@@ -10,5 +10,6 @@ public interface QuoteService {
     Quote findById(Long id);
     Quote create(QuotePriceMode priceMode, List<QuoteItemInput> items);
     void delete(Long id);
+    void setPinned(Long id, boolean pinned);
     String previewNextQuoteNumber();
 }

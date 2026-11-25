@@ -11,6 +11,14 @@ import java.util.Optional;
 public interface QuoteRepository extends JpaRepository<Quote, Long> {
 
     @EntityGraph(attributePaths = {"seller"})
+    @Query("select q from Quote q where q.seller.id = :sellerId or q.pinned = true "
+            + "order by q.pinned desc, q.createdAt desc, q.id desc")
+    List<Quote> findVisible(Long sellerId);
+
+    @EntityGraph(attributePaths = {"seller"})
+    Optional<Quote> findByIdAndPinnedTrue(Long id);
+
+    @EntityGraph(attributePaths = {"seller"})
     List<Quote> findBySeller_IdOrderByCreatedAtDescIdDesc(Long sellerId);
 
     @EntityGraph(attributePaths = {"seller"})
