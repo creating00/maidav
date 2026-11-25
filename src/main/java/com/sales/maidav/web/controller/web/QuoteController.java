@@ -47,7 +47,7 @@ public class QuoteController {
         if (q != null && !q.isBlank()) {
             String term = SearchTextNormalizer.normalize(q);
             quotes = quotes.stream()
-                    .filter(quote -> contains(quote.getQuoteNumber(), term)
+                    .filter(quote -> quote.isPinned() || contains(quote.getQuoteNumber(), term)
                             || contains(quote.getProductSummary(), term))
                     .toList();
         }
@@ -123,6 +123,16 @@ public class QuoteController {
     public String delete(@PathVariable Long id, RedirectAttributes redirectAttributes) {
         quoteService.delete(id);
         redirectAttributes.addFlashAttribute("successMessage", "Presupuesto eliminado correctamente");
+        return "redirect:/quotes";
+    }
+
+    @PostMapping("/{id}/pin")
+    @PreAuthorize("hasRole('ADMIN') and hasAuthority('QUOTE_READ')")
+    public String pin(@PathVariable Long id, @RequestParam boolean pinned,
+                      RedirectAttributes redirectAttributes) {
+        quoteService.setPinned(id, pinned);
+        redirectAttributes.addFlashAttribute("successMessage",
+                pinned ? "Presupuesto anclado como plantilla" : "Plantilla desanclada");
         return "redirect:/quotes";
     }
 

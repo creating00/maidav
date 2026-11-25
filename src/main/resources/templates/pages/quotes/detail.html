@@ -120,6 +120,7 @@
                         Volver al listado
                     </a>
                     <form sec:authorize="hasAuthority('QUOTE_DELETE')"
+                          th:if="${quote.seller.email == #authentication.name}"
                           th:action="@{/quotes/{id}/delete(id=${quote.id})}"
                           method="post"
                           class="flex-1"

@@ -14,6 +14,7 @@ import com.sales.maidav.service.settings.CompanySettingsService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
@@ -37,7 +38,7 @@ public class QuoteServiceImpl implements QuoteService {
     @Override
     public List<Quote> findAll() {
         Long sellerId = currentUserId();
-        return sellerId == null ? List.of() : quoteRepository.findBySeller_IdOrderByCreatedAtDescIdDesc(sellerId);
+        return sellerId == null ? List.of() : quoteRepository.findVisible(sellerId);
     }
 
     @Override
@@ -47,6 +48,7 @@ public class QuoteServiceImpl implements QuoteService {
             throw new RuntimeException("Presupuesto no encontrado");
         }
         Quote quote = quoteRepository.findByIdAndSeller_Id(id, sellerId)
+                .or(() -> quoteRepository.findByIdAndPinnedTrue(id))
                 .orElseThrow(() -> new RuntimeException("Presupuesto no encontrado"));
         quote.getItems().size();
         quote.getPlanOptions().size();
@@ -155,8 +157,27 @@ public class QuoteServiceImpl implements QuoteService {
 
     @Override
     public void delete(Long id) {
-        Quote quote = findById(id);
+        Quote quote = findOwned(id);
         quoteRepository.delete(quote);
+    }
+
+    @Override
+    public void setPinned(Long id, boolean pinned) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getAuthorities().stream()
+                .noneMatch(authority -> "ROLE_ADMIN".equals(authority.getAuthority()))) {
+            throw new AccessDeniedException("Solo el administrador puede anclar presupuestos");
+        }
+        findOwned(id).setPinned(pinned);
+    }
+
+    private Quote findOwned(Long id) {
+        Long sellerId = currentUserId();
+        if (sellerId == null) {
+            throw new AccessDeniedException("No se pudo identificar al usuario actual");
+        }
+        return quoteRepository.findByIdAndSeller_Id(id, sellerId)
+                .orElseThrow(() -> new AccessDeniedException("No puede modificar un presupuesto ajeno"));
     }
 
     @Override

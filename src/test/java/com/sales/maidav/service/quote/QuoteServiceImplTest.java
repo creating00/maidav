@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -28,6 +29,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
 
 @ExtendWith(MockitoExtension.class)
 class QuoteServiceImplTest {
@@ -151,12 +153,12 @@ class QuoteServiceImplTest {
         Quote second = new Quote();
 
         when(userRepository.findByEmail("seller@maidav.com")).thenReturn(Optional.of(seller));
-        when(quoteRepository.findBySeller_IdOrderByCreatedAtDescIdDesc(15L)).thenReturn(List.of(first, second));
+        when(quoteRepository.findVisible(15L)).thenReturn(List.of(first, second));
 
         List<Quote> quotes = quoteService.findAll();
 
         assertThat(quotes).containsExactly(first, second);
-        verify(quoteRepository).findBySeller_IdOrderByCreatedAtDescIdDesc(15L);
+        verify(quoteRepository).findVisible(15L);
     }
 
     @Test
@@ -192,6 +194,53 @@ class QuoteServiceImplTest {
         assertThat(loaded).isSameAs(quote);
         verify(quote).getItems();
         verify(quote).getPlanOptions();
+    }
+
+    @Test
+    void sharedTemplateCanBeReadButCannotBeDeletedByAnotherSeller() {
+        authenticate("seller@maidav.com");
+        User seller = new User();
+        seller.setId(15L);
+        Quote template = new Quote();
+        template.setPinned(true);
+        when(userRepository.findByEmail("seller@maidav.com")).thenReturn(Optional.of(seller));
+        when(quoteRepository.findByIdAndPinnedTrue(8L)).thenReturn(Optional.of(template));
+
+        assertThat(quoteService.findById(8L)).isSameAs(template);
+        assertThatThrownBy(() -> quoteService.delete(8L)).isInstanceOf(AccessDeniedException.class);
+        verify(quoteRepository, never()).delete(any());
+    }
+
+    @Test
+    void sellerCannotPinEvenOwnBudget() {
+        authenticate("seller@maidav.com");
+        assertThatThrownBy(() -> quoteService.setPinned(8L, true)).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void adminCanPinAndUnpinOwnQuote() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin@maidav.com", "secret", List.of(() -> "ROLE_ADMIN")));
+        User admin = new User();
+        admin.setId(1L);
+        Quote quote = new Quote();
+        when(userRepository.findByEmail("admin@maidav.com")).thenReturn(Optional.of(admin));
+        when(quoteRepository.findByIdAndSeller_Id(8L, 1L)).thenReturn(Optional.of(quote));
+
+        quoteService.setPinned(8L, true);
+        assertThat(quote.isPinned()).isTrue();
+        quoteService.setPinned(8L, false);
+        assertThat(quote.isPinned()).isFalse();
+    }
+
+    @Test
+    void adminCannotPinAnotherUsersQuote() {
+        SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
+                "admin@maidav.com", "secret", List.of(() -> "ROLE_ADMIN")));
+        User admin = new User();
+        admin.setId(1L);
+        when(userRepository.findByEmail("admin@maidav.com")).thenReturn(Optional.of(admin));
+        assertThatThrownBy(() -> quoteService.setPinned(8L, true)).isInstanceOf(AccessDeniedException.class);
     }
 
     private void authenticate(String username) {

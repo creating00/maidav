@@ -23,6 +23,10 @@
             <span th:if="${saleNumber}" th:text="${' | Numero de venta: ' + saleNumber}"></span>
         </div>
         <input type="hidden" name="draftState" id="draftStateInput" th:value="${draftState}"/>
+        <input th:if="${quoteDraftState}" type="hidden" id="quoteDraftStateInput" th:value="${quoteDraftState}"/>
+        <p th:if="${sourceQuoteNumber}" role="status"
+           class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+           th:text="${'Productos cargados desde ' + sourceQuoteNumber + '. Revisá los datos y la forma de pago antes de guardar.'}"></p>
         <input type="hidden" name="idempotencyKey" th:value="${idempotencyKey}"/>
         <div id="calcConfig"
              th:attr="data-recargo=${calculatorConfig.recargo},
@@ -3762,7 +3766,10 @@
                 localStorage.removeItem(draftKey);
             }
             const serverDraft = draftStateInput ? draftStateInput.value : '';
-            if (hasFormError && serverDraft) {
+            const quoteDraftInput = document.getElementById('quoteDraftStateInput');
+            if (quoteDraftInput && quoteDraftInput.value) {
+                restoreDraft(quoteDraftInput.value);
+            } else if (hasFormError && serverDraft) {
                 restoreDraft(serverDraft);
             } else if (hasFormError && localStorage.getItem(draftKey)) {
                 restoreDraft(localStorage.getItem(draftKey));
